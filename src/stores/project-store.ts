@@ -1,5 +1,5 @@
-import { create } from "zustand"
 import type { Project, Sentence } from "@/types"
+import { create } from "zustand"
 
 interface ProjectState extends Project {
   setVoice: (voice: string) => void

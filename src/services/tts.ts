@@ -1,0 +1,74 @@
+import type { Settings } from "@/types"
+import { invoke } from "@tauri-apps/api/core"
+
+/** TTS 调用参数，与 Settings 字段一一对应，传给 Rust 后端。 */
+export type TtsParams = Settings
+
+/** `tts_generate` 的返回值。 */
+export interface TtsResult {
+  audioPath: string
+}
+
+// ---- Blob URL 缓存 ----------------------------------------------------
+// 同一句重新生成会用相同路径覆盖文件，缓存中对应 URL 即失效。
+// generateSentenceAudio 成功后会自动 invalidate 该路径，确保下次读取拿到新字节。
+const audioUrlCache = new Map<string, string>()
+
+/** 释放某个路径对应的 Blob URL（若已缓存）。 */
+export function invalidateAudioUrl(path: string | null | undefined): void {
+  if (!path) return
+  const url = audioUrlCache.get(path)
+  if (url) {
+    URL.revokeObjectURL(url)
+    audioUrlCache.delete(path)
+  }
+}
+
+/** 释放所有缓存的 Blob URL（项目切换/退出时调用）。 */
+export function revokeAllAudioUrls(): void {
+  for (const url of audioUrlCache.values()) URL.revokeObjectURL(url)
+  audioUrlCache.clear()
+}
+
+// ---- Tauri command 封装 ------------------------------------------------
+
+/**
+ * 为某一句文本生成音频并缓存到本地。
+ * 成功后自动 invalidate 该路径的旧 Blob URL（重新生成场景）。
+ *
+ * 后端: invoke("tts_generate", { sentenceId, text, params })
+ */
+export async function generateSentenceAudio(
+  sentenceId: string,
+  text: string,
+  params: TtsParams,
+): Promise<TtsResult> {
+  const result = await invoke<TtsResult>("tts_generate", { sentenceId, text, params })
+  invalidateAudioUrl(result.audioPath)
+  return result
+}
+
+/**
+ * 测试当前 settings 是否可用（设置页「Test API」按钮）。
+ *
+ * 后端: invoke("tts_test", { params })
+ */
+export async function testTts(params: TtsParams): Promise<void> {
+  await invoke<void>("tts_test", { params })
+}
+
+/**
+ * 读取本地音频文件字节并转为可播放的 Blob URL（带缓存）。
+ * 直接给 <audio src={url}> 使用即可。
+ *
+ * 后端: invoke("tts_read_audio", { path }) -> ArrayBuffer
+ */
+export async function readAudioAsUrl(path: string): Promise<string> {
+  const cached = audioUrlCache.get(path)
+  if (cached) return cached
+
+  const bytes = await invoke<ArrayBuffer>("tts_read_audio", { path })
+  const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }))
+  audioUrlCache.set(path, url)
+  return url
+}

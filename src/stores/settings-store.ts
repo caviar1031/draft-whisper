@@ -1,5 +1,5 @@
-import { create } from "zustand"
 import type { Settings } from "@/types"
+import { create } from "zustand"
 
 interface SettingsState extends Settings {
   setBaseUrl: (baseUrl: string) => void
@@ -11,10 +11,11 @@ interface SettingsState extends Settings {
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  baseUrl: "",
+  // MVP 默认使用小米 MiMo v2.5 TTS 协议
+  baseUrl: "https://api.xiaomimimo.com/v1",
   apiKey: "",
-  model: "",
-  voice: "",
+  model: "mimo-v2.5-tts",
+  voice: "冰糖",
   speed: 1,
 
   setBaseUrl: (baseUrl) => set({ baseUrl }),

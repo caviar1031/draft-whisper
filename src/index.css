@@ -1,17 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/dm-sans";
 
 @custom-variant dark (&:is(.dark *));
 
-body {
-  margin: 0;
-}
-
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -43,6 +41,9 @@ body {
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -50,85 +51,1248 @@ body {
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --spacing: 0.24rem;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* ===== Apple-inspired primitive palette (Pinguo design tokens) ===== */
+
+  /* brand */
+  --brand-50: #e8f2ff;
+  --brand-100: #cfe5ff;
+  --brand-200: #9fcbff;
+  --brand-300: #66abff;
+  --brand-400: #2e8dff;
+  --brand-500: #007aff;
+  --brand-600: #0064d6;
+  --brand-700: #004fad;
+  --brand-800: #003b82;
+  --brand-900: #00275a;
+
+  /* background */
+  --background-50: #ffffff;
+  --background-100: #f7f7fa;
+  --background-200: #f2f2f7;
+  --background-300: #e5e5ea;
+  --background-400: #d1d1d6;
+  --background-500: #aeaeb2;
+  --background-600: #8e8e93;
+  --background-700: #3a3a3c;
+  --background-800: #1c1c1e;
+  --background-900: #000000;
+
+  /* text */
+  --text-50: #f5f5f7;
+  --text-100: #e3e3e8;
+  --text-200: #c7c7cc;
+  --text-300: #aeaeb2;
+  --text-400: #8e8e93;
+  --text-500: #6e6e73;
+  --text-600: #48484a;
+  --text-700: #3c3c43;
+  --text-800: #1d1d1f;
+  --text-900: #000000;
+
+  /* icon */
+  --icon-50: #f5f5f7;
+  --icon-100: #e5e5ea;
+  --icon-200: #d1d1d6;
+  --icon-300: #c7c7cc;
+  --icon-400: #aeaeb2;
+  --icon-500: #8e8e93;
+  --icon-600: #6e6e73;
+  --icon-700: #48484a;
+  --icon-800: #2c2c2e;
+  --icon-900: #1d1d1f;
+
+  /* state */
+  --state-success: #34c759;
+  --state-success-dark: #30d158;
+  --state-success-surface: #e9f9ee;
+  --state-error: #ff3b30;
+  --state-error-dark: #ff453a;
+  --state-error-surface: #ffecea;
+  --glass-orange: #ff9500;
+
+  /* ===== semantic roles ===== */
+  --background: var(--background-50);
+  --foreground: var(--text-800);
+  --card: var(--background-50);
+  --card-foreground: var(--text-800);
+  --popover: var(--background-50);
+  --popover-foreground: var(--text-900);
+
+  --primary: var(--brand-500);
+  --primary-foreground: var(--background-50);
+  --secondary: var(--background-200);
+  --secondary-foreground: var(--text-800);
+  --muted: var(--background-200);
+  --muted-foreground: var(--text-400);
+  --accent: var(--background-100);
+  --accent-foreground: var(--text-800);
+  --destructive: var(--state-error);
+  --destructive-foreground: #ffffff;
+  --success: var(--state-success);
+  --success-foreground: #ffffff;
+  --border: var(--background-300);
+  --input: var(--background-400);
+  --ring: var(--brand-500);
+
+  --chart-1: var(--state-success);
+  --chart-2: var(--brand-500);
+  --chart-3: #ff9500;
+  --chart-4: #5856d6;
+  --chart-5: #af52de;
+
+  --sidebar: var(--background-200);
+  --sidebar-foreground: var(--text-800);
+  --sidebar-primary: var(--brand-500);
+  --sidebar-primary-foreground: var(--background-50);
+  --sidebar-accent: var(--background-300);
+  --sidebar-accent-foreground: var(--text-800);
+  --sidebar-border: var(--background-300);
+  --sidebar-ring: var(--brand-500);
+
+  --radius: 1.2rem;
+
+  /* ===== Liquid Glass structural colors ===== */
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --glass-surface: rgba(0, 0, 0, 0.04);
+  --glass-surface-hover: rgba(0, 0, 0, 0.06);
+  --glass-surface-2: rgba(0, 0, 0, 0.08);
+  --glass-surface-5: rgba(0, 0, 0, 0.05);
+  --glass-divider: rgba(0, 0, 0, 0.06);
+  --glass-divider-strong: rgba(0, 0, 0, 0.12);
+  --glass-card-bg: rgba(255, 255, 255, 0.3);
+  --glass-bg-card: rgba(255, 255, 255, 0.55);
+  --glass-bg-card-light: rgba(255, 255, 255, 0.65);
+  --glass-bg-card-hover: rgba(255, 255, 255, 0.75);
+  --glass-bg-card-subtle: rgba(255, 255, 255, 0.25);
+  --glass-bg-input: rgba(255, 255, 255, 0.6);
+  --glass-overlay: rgba(0, 0, 0, 0.15);
+  --glass-focus-ring: rgba(0, 122, 255, 0.3);
+  --glass-text-on-primary: #ffffff;
+  --glass-popover-bg: rgba(255, 255, 255, 0.82);
+  --glass-popover-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  --glass-input-border: rgba(0, 0, 0, 0.1);
+  --glass-handle: rgba(0, 0, 0, 0.18);
+  --glass-handle-hover: rgba(0, 0, 0, 0.35);
+  --glass-blue-tint: rgba(0, 122, 255, 0.04);
+  --glass-blue-tint-medium: rgba(0, 122, 255, 0.1);
+  --glass-blue-tint-strong: rgba(0, 122, 255, 0.12);
+  --glass-blue-tint-glow: rgba(0, 122, 255, 0.15);
+  --glass-blue-tint-spinner: rgba(0, 122, 255, 0.2);
+  --glass-blue-tint-border: rgba(0, 122, 255, 0.25);
+  --glass-green-tint: rgba(52, 199, 89, 0.1);
+  --glass-green-tint-strong: rgba(52, 199, 89, 0.12);
+  --glass-green-strong: #248a3d;
+  --glass-red-tint-medium: rgba(255, 59, 48, 0.08);
+  --glass-orange-tint: rgba(255, 149, 0, 0.12);
+
+  /* macOS desktop wallpaper gradient */
+  --macos-bg-1: #d4dce4;
+  --macos-bg-2: #b8c9d4;
+  --macos-bg-3: #c2cdd6;
+  --macos-bg-4: #a8bcc9;
+  --macos-bg-5: #bcc8d0;
+  --macos-bg-6: #c8d0d8;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: var(--background-900);
+  --foreground: var(--text-50);
+  --card: var(--background-800);
+  --card-foreground: var(--text-50);
+  --popover: var(--background-700);
+  --popover-foreground: var(--text-50);
+
+  --primary: var(--brand-400);
+  --primary-foreground: var(--background-900);
+  --secondary: var(--background-800);
+  --secondary-foreground: var(--text-50);
+  --muted: var(--background-800);
+  --muted-foreground: var(--text-400);
+  --accent: var(--background-700);
+  --accent-foreground: var(--text-50);
+  --destructive: var(--state-error-dark);
+  --success: var(--state-success-dark);
+
+  --glass-bg: rgba(28, 28, 30, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-surface: rgba(255, 255, 255, 0.06);
+  --glass-surface-hover: rgba(255, 255, 255, 0.1);
+  --glass-surface-2: rgba(255, 255, 255, 0.14);
+  --glass-surface-5: rgba(255, 255, 255, 0.08);
+  --glass-divider: rgba(255, 255, 255, 0.08);
+  --glass-divider-strong: rgba(255, 255, 255, 0.16);
+  --glass-bg-card: rgba(58, 58, 60, 0.55);
+  --glass-bg-card-light: rgba(58, 58, 60, 0.65);
+  --glass-bg-card-hover: rgba(58, 58, 60, 0.75);
+  --glass-bg-card-subtle: rgba(255, 255, 255, 0.08);
+  --glass-bg-input: rgba(58, 58, 60, 0.6);
+  --glass-popover-bg: rgba(28, 28, 30, 0.82);
+  --glass-input-border: rgba(255, 255, 255, 0.12);
+  --glass-handle: rgba(255, 255, 255, 0.2);
+  --glass-handle-hover: rgba(255, 255, 255, 0.4);
+  --glass-text-on-primary: #ffffff;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+  }
+  body {
+    margin: 0;
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+@layer utilities {
+  /* macOS desktop wallpaper backdrop */
+  .dw-desktop-bg {
+    background: linear-gradient(
+      135deg,
+      var(--macos-bg-1) 0%,
+      var(--macos-bg-2) 25%,
+      var(--macos-bg-3) 40%,
+      var(--macos-bg-4) 60%,
+      var(--macos-bg-5) 80%,
+      var(--macos-bg-6) 100%
+    );
+    background-attachment: fixed;
+  }
+
+  /* glass surface (window) */
+  .dw-glass {
+    backdrop-filter: blur(36px) saturate(180%);
+    -webkit-backdrop-filter: blur(36px) saturate(180%);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .dw-glass-card {
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
+
+  .dw-glass-popover {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--glass-popover-bg);
+    box-shadow: var(--glass-popover-shadow);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* thin glass scrollbar */
+  .dw-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .dw-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .dw-scroll::-webkit-scrollbar-thumb {
+    background: var(--glass-divider-strong);
+    border-radius: 3px;
+  }
+  .dw-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--glass-bg-card-subtle);
+  }
+}
+
+/* ============================================================
+ * DraftWhisper component styles
+ * Faithfully ported from design exports.
+ * Consumes tokens defined in :root and .dark above.
+ * ============================================================ */
+@layer components {
+  /* ===== Page backdrop & window frame ===== */
+  .dw-page-bg {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px 16px;
+  }
+
+  .draftwhisper-window {
+    width: 460px;
+    min-height: 700px;
+    border-radius: 16px;
+    backdrop-filter: blur(36px) saturate(180%);
+    -webkit-backdrop-filter: blur(36px) saturate(180%);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    color: var(--text-800);
+  }
+
+  /* ===== Navigation Bar (48px) ===== */
+  .dw-nav-bar {
+    height: 48px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--glass-divider);
+  }
+
+  .dw-nav-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .dw-app-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--brand-500);
+    flex-shrink: 0;
+  }
+
+  .dw-app-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-800);
+    white-space: nowrap;
+  }
+
+  .dw-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .dw-nav-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: var(--glass-surface);
+    color: var(--icon-600);
+    cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s
+      cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .dw-nav-btn:hover {
+    transform: scale(1.05);
+    background: var(--glass-surface-2);
+  }
+
+  .dw-nav-btn:active {
+    transform: scale(0.95);
+  }
+
+  .dw-nav-btn:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-nav-btn.is-active {
+    background: var(--glass-blue-tint-strong);
+    color: var(--brand-500);
+  }
+
+  /* Always-on-top toggle pill */
+  .dw-toggle-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 12px;
+    background: var(--glass-surface);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-400);
+    cursor: pointer;
+    border: none;
+    gap: 5px;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s
+      cubic-bezier(0.32, 0.72, 0, 1);
+    white-space: nowrap;
+  }
+
+  .dw-toggle-pill:hover {
+    transform: scale(1.02);
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-toggle-pill:active {
+    transform: scale(0.98);
+  }
+
+  .dw-toggle-pill .dw-toggle-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--glass-divider-strong);
+    transition: background 0.15s ease;
+  }
+
+  .dw-toggle-pill.is-active .dw-toggle-dot {
+    background: var(--brand-500);
+  }
+
+  .dw-toggle-pill.is-active {
+    color: var(--text-500);
+  }
+
+  /* ===== Toolbar (56px) ===== */
+  .dw-toolbar {
+    height: 56px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    gap: 6px;
+    border-bottom: 1px solid var(--glass-divider);
+  }
+
+  .dw-toolbar-left,
+  .dw-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .dw-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 16px;
+    border: none;
+    background: var(--glass-surface);
+    color: var(--text-800);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s
+      cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .dw-pill-btn:hover {
+    transform: scale(1.02);
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-pill-btn:active {
+    transform: scale(0.98);
+  }
+
+  .dw-pill-btn:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-pill-btn.is-active {
+    background: var(--glass-blue-tint-medium);
+    color: var(--brand-500);
+  }
+
+  .dw-pill-btn:disabled {
+    opacity: 0.32;
+    pointer-events: none;
+  }
+
+  .dw-pill-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 16px;
+    border: none;
+    background: var(--glass-surface);
+    color: var(--text-800);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s
+      cubic-bezier(0.32, 0.72, 0, 1);
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .dw-pill-select:hover {
+    transform: scale(1.02);
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-pill-select:active {
+    transform: scale(0.98);
+  }
+
+  .dw-pill-select:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-primary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 16px;
+    border: none;
+    background: var(--brand-500);
+    color: var(--glass-text-on-primary);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), filter 0.15s
+      cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .dw-primary-btn:hover {
+    transform: scale(1.02);
+    filter: brightness(1.08);
+  }
+
+  .dw-primary-btn:active {
+    transform: scale(0.98);
+    filter: brightness(0.95);
+  }
+
+  .dw-primary-btn:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-primary-btn:disabled {
+    opacity: 0.32;
+    pointer-events: none;
+  }
+
+  /* ===== Sentence list & cards ===== */
+  .sentence-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .dw-sentence-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--glass-bg-card);
+    border: 1px solid var(--glass-surface-5);
+    transition: background 0.15s ease, box-shadow 0.3s ease, border-color 0.2s ease;
+  }
+
+  .dw-sentence-card:hover {
+    background: var(--glass-bg-card-hover);
+  }
+
+  /* Drag handle */
+  .dw-drag-handle {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--glass-handle);
+    cursor: grab;
+    transition: color 0.15s ease;
+  }
+
+  .dw-sentence-card:hover .dw-drag-handle {
+    color: var(--glass-handle-hover);
+  }
+
+  .dw-sentence-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dw-sentence-text {
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--text-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
+
+  .dw-sentence-text--muted {
+    color: var(--text-400);
+  }
+
+  .dw-sentence-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Status dot & label */
+  .dw-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-400);
+  }
+
+  .dw-status-dot.is-ready {
+    background: var(--state-success);
+  }
+
+  .dw-status-dot.is-queued {
+    background: var(--text-400);
+  }
+
+  .dw-status-dot.is-generating {
+    background: var(--brand-500);
+    animation: dw-status-pulse 1.5s ease-in-out infinite;
+  }
+
+  .dw-status-dot.is-playing {
+    background: var(--brand-500);
+    animation: dw-status-pulse 1.5s ease-in-out infinite;
+  }
+
+  .dw-status-dot.is-failed {
+    background: var(--state-error);
+  }
+
+  .dw-status-dot.is-pending {
+    background: var(--glass-orange);
+  }
+
+  @keyframes dw-status-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(0.85);
+    }
+  }
+
+  .dw-status-text {
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .dw-status-text.is-ready {
+    color: var(--state-success);
+  }
+
+  .dw-status-text.is-queued {
+    color: var(--text-400);
+  }
+
+  .dw-status-text.is-generating {
+    color: var(--brand-500);
+  }
+
+  .dw-status-text.is-playing {
+    color: var(--brand-500);
+  }
+
+  .dw-status-text.is-failed {
+    color: var(--state-error);
+  }
+
+  .dw-status-text.is-pending {
+    color: var(--glass-orange);
+  }
+
+  /* Card actions */
+  .dw-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .dw-action-btn {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease, color 0.15s
+      ease;
+  }
+
+  .dw-action-btn:hover {
+    transform: scale(1.08);
+  }
+
+  .dw-action-btn:active {
+    transform: scale(0.95);
+  }
+
+  .dw-action-btn:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-action-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .dw-play-btn {
+    color: var(--state-success);
+  }
+
+  .dw-play-btn:hover {
+    background: var(--glass-green-tint);
+  }
+
+  .dw-pause-btn {
+    color: var(--brand-500);
+  }
+
+  .dw-pause-btn:hover {
+    background: var(--glass-blue-tint-medium);
+  }
+
+  .dw-regen-btn {
+    color: var(--text-400);
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease, transform 0.15s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .dw-sentence-card:hover .dw-regen-btn {
+    opacity: 1;
+  }
+
+  .dw-regen-btn:hover {
+    color: var(--text-500);
+    transform: scale(1.1);
+  }
+
+  .dw-regen-btn:active {
+    transform: scale(0.9);
+  }
+
+  /* Playing card accent */
+  .dw-sentence-card.is-playing {
+    border-left: 3px solid var(--brand-500);
+    animation: dw-pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes dw-pulse-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--glass-blue-tint);
+    }
+    50% {
+      box-shadow: 0 0 8px 2px var(--glass-blue-tint-glow);
+    }
+  }
+
+  /* Generating card accent */
+  .dw-sentence-card.is-generating {
+    border-left: 3px solid var(--brand-500);
+    background: var(--glass-blue-tint);
+  }
+
+  /* Error card accent */
+  .dw-sentence-card.is-failed {
+    border-left: 3px solid var(--state-error);
+    background: var(--glass-red-tint-medium);
+  }
+
+  .dw-sentence-card.is-failed:hover {
+    background: var(--glass-red-tint-medium);
+  }
+
+  /* Editing card accent */
+  .dw-sentence-card.is-editing {
+    border: 1px solid var(--glass-blue-tint-border);
+    background: var(--glass-bg-card-light);
+    box-shadow: var(--glass-shadow);
+    align-items: flex-start;
+  }
+
+  /* ===== Waveform (CSS-only) ===== */
+  .dw-waveform {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .dw-waveform-bar {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--brand-500);
+    animation: dw-waveform-bounce 1.2s ease-in-out infinite;
+  }
+
+  .dw-waveform-bar:nth-child(1) {
+    height: 6px;
+    animation-delay: 0s;
+  }
+  .dw-waveform-bar:nth-child(2) {
+    height: 12px;
+    animation-delay: 0.15s;
+  }
+  .dw-waveform-bar:nth-child(3) {
+    height: 8px;
+    animation-delay: 0.3s;
+  }
+  .dw-waveform-bar:nth-child(4) {
+    height: 14px;
+    animation-delay: 0.45s;
+  }
+  .dw-waveform-bar:nth-child(5) {
+    height: 10px;
+    animation-delay: 0.6s;
+  }
+
+  @keyframes dw-waveform-bounce {
+    0%,
+    100% {
+      transform: scaleY(0.4);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+
+  /* ===== Spinner ===== */
+  .dw-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--glass-blue-tint-spinner);
+    border-top-color: var(--brand-500);
+    border-radius: 50%;
+    animation: dw-spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes dw-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ===== Retry All banner ===== */
+  .dw-retry-all-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--glass-red-tint-medium);
+    border-bottom: 1px solid var(--glass-red-tint-medium);
+  }
+
+  .dw-retry-all-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--state-error);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .dw-retry-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 14px;
+    border: 1px solid var(--state-error);
+    background: transparent;
+    color: var(--state-error);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease;
+  }
+
+  .dw-retry-all-btn:hover {
+    background: var(--glass-red-tint-medium);
+    transform: scale(1.02);
+  }
+
+  .dw-retry-all-btn:active {
+    transform: scale(0.98);
+  }
+
+  .dw-retry-all-btn:focus-visible {
+    outline: 2px solid var(--state-error);
+    outline-offset: 2px;
+  }
+
+  /* ===== Retry button (per-card) ===== */
+  .dw-retry-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 12px;
+    border: 1px solid var(--state-error);
+    background: transparent;
+    color: var(--state-error);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease;
+  }
+
+  .dw-retry-btn:hover {
+    background: var(--glass-red-tint-medium);
+    transform: scale(1.02);
+  }
+
+  .dw-retry-btn:active {
+    transform: scale(0.98);
+  }
+
+  .dw-retry-btn:focus-visible {
+    outline: 2px solid var(--state-error);
+    outline-offset: 2px;
+  }
+
+  /* ===== Error detail ===== */
+  .dw-error-detail {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 3px;
+  }
+
+  .dw-error-icon {
+    color: var(--state-error);
+    flex-shrink: 0;
+  }
+
+  .dw-error-msg {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--state-error);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ===== Editing textarea ===== */
+  .dw-editing-textarea {
+    width: 100%;
+    min-height: 52px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-blue-tint-border);
+    background: var(--glass-bg-input);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-800);
+    resize: none;
+    outline: none;
+    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dw-editing-textarea::placeholder {
+    color: var(--text-300);
+  }
+
+  .dw-editing-hint {
+    font-size: 11px;
+    color: var(--text-400);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .dw-changed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 18px;
+    padding: 0 7px;
+    border-radius: 9px;
+    background: var(--glass-orange-tint);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--glass-orange);
+    white-space: nowrap;
+  }
+
+  .dw-sentence-num {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-400);
+    min-width: 18px;
+    flex-shrink: 0;
+  }
+
+  /* ===== Status Bar (28px) ===== */
+  .dw-status-bar {
+    height: 28px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-top: 1px solid var(--glass-surface);
+    border-radius: 0 0 16px 16px;
+    background: var(--glass-card-bg);
+  }
+
+  .dw-status-bar-text {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-400);
+    white-space: nowrap;
+  }
+
+  /* ===== Settings popover ===== */
+  .dw-dim-overlay {
+    position: absolute;
+    inset: 0;
+    top: 104px;
+    background: var(--glass-overlay);
+    z-index: 5;
+    padding: 0;
+    border: 0;
+    border-radius: 0 0 16px 16px;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .dw-settings-popover {
+    position: absolute;
+    top: 56px;
+    right: 8px;
+    width: 340px;
+    margin: 0;
+    padding: 20px;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--glass-popover-bg);
+    border: 1px solid var(--glass-bg-card);
+    border-radius: 16px;
+    box-shadow: var(--glass-popover-shadow);
+    z-index: 10;
+  }
+
+  .dw-settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .dw-settings-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-800);
+  }
+
+  .dw-settings-close {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: var(--glass-surface);
+    color: var(--icon-600);
+    cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease;
+  }
+
+  .dw-settings-close:hover {
+    transform: scale(1.05);
+    background: var(--glass-surface-2);
+  }
+
+  .dw-settings-close:active {
+    transform: scale(0.95);
+  }
+
+  .dw-settings-field {
+    margin-bottom: 16px;
+  }
+
+  .dw-settings-field:last-of-type {
+    margin-bottom: 20px;
+  }
+
+  .dw-settings-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-500);
+  }
+
+  .dw-settings-input,
+  .dw-settings-select {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-input-border);
+    background: var(--glass-bg-input);
+    color: var(--text-800);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .dw-settings-input::placeholder {
+    color: var(--text-400);
+    font-size: 13px;
+  }
+
+  .dw-settings-input:focus,
+  .dw-settings-select:focus {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+  }
+
+  .dw-settings-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    cursor: pointer;
+    padding-right: 32px;
+  }
+
+  .dw-settings-select option {
+    background: #fff;
+    color: var(--text-800);
+  }
+
+  .dw-test-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 38px;
+    border-radius: 19px;
+    border: 1px solid var(--glass-overlay);
+    background: transparent;
+    color: var(--text-800);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease, border-color
+      0.15s ease;
+  }
+
+  .dw-test-btn:hover {
+    transform: scale(1.02);
+    background: var(--glass-surface);
+    border-color: var(--glass-bg-card-subtle);
+  }
+
+  .dw-test-btn:active {
+    transform: scale(0.98);
+  }
+
+  .dw-test-btn:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-test-btn.is-testing {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  .dw-test-btn.is-success {
+    color: var(--state-success);
+    border-color: var(--state-success);
+  }
+
+  .dw-test-btn.is-error {
+    color: var(--state-error);
+    border-color: var(--state-error);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .dw-sentence-card.is-playing,
+  .dw-status-dot.is-generating,
+  .dw-status-dot.is-playing,
+  .dw-waveform-bar,
+  .dw-spinner {
+    animation: none !important;
+  }
+  .dw-waveform-bar {
+    transform: scaleY(1);
   }
 }

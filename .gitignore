@@ -12,11 +12,15 @@ dist
 dist-ssr
 *.local
 
+# TTS 音频缓存（dev 模式 sandbox fallback 会写到项目本地）
+.cache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+.trae/
 *.suo
 *.ntvs*
 *.njsproj

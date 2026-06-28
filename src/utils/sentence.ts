@@ -2,8 +2,8 @@ import type { Sentence } from "@/types"
 import { generateId } from "./id"
 
 export function splitTextToSentences(text: string): Sentence[] {
-  // 匹配一段非分隔符文本 + 可选的分隔符（。！？；），保留原标点
-  const pattern = /[^。！？；]+[。！？；]?/g
+  // 匹配一段非分隔符文本 + 可选的分隔符（中英文句末标点），保留原标点
+  const pattern = /[^。！？；.!?\n]+[。！？；.!?]*/g
   const matches = text.match(pattern) ?? []
 
   return matches
