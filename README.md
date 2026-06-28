@@ -1,0 +1,78 @@
+# DraftWhisper
+
+AI voice-over desktop tool — manage your voice-over one sentence at a time.
+
+## Tech Stack
+
+- **Desktop**: Tauri 2
+- **Frontend**: React + TypeScript + Vite
+- **Styling**: Tailwind CSS + shadcn/ui
+- **State**: Zustand
+- **Animation**: Motion
+- **Lint/Format**: Biome
+
+## Getting Started
+
+```bash
+# Install dependencies
+npm install
+
+# Start the Vite dev server
+npm run dev
+
+# Start the Tauri desktop app (launches Vite automatically)
+npm run tauri dev
+
+# Build a production bundle
+npm run tauri build
+```
+
+## Code Quality
+
+```bash
+# Lint
+npm run lint
+
+# Lint with auto-fix
+npm run lint:fix
+
+# Format
+npm run format
+```
+
+## Project Structure
+
+```
+draft-whisper/
+├── docs/                # Product docs (PRD, etc.)
+├── public/              # Static assets served as-is
+├── src/                 # Frontend source
+│   ├── assets/          # Images and static imports
+│   ├── components/
+│   │   └── ui/          # shadcn/ui primitives
+│   ├── lib/             # Shared helpers (cn, etc.)
+│   ├── stores/          # Zustand stores
+│   ├── types/           # TypeScript type definitions
+│   ├── utils/           # Domain utilities (sentence splitting, id, etc.)
+│   ├── App.tsx          # Root component
+│   ├── main.tsx         # React entry
+│   └── index.css        # Global styles + Tailwind theme tokens
+├── src-tauri/           # Rust backend (Tauri)
+│   ├── capabilities/    # Permission definitions
+│   ├── icons/           # App icons
+│   ├── src/             # Rust source (lib.rs, main.rs)
+│   ├── Cargo.toml       # Rust manifest
+│   └── tauri.conf.json  # Tauri config
+├── biome.json           # Biome config
+├── components.json      # shadcn/ui config
+├── index.html           # HTML entry
+├── package.json
+├── tsconfig.json        # TS project references
+├── tsconfig.app.json    # TS config for src/
+├── tsconfig.node.json   # TS config for build scripts
+└── vite.config.ts
+```
+
+## License
+
+MIT
