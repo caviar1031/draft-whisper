@@ -1,10 +1,26 @@
 mod tts;
 use tauri::Manager;
 
+#[cfg(target_os = "macos")]
+use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .setup(|app| {
+      // ===== macOS 动态毛玻璃 (Vibrancy) =====
+      // UnderWindowBackground: 透出桌面壁纸 + 后台窗口，最接近 Liquid Glass 质感
+      #[cfg(target_os = "macos")]
+      if let Some(window) = app.get_webview_window("main") {
+        apply_vibrancy(
+          &window,
+          NSVisualEffectMaterial::UnderWindowBackground,
+          None,
+          Some(16.0),
+        )
+        .expect("apply_vibrancy 仅支持 macOS");
+      }
+
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()

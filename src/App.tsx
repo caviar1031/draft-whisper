@@ -1,8 +1,9 @@
 import { EmptyState } from "@/components/dw/empty-state"
 import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
 import { SettingsPopover } from "@/components/dw/settings-popover"
+import { TitleBar } from "@/components/dw/title-bar"
 import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
-import { NavBar, StatusBar, WindowShell } from "@/components/dw/window-shell"
+import { StatusBar, WindowShell } from "@/components/dw/window-shell"
 import { SPEED_OPTIONS, VOICE_OPTIONS } from "@/lib/options"
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
@@ -203,7 +204,7 @@ function App() {
 
   return (
     <WindowShell>
-      <NavBar
+      <TitleBar
         settingsOpen={settingsOpen}
         alwaysOnTop={alwaysOnTop}
         onToggleSettings={() => setSettingsOpen((v) => !v)}

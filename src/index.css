@@ -246,12 +246,25 @@
   }
   html {
     @apply font-sans;
+    width: 100%;
+    height: 100%;
+    /* 透明背景 — 让 macOS vibrancy 透出桌面壁纸；shadcn preflight 默认背景需显式覆盖 */
+    background: transparent;
+    /* 圆角裁剪到窗口边界 — 让 .draftwhisper-window 的圆角生效 */
+    overflow: hidden;
+    border-radius: 16px;
   }
   body {
     margin: 0;
-    @apply bg-background text-foreground;
+    /* 透明背景 — 让 macOS vibrancy (window-vibrancy) 透出桌面壁纸 */
+    background: transparent;
+    @apply text-foreground;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+    overflow: hidden;
   }
 }
 
@@ -321,65 +334,69 @@
  * Consumes tokens defined in :root and .dark above.
  * ============================================================ */
 @layer components {
-  /* ===== Page backdrop & window frame ===== */
-  .dw-page-bg {
-    width: 100%;
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    padding: 40px 16px;
-  }
-
+  /* ===== Window frame (铺满视口 — 窗口本身就是 Liquid Glass 卡片) ===== */
+  /* macOS vibrancy 在 Rust setup 中应用，这里只负责半透明叠加层 */
+  /* 不使用 CSS box-shadow：外阴影会扩散到圆角外的四个角，被 webview 矩形渲染出来，
+     盖住透明区域导致四角变方。窗口阴影由 NSWindow (shadow:true) 系统级提供，会跟随圆角 */
   .draftwhisper-window {
-    width: 460px;
-    min-height: 700px;
+    position: absolute;
+    inset: 0;
     border-radius: 16px;
     backdrop-filter: blur(36px) saturate(180%);
     -webkit-backdrop-filter: blur(36px) saturate(180%);
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    position: relative;
     color: var(--text-800);
   }
 
-  /* ===== Navigation Bar (48px) ===== */
-  .dw-nav-bar {
-    height: 48px;
-    min-height: 48px;
+  /* ===== TitleBar (38px — 应用图标/名称 + 右侧设置/置顶) ===== */
+  /* 红黄绿使用 macOS 原生 NSWindow 控件 (Overlay 模式)，浮在 webview 之上
+     左侧 padding 80px 让出原生按钮空间 */
+  .dw-title-bar {
+    height: 38px;
+    min-height: 38px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
-    border-bottom: 1px solid var(--glass-divider);
+    padding: 0 14px 0 80px;
+    /* 与下方内容无缝融合：无背景、无分割线 */
+    background: transparent;
+    border-bottom: none;
+    flex-shrink: 0;
   }
 
-  .dw-nav-left {
+  .dw-title-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .dw-title-app {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
   }
 
   .dw-app-icon {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     color: var(--brand-500);
     flex-shrink: 0;
   }
 
   .dw-app-name {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-800);
     white-space: nowrap;
   }
 
-  .dw-nav-right {
+  .dw-title-right {
     display: flex;
     align-items: center;
     gap: 8px;
