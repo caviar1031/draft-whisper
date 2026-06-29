@@ -48,6 +48,22 @@ fn build_chat_endpoint(base_url: &str) -> String {
   }
 }
 
+/// 构建 models 列表端点：`GET {base}/v1/models`
+///
+/// 输入 baseUrl 可能是各种格式，统一提取到 `/v1` 层级后补 `/models`。
+fn build_models_endpoint(base_url: &str) -> String {
+  let url = base_url.trim_end_matches('/');
+  // 去掉 /chat/completions 后缀
+  let base = if url.ends_with("/chat/completions") {
+    url.trim_end_matches("/chat/completions")
+  } else {
+    url
+  };
+  // 去掉 /v1 后缀（如果有），统一补 /v1/models
+  let base = base.trim_end_matches("/v1").trim_end_matches('/');
+  format!("{base}/v1/models")
+}
+
 /// 返回音频缓存目录，不存在则创建。
 ///
 /// 尝试顺序：`app_cache_dir` → `app_data_dir` → 项目本地 `.cache/audio`。
@@ -181,12 +197,14 @@ async fn request_speech(params: &TtsParams, text: &str) -> Result<Vec<u8>, Strin
 
 /// 为某一句文本生成音频并写入本地缓存（同名覆盖）。
 ///
-/// 前端调用: `invoke("tts_generate", { sentenceId, text, params })`
+/// 前端调用: `invoke("tts_generate", { sentenceId, text, params, outputDir })`
+/// - `output_dir`（可选）: 自定义输出目录；为 `None` 时使用默认三级 fallback 目录
 #[tauri::command]
 pub async fn tts_generate(
   sentence_id: String,
   text: String,
   params: TtsParams,
+  output_dir: Option<String>,
   app: AppHandle,
 ) -> Result<TtsResult, String> {
   if text.trim().is_empty() {
@@ -196,7 +214,14 @@ pub async fn tts_generate(
     return Err("缺少 baseUrl 或 apiKey，请先在设置中填写".into());
   }
 
-  let audio_dir = ensure_audio_dir(&app)?;
+  let audio_dir = if let Some(dir) = output_dir {
+    let path = PathBuf::from(&dir);
+    std::fs::create_dir_all(&path)
+      .map_err(|e| format!("创建输出目录失败: {dir} -> {e}"))?;
+    path
+  } else {
+    ensure_audio_dir(&app)?
+  };
   let file_name = format!("{}.wav", sanitize_filename(&sentence_id));
   let file_path = audio_dir.join(file_name);
 
@@ -220,6 +245,56 @@ pub async fn tts_test(params: TtsParams) -> Result<(), String> {
   }
   request_speech(&params, "测试").await?;
   Ok(())
+}
+
+/// 获取可用模型列表。
+///
+/// 调用 `GET {baseUrl}/v1/models`，解析响应中的 `data[].id` 返回模型 ID 列表。
+/// 前端调用: `invoke("tts_list_models", { baseUrl, apiKey })` → `string[]`
+#[tauri::command]
+pub async fn tts_list_models(base_url: String, api_key: String) -> Result<Vec<String>, String> {
+  if base_url.trim().is_empty() || api_key.trim().is_empty() {
+    return Err("缺少 baseUrl 或 apiKey".into());
+  }
+
+  let endpoint = build_models_endpoint(&base_url);
+  log::info!("获取模型列表: {endpoint}");
+
+  let client = reqwest::Client::new();
+  let resp = client
+    .get(&endpoint)
+    .header("api-key", &api_key)
+    .send()
+    .await
+    .map_err(|e| format!("请求失败: {e}"))?;
+
+  let status = resp.status();
+  if !status.is_success() {
+    let text = resp.text().await.unwrap_or_default();
+    return Err(format!("HTTP {status}: {text}"));
+  }
+
+  let json: Value = resp
+    .json()
+    .await
+    .map_err(|e| format!("解析响应 JSON 失败: {e}"))?;
+
+  let models = json
+    .get("data")
+    .and_then(|d| d.as_array())
+    .ok_or_else(|| format!("响应中缺少 data 数组: {json}"))?;
+
+  let ids: Vec<String> = models
+    .iter()
+    .filter_map(|m| m.get("id").and_then(|id| id.as_str()).map(String::from))
+    .collect();
+
+  if ids.is_empty() {
+    return Err("模型列表为空".into());
+  }
+
+  log::info!("获取到 {} 个模型", ids.len());
+  Ok(ids)
 }
 
 /// 读取本地音频文件字节，供前端转 Blob URL 播放。
@@ -358,14 +433,11 @@ pub fn tts_drag_file(path: String, window: tauri::Window) -> Result<(), String> 
       msg_send![class!(NSString), stringWithUTF8String: c_path.as_ptr()];
     let file_url: *mut Object = msg_send![class!(NSURL), fileURLWithPath: path_str];
 
-    // --- Audio file icon ---
-    let icon_name: *mut Object =
-      msg_send![class!(NSString), stringWithUTF8String: b"NSAudioFile\0".as_ptr()];
-    let drag_image: *mut Object = msg_send![class!(NSImage), imageNamed: icon_name];
-    if drag_image.is_null() {
-      let _: () = msg_send![source, release];
-      return Err("获取音频图标失败".into());
-    }
+    // --- Audio file icon via NSWorkspace (public API) ---
+    let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+    let ext_str: *mut Object =
+      msg_send![class!(NSString), stringWithUTF8String: b"wav\0".as_ptr()];
+    let drag_image: *mut Object = msg_send![workspace, iconForFileType: ext_str];
 
     // --- Mouse location (global, in screen coordinates) ---
     let mouse_loc: NSPoint = msg_send![class!(NSEvent), mouseLocation];

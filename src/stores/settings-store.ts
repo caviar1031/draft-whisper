@@ -8,6 +8,8 @@ interface SettingsState extends Settings {
   setModel: (model: string) => void
   setVoice: (voice: string) => void
   setSpeed: (speed: number) => void
+  setConcurrency: (concurrency: number) => void
+  setWorkingDir: (workingDir: string | null) => void
   updateSettings: (settings: Partial<Settings>) => void
 }
 
@@ -20,12 +22,16 @@ export const useSettingsStore = create<SettingsState>()(
       model: "mimo-v2.5-tts",
       voice: "冰糖",
       speed: 1,
+      concurrency: 1,
+      workingDir: null,
 
       setBaseUrl: (baseUrl) => set({ baseUrl }),
       setApiKey: (apiKey) => set({ apiKey }),
       setModel: (model) => set({ model }),
       setVoice: (voice) => set({ voice }),
       setSpeed: (speed) => set({ speed }),
+      setConcurrency: (concurrency) => set({ concurrency }),
+      setWorkingDir: (workingDir) => set({ workingDir }),
       updateSettings: (settings) => set((state) => ({ ...state, ...settings })),
     }),
     { name: "dw-settings" },

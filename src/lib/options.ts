@@ -20,6 +20,8 @@ export const VOICE_OPTIONS: VoiceOption[] = [
 
 export const SPEED_OPTIONS: number[] = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
+export const CONCURRENCY_OPTIONS: number[] = [1, 2, 3, 4, 5]
+
 export const MODEL_OPTIONS: string[] = [
   "mimo-v2.5-tts",
   "mimo-v2.5-tts-voicedesign",

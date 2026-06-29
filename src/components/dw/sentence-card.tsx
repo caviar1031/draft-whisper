@@ -57,7 +57,7 @@ export function SentenceCard({
     if (!sentence.audioPath || view !== "ready") return
     // 延迟一帧调用 Rust，避免与浏览器的 mousedown 处理冲突
     const path = sentence.audioPath
-    setTimeout(() => void nativeDragFile(path), 0)
+    setTimeout(() => void nativeDragFile(path).catch(() => {}), 0)
   }, [sentence.audioPath, view])
 
   const handleContextMenu = useCallback(

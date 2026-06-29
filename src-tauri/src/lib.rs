@@ -7,6 +7,7 @@ use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
       // ===== macOS 动态毛玻璃 (Vibrancy) =====
       // UnderWindowBackground: 透出桌面壁纸 + 后台窗口，最接近 Liquid Glass 质感
@@ -37,6 +38,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       tts::tts_generate,
       tts::tts_test,
+      tts::tts_list_models,
       tts::tts_read_audio,
       tts::tts_copy_to_clipboard,
       tts::tts_show_in_finder,

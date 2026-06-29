@@ -1,11 +1,10 @@
 import { EmptyState } from "@/components/dw/empty-state"
 import { ImportDialog } from "@/components/dw/import-dialog"
 import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
-import { SettingsPopover } from "@/components/dw/settings-popover"
+import { SettingsPage } from "@/components/dw/settings-page"
 import { TitleBar } from "@/components/dw/title-bar"
 import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
-import { SPEED_OPTIONS, VOICE_OPTIONS } from "@/lib/options"
 import { generateSentenceAudio, readAudioAsUrl } from "@/services/tts"
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
@@ -50,7 +49,7 @@ function App() {
   const phase: Phase =
     sentences.length === 0
       ? "empty"
-      : sentences.some((s) => s.status === "generating")
+      : sentences.some((s) => s.status === "generating" || s.status === "queued")
         ? "generating"
         : sentences.every((s) => s.status === "completed" || s.status === "failed")
           ? "complete"
@@ -58,7 +57,7 @@ function App() {
 
   const failedCount = sentences.filter((s) => s.status === "failed").length
 
-  // --- 真实 TTS 生成 ---
+  // --- 真实 TTS 生成（支持并行） ---
   const runGeneration = useCallback(
     async (ids: string[]) => {
       const runId = ++genRunId.current
@@ -70,20 +69,35 @@ function App() {
         voice: settings.voice,
         speed: settings.speed,
       }
+      const concurrency = settings.concurrency
+      const workingDir = settings.workingDir
+
+      // 先把所有句子标记为 queued（等待中）
       for (const id of ids) {
-        if (genRunId.current !== runId) return
-        const sentence = useProjectStore.getState().sentences.find((s) => s.id === id)
-        if (!sentence) continue
-        updateSentence(id, { status: "generating" })
-        try {
-          const result = await generateSentenceAudio(id, sentence.text, params)
-          if (genRunId.current !== runId) return
-          updateSentence(id, { status: "completed", audioPath: result.audioPath })
-        } catch {
-          if (genRunId.current !== runId) return
-          updateSentence(id, { status: "failed" })
-        }
+        updateSentence(id, { status: "queued" })
       }
+
+      // 并行 worker 池
+      const queue = [...ids]
+      const workers = Array.from({ length: Math.min(concurrency, ids.length) }, async () => {
+        while (queue.length > 0) {
+          if (genRunId.current !== runId) return
+          const id = queue.shift()!
+          const sentence = useProjectStore.getState().sentences.find((s) => s.id === id)
+          if (!sentence) continue
+          updateSentence(id, { status: "generating" })
+          try {
+            const result = await generateSentenceAudio(id, sentence.text, params, workingDir)
+            if (genRunId.current !== runId) return
+            updateSentence(id, { status: "completed", audioPath: result.audioPath })
+          } catch {
+            if (genRunId.current !== runId) return
+            updateSentence(id, { status: "failed" })
+          }
+        }
+      })
+
+      await Promise.all(workers)
     },
     [updateSentence],
   )
@@ -200,16 +214,7 @@ function App() {
     }
   }, [alwaysOnTop])
 
-  // --- 语音/速度循环切换 ---
-  const handleVoiceClick = useCallback(() => {
-    const idx = VOICE_OPTIONS.findIndex((v) => v.value === voice)
-    setVoice(VOICE_OPTIONS[(idx + 1) % VOICE_OPTIONS.length].value)
-  }, [voice, setVoice])
-
-  const handleSpeedClick = useCallback(() => {
-    const idx = SPEED_OPTIONS.indexOf(speed)
-    setSpeed(SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length])
-  }, [speed, setSpeed])
+  // --- 语音/速度选择 ---
 
   // --- 工具栏 ---
   const toolbarAction: ToolbarAction =
@@ -229,6 +234,7 @@ function App() {
     (sentenceId: string, status: SentenceStatus): CardView => {
       if (editingId === sentenceId) return "editing"
       if (status === "generating") return "generating"
+      if (status === "queued") return "queued"
       if (status === "failed") return "failed"
       if (status === "completed") return playingId === sentenceId ? "playing" : "ready"
       return "queued"
@@ -243,8 +249,9 @@ function App() {
     if (phase === "imported") return { statusText: "Ready", statusTone: "default" as const }
     if (phase === "generating") {
       const done = sentences.filter((s) => s.status === "completed" || s.status === "failed").length
+      const active = sentences.filter((s) => s.status === "generating").length
       return {
-        statusText: `Generating ${done} / ${count}...`,
+        statusText: `Generating ${done} / ${count} (${active} active)...`,
         statusTone: "generating" as const,
       }
     }
@@ -265,60 +272,72 @@ function App() {
         onToggleSettings={() => setSettingsOpen((v) => !v)}
         onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
       />
-      <Toolbar
-        voice={voice}
-        speed={speed}
-        action={toolbarAction}
-        editMode={editMode}
-        onImportScript={handleOpenImport}
-        onToggleEdit={phase === "complete" ? () => setEditMode((v) => !v) : undefined}
-        onVoiceClick={handleVoiceClick}
-        onSpeedClick={handleSpeedClick}
-        onAction={handleToolbarAction}
-      />
 
-      {failedCount > 0 && (
-        <div className="dw-retry-all-bar">
-          <span className="dw-retry-all-label">
-            <TriangleAlert size={14} strokeWidth={2} style={{ color: "var(--state-error)" }} />
-            {failedCount} {failedCount === 1 ? "generation" : "generations"} failed
-          </span>
-          <button type="button" className="dw-retry-all-btn" onClick={handleRetryAll}>
-            <RefreshCw size={14} strokeWidth={2} />
-            Retry All
-          </button>
-        </div>
-      )}
-
-      {phase === "empty" ? (
-        <EmptyState />
+      {settingsOpen ? (
+        <SettingsPage />
       ) : (
-        <div className="sentence-list">
-          {sentences.map((sentence, index) => (
-            <SentenceCard
-              key={sentence.id}
-              sentence={sentence}
-              index={index}
-              view={cardView(sentence.id, sentence.status)}
-              queuedLabel={phase === "imported" ? "Idle" : "Queued"}
-              errorMessage={
-                sentence.status === "failed" ? "Generation failed — check API settings" : undefined
-              }
-              onPlay={() => void handlePlay(sentence.id)}
-              onPause={handlePause}
-              onRegenerate={() => handleRegenerateCard(sentence.id)}
-              onRetry={() => handleRegenerateCard(sentence.id)}
-              onEdit={() => handleEditCard(sentence.id)}
-              onCommitEdit={(text) => handleCommitEdit(sentence.id, text)}
-              onCancelEdit={handleCancelEdit}
-            />
-          ))}
-        </div>
+        <>
+          <Toolbar
+            voice={voice}
+            speed={speed}
+            action={toolbarAction}
+            editMode={editMode}
+            onImportScript={handleOpenImport}
+            onToggleEdit={phase === "complete" ? () => setEditMode((v) => !v) : undefined}
+            onVoiceChange={setVoice}
+            onSpeedChange={setSpeed}
+            onAction={handleToolbarAction}
+          />
+
+          {failedCount > 0 && (
+            <div className="dw-retry-all-bar">
+              <span className="dw-retry-all-label">
+                <TriangleAlert
+                  size={14}
+                  strokeWidth={2}
+                  style={{ color: "var(--state-error)" }}
+                />
+                {failedCount} {failedCount === 1 ? "generation" : "generations"} failed
+              </span>
+              <button type="button" className="dw-retry-all-btn" onClick={handleRetryAll}>
+                <RefreshCw size={14} strokeWidth={2} />
+                Retry All
+              </button>
+            </div>
+          )}
+
+          {phase === "empty" ? (
+            <EmptyState />
+          ) : (
+            <div className="sentence-list">
+              {sentences.map((sentence, index) => (
+                <SentenceCard
+                  key={sentence.id}
+                  sentence={sentence}
+                  index={index}
+                  view={cardView(sentence.id, sentence.status)}
+                  queuedLabel={phase === "imported" ? "Idle" : "Queued"}
+                  errorMessage={
+                    sentence.status === "failed"
+                      ? "Generation failed — check API settings"
+                      : undefined
+                  }
+                  onPlay={() => void handlePlay(sentence.id)}
+                  onPause={handlePause}
+                  onRegenerate={() => handleRegenerateCard(sentence.id)}
+                  onRetry={() => handleRegenerateCard(sentence.id)}
+                  onEdit={() => handleEditCard(sentence.id)}
+                  onCommitEdit={(text) => handleCommitEdit(sentence.id, text)}
+                  onCancelEdit={handleCancelEdit}
+                />
+              ))}
+            </div>
+          )}
+
+          <StatusBar count={sentences.length} {...statusBar} />
+        </>
       )}
 
-      <StatusBar count={sentences.length} {...statusBar} />
-
-      {settingsOpen && <SettingsPopover onClose={() => setSettingsOpen(false)} />}
       {importDialogOpen && (
         <ImportDialog onImport={handleImport} onClose={() => setImportDialogOpen(false)} />
       )}

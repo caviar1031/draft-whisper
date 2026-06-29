@@ -1,5 +1,6 @@
 import type { Settings } from "@/types"
 import { invoke } from "@tauri-apps/api/core"
+import { open } from "@tauri-apps/plugin-dialog"
 
 /** TTS 调用参数，与 Settings 字段一一对应，传给 Rust 后端。 */
 export type TtsParams = Settings
@@ -36,14 +37,15 @@ export function revokeAllAudioUrls(): void {
  * 为某一句文本生成音频并缓存到本地。
  * 成功后自动 invalidate 该路径的旧 Blob URL（重新生成场景）。
  *
- * 后端: invoke("tts_generate", { sentenceId, text, params })
+ * 后端: invoke("tts_generate", { sentenceId, text, params, outputDir })
  */
 export async function generateSentenceAudio(
   sentenceId: string,
   text: string,
   params: TtsParams,
+  outputDir?: string | null,
 ): Promise<TtsResult> {
-  const result = await invoke<TtsResult>("tts_generate", { sentenceId, text, params })
+  const result = await invoke<TtsResult>("tts_generate", { sentenceId, text, params, outputDir })
   invalidateAudioUrl(result.audioPath)
   return result
 }
@@ -55,6 +57,31 @@ export async function generateSentenceAudio(
  */
 export async function testTts(params: TtsParams): Promise<void> {
   await invoke<void>("tts_test", { params })
+}
+
+/**
+ * 获取可用模型列表。
+ *
+ * 后端: invoke("tts_list_models", { baseUrl, apiKey }) → string[]
+ */
+export async function listModels(baseUrl: string, apiKey: string): Promise<string[]> {
+  return invoke<string[]>("tts_list_models", { baseUrl, apiKey })
+}
+
+/**
+ * 弹出系统目录选择对话框，返回选中的目录路径。
+ * 用户取消时返回 `null`。
+ *
+ * 后端: `@tauri-apps/plugin-dialog` 的 `open` 方法
+ */
+export async function pickDir(): Promise<string | null> {
+  const result = await open({
+    directory: true,
+    multiple: false,
+  })
+  if (!result) return null
+  if (Array.isArray(result)) return result[0] ?? null
+  return result
 }
 
 /**

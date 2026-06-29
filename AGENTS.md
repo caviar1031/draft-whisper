@@ -143,28 +143,28 @@ draft-whisper/
 **前端**：[src/utils/id.ts](src/utils/id.ts) 的 `generateSentenceId(index, text)` 函数
 
 ```ts
+import { pinyin } from "pinyin-pro"
+
 export function generateSentenceId(index: number, text: string): string {
-  // 3 位序号，从 001 开始
   const seq = String(index + 1).padStart(3, "0")
 
-  // 文本摘要：取前 20 个字符，清理特殊字符
-  const cleaned = text
-    .replace(/[。！？；.!?\n\r]/g, "") // 移除句末标点
-    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, "") // 只保留中文、英文、数字
-    .substring(0, 20)
+  // 中文转拼音首字母，英文数字保留，其他字符忽略
+  const raw = pinyin(text, { pattern: "first", toneType: "none", type: "array" })
+    .join("")
+    .replace(/[^a-zA-Z0-9]/g, "")
 
-  // 4 位短 ID，保证唯一性
+  const summary = raw.charAt(0).toUpperCase() + raw.slice(1).substring(0, 19)
   const shortId = Math.random().toString(36).substring(2, 6)
 
-  return `${seq}_${cleaned}_${shortId}`
+  return summary.length > 0 ? `${seq}_${summary}_${shortId}` : `${seq}_${shortId}`
 }
 ```
 
-- **格式**：`{3位序号}_{文本摘要}_{4位短ID}`
+- **格式**：`{3位序号}_{拼音摘要}_{4位短ID}`（摘要为空时省略）
 - **序号**：从 `001` 开始，按句子顺序递增
-- **文本摘要**：取原文前 20 个字符，只保留中文/英文/数字
+- **文本摘要**：中文取拼音首字母，英文/数字保留原样，首字母大写，取前 20 个字符
 - **短 ID**：4 位随机字符串，避免同序号同文本冲突
-- **示例**：`001_今天我们学习Agent_k7x9`
+- **依赖**：`pinyin-pro` 库（轻量，tree-shakeable）
 
 ### 7.2 文件名清理规则
 
@@ -203,9 +203,11 @@ fn sanitize_filename(name: &str) -> String {
 
 | 原文 | sentenceId | 清理后 | 最终文件名 |
 |------|------------|--------|------------|
-| `今天我们学习 Agent。` | `001_今天我们学习Agent_k7x9` | `001_今天我们学习Agent_k7x9` | `001_今天我们学习Agent_k7x9.wav` |
-| `它是什么？` | `002_它是什么_m2n4` | `002_它是什么_m2n4` | `002_它是什么_m2n4.wav` |
+| `今天我们学习 Agent。` | `001_JinTianWMenXxAgent_k7x9` | `001_JinTianWMenXxAgent_k7x9` | `001_JinTianWMenXxAgent_k7x9.wav` |
+| `它是什么？` | `002_TaSSM_m2n4` | `002_TaSSM_m2n4` | `002_TaSSM_m2n4.wav` |
 | `Hello World!` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8.wav` |
+
+> 注：拼音首字母缩写（`pattern: "first"`），如「我们」→ `WM`，「什么」→ `SM`。实际输出取决于 `pinyin-pro` 的分词结果。
 
 ### 7.5 重新生成行为
 

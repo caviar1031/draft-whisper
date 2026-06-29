@@ -15,6 +15,9 @@ dist-ssr
 # Rust
 src-tauri/target
 
+# Tauri auto-generated
+src-tauri/gen/
+
 # TTS 音频缓存（dev 模式 sandbox fallback 会写到项目本地）
 .cache
 
@@ -24,6 +27,7 @@ src-tauri/target
 .idea
 .DS_Store
 .trae/
+.trae-cn/
 *.suo
 *.ntvs*
 *.njsproj

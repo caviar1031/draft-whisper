@@ -1,4 +1,4 @@
-export type SentenceStatus = "pending" | "generating" | "completed" | "failed"
+export type SentenceStatus = "pending" | "queued" | "generating" | "completed" | "failed"
 
 export interface Sentence {
   id: string

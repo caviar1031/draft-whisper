@@ -1,4 +1,4 @@
-import { PenLine } from "lucide-react"
+import { Settings } from "lucide-react"
 import { AppIcon } from "./app-icon"
 
 // 自定义顶栏 — 仅承载应用图标/名称 + 右侧设置/置顶
@@ -35,7 +35,7 @@ export function TitleBar({
           aria-pressed={settingsOpen}
           onClick={onToggleSettings}
         >
-          <PenLine size={16} strokeWidth={2} />
+          <Settings size={16} strokeWidth={2} />
         </button>
         <button
           type="button"

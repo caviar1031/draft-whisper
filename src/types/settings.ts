@@ -4,4 +4,6 @@ export interface Settings {
   model: string
   voice: string
   speed: number
+  concurrency: number
+  workingDir: string | null
 }

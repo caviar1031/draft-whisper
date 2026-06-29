@@ -1,4 +1,4 @@
-import { formatSpeed, voiceLabel } from "@/lib/options"
+import { formatSpeed, voiceLabel, VOICE_OPTIONS, SPEED_OPTIONS } from "@/lib/options"
 import {
   ArrowRight,
   ChevronDown,
@@ -8,6 +8,7 @@ import {
   Pencil,
   User,
 } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 // 工具栏主操作类型 — 不同视图状态显示不同按钮
 export type ToolbarAction =
@@ -22,8 +23,8 @@ interface ToolbarProps {
   editMode?: boolean
   onImportScript: () => void
   onToggleEdit?: () => void
-  onVoiceClick: () => void
-  onSpeedClick: () => void
+  onVoiceChange: (voice: string) => void
+  onSpeedChange: (speed: number) => void
   onAction: () => void
 }
 
@@ -34,10 +35,32 @@ export function Toolbar({
   editMode = false,
   onImportScript,
   onToggleEdit,
-  onVoiceClick,
-  onSpeedClick,
+  onVoiceChange,
+  onSpeedChange,
   onAction,
 }: ToolbarProps) {
+  const [openDropdown, setOpenDropdown] = useState<"voice" | "speed" | null>(null)
+  const voiceRef = useRef<HTMLDivElement>(null)
+  const speedRef = useRef<HTMLDivElement>(null)
+
+  const toggle = useCallback((which: "voice" | "speed") => {
+    setOpenDropdown((prev) => (prev === which ? null : which))
+  }, [])
+
+  useEffect(() => {
+    if (!openDropdown) return
+    const close = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (
+        (openDropdown === "voice" && voiceRef.current?.contains(target)) ||
+        (openDropdown === "speed" && speedRef.current?.contains(target))
+      ) return
+      setOpenDropdown(null)
+    }
+    document.addEventListener("mousedown", close)
+    return () => document.removeEventListener("mousedown", close)
+  }, [openDropdown])
+
   return (
     <div className="dw-toolbar">
       <div className="dw-toolbar-left">
@@ -57,16 +80,49 @@ export function Toolbar({
         )}
       </div>
       <div className="dw-toolbar-right">
-        <button type="button" className="dw-pill-select" onClick={onVoiceClick}>
-          <User size={14} strokeWidth={2} />
-          {voiceLabel(voice)}
-          <ChevronDown size={10} strokeWidth={2} />
-        </button>
-        <button type="button" className="dw-pill-select" onClick={onSpeedClick}>
-          <ChevronsUpDown size={14} strokeWidth={2} />
-          {formatSpeed(speed)}
-          <ChevronDown size={10} strokeWidth={2} />
-        </button>
+        <div className="dw-select-wrapper" ref={voiceRef}>
+          <button type="button" className="dw-pill-select" onClick={() => toggle("voice")}>
+            <User size={14} strokeWidth={2} />
+            {voiceLabel(voice)}
+            <ChevronDown size={10} strokeWidth={2} />
+          </button>
+          {openDropdown === "voice" && (
+            <div className="dw-select-dropdown">
+              {VOICE_OPTIONS.map((opt) => (
+                <button
+                  type="button"
+                  key={opt.value}
+                  className={`dw-select-option${opt.value === voice ? " is-active" : ""}`}
+                  onClick={() => { onVoiceChange(opt.value); setOpenDropdown(null) }}
+                >
+                  <span>{opt.label}</span>
+                  {opt.desc && <span className="dw-select-desc">{opt.desc}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="dw-select-wrapper" ref={speedRef}>
+          <button type="button" className="dw-pill-select" onClick={() => toggle("speed")}>
+            <ChevronsUpDown size={14} strokeWidth={2} />
+            {formatSpeed(speed)}
+            <ChevronDown size={10} strokeWidth={2} />
+          </button>
+          {openDropdown === "speed" && (
+            <div className="dw-select-dropdown">
+              {SPEED_OPTIONS.map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  className={`dw-select-option${s === speed ? " is-active" : ""}`}
+                  onClick={() => { onSpeedChange(s); setOpenDropdown(null) }}
+                >
+                  {formatSpeed(s)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <ActionButton action={action} onAction={onAction} />
       </div>
     </div>

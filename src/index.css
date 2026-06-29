@@ -417,17 +417,11 @@
     background: var(--glass-surface);
     color: var(--icon-600);
     cursor: pointer;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s
-      cubic-bezier(0.32, 0.72, 0, 1);
+    transition: background 0.15s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .dw-nav-btn:hover {
-    transform: scale(1.05);
     background: var(--glass-surface-2);
-  }
-
-  .dw-nav-btn:active {
-    transform: scale(0.95);
   }
 
   .dw-nav-btn:focus-visible {
@@ -454,18 +448,12 @@
     cursor: pointer;
     border: none;
     gap: 5px;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s
-      cubic-bezier(0.32, 0.72, 0, 1);
+    transition: background 0.15s cubic-bezier(0.32, 0.72, 0, 1);
     white-space: nowrap;
   }
 
   .dw-toggle-pill:hover {
-    transform: scale(1.02);
     background: var(--glass-surface-hover);
-  }
-
-  .dw-toggle-pill:active {
-    transform: scale(0.98);
   }
 
   .dw-toggle-pill .dw-toggle-dot {
@@ -519,17 +507,11 @@
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s
-      cubic-bezier(0.32, 0.72, 0, 1);
+    transition: background 0.15s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .dw-pill-btn:hover {
-    transform: scale(1.02);
     background: var(--glass-surface-hover);
-  }
-
-  .dw-pill-btn:active {
-    transform: scale(0.98);
   }
 
   .dw-pill-btn:focus-visible {
@@ -548,11 +530,13 @@
   }
 
   .dw-pill-select {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
     height: 32px;
-    padding: 0 10px;
+    width: 130px;
+    padding: 0 28px;
     border-radius: 16px;
     border: none;
     background: var(--glass-surface);
@@ -562,24 +546,83 @@
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s
-      cubic-bezier(0.32, 0.72, 0, 1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s cubic-bezier(0.32, 0.72, 0, 1);
     appearance: none;
     -webkit-appearance: none;
   }
 
-  .dw-pill-select:hover {
-    transform: scale(1.02);
-    background: var(--glass-surface-hover);
+  .dw-pill-select > svg:first-child {
+    position: absolute;
+    left: 10px;
+    flex-shrink: 0;
   }
 
-  .dw-pill-select:active {
-    transform: scale(0.98);
+  .dw-pill-select > svg:last-child {
+    position: absolute;
+    right: 10px;
+    flex-shrink: 0;
+  }
+
+  .dw-pill-select:hover {
+    background: var(--glass-surface-hover);
   }
 
   .dw-pill-select:focus-visible {
     outline: 2px solid var(--brand-500);
     outline-offset: 2px;
+  }
+
+  /* --- Dropdown select --- */
+  .dw-select-wrapper {
+    position: relative;
+  }
+
+  .dw-select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    background: var(--glass-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    padding: 4px;
+    z-index: 50;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .dw-select-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-800);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  .dw-select-option:hover {
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-select-option.is-active {
+    color: var(--brand-500);
+    font-weight: 600;
+  }
+
+  .dw-select-desc {
+    font-size: 11px;
+    color: var(--text-500);
+    margin-left: 8px;
   }
 
   .dw-primary-btn {
@@ -597,17 +640,14 @@
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), filter 0.15s
-      cubic-bezier(0.32, 0.72, 0, 1);
+    transition: filter 0.15s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .dw-primary-btn:hover {
-    transform: scale(1.02);
     filter: brightness(1.08);
   }
 
   .dw-primary-btn:active {
-    transform: scale(0.98);
     filter: brightness(0.95);
   }
 
@@ -639,7 +679,6 @@
     border-radius: 10px;
     background: var(--glass-bg-card);
     border: 1px solid var(--glass-surface-5);
-    transition: background 0.15s ease, box-shadow 0.3s ease, border-color 0.2s ease;
   }
 
   .dw-sentence-card:hover {
@@ -771,15 +810,17 @@
 
   /* Card actions */
   .dw-card-actions {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 4px;
     flex-shrink: 0;
+    min-width: 80px;
+    justify-content: center;
   }
 
   .dw-action-btn {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -787,16 +828,7 @@
     border: none;
     background: transparent;
     cursor: pointer;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease, color 0.15s
-      ease;
-  }
-
-  .dw-action-btn:hover {
-    transform: scale(1.08);
-  }
-
-  .dw-action-btn:active {
-    transform: scale(0.95);
+    position: absolute;
   }
 
   .dw-action-btn:focus-visible {
@@ -808,6 +840,14 @@
     opacity: 0.3;
     cursor: not-allowed;
     pointer-events: none;
+  }
+
+  .dw-play-btn,
+  .dw-pause-btn {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    z-index: 1;
   }
 
   .dw-play-btn {
@@ -829,25 +869,30 @@
   .dw-regen-btn {
     color: var(--text-400);
     opacity: 0;
-    transition: opacity 0.15s ease, color 0.15s ease, transform 0.15s cubic-bezier(0.32, 0.72, 0, 1);
+    pointer-events: none;
+  }
+
+  .dw-regen-btn:first-child {
+    left: 0;
+  }
+
+  .dw-regen-btn:last-child {
+    right: 0;
   }
 
   .dw-sentence-card:hover .dw-regen-btn {
     opacity: 1;
+    pointer-events: auto;
   }
 
   .dw-regen-btn:hover {
     color: var(--text-500);
-    transform: scale(1.1);
   }
 
-  .dw-regen-btn:active {
-    transform: scale(0.9);
-  }
+  
 
   /* Playing card accent */
   .dw-sentence-card.is-playing {
-    border-left: 3px solid var(--brand-500);
     animation: dw-pulse-glow 2s ease-in-out infinite;
   }
 
@@ -863,13 +908,11 @@
 
   /* Generating card accent */
   .dw-sentence-card.is-generating {
-    border-left: 3px solid var(--brand-500);
     background: var(--glass-blue-tint);
   }
 
   /* Error card accent */
   .dw-sentence-card.is-failed {
-    border-left: 3px solid var(--state-error);
     background: var(--glass-red-tint-medium);
   }
 
@@ -984,16 +1027,11 @@
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease;
+    transition: background 0.15s ease;
   }
 
   .dw-retry-all-btn:hover {
     background: var(--glass-red-tint-medium);
-    transform: scale(1.02);
-  }
-
-  .dw-retry-all-btn:active {
-    transform: scale(0.98);
   }
 
   .dw-retry-all-btn:focus-visible {
@@ -1018,16 +1056,11 @@
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease;
+    transition: background 0.15s ease;
   }
 
   .dw-retry-btn:hover {
     background: var(--glass-red-tint-medium);
-    transform: scale(1.02);
-  }
-
-  .dw-retry-btn:active {
-    transform: scale(0.98);
   }
 
   .dw-retry-btn:focus-visible {
@@ -1134,70 +1167,23 @@
     white-space: nowrap;
   }
 
-  /* ===== Settings popover ===== */
-  .dw-dim-overlay {
-    position: absolute;
-    inset: 0;
-    top: 104px;
-    background: var(--glass-overlay);
-    z-index: 5;
-    padding: 0;
-    border: 0;
-    border-radius: 0 0 16px 16px;
-    cursor: pointer;
-    font: inherit;
-  }
-
-  .dw-settings-popover {
-    position: absolute;
-    top: 56px;
-    right: 8px;
-    width: 340px;
-    margin: 0;
-    padding: 20px;
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    background: var(--glass-popover-bg);
-    border: 1px solid var(--glass-bg-card);
-    border-radius: 16px;
-    box-shadow: var(--glass-popover-shadow);
-    z-index: 10;
+  /* ===== Settings page ===== */
+  .dw-settings-page {
+    flex: 1;
+    padding: 20px 24px;
+    overflow-y: auto;
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   .dw-settings-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
 
   .dw-settings-title {
     font-size: 17px;
     font-weight: 600;
     color: var(--text-800);
-  }
-
-  .dw-settings-close {
-    width: 28px;
-    height: 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    border: none;
-    background: var(--glass-surface);
-    color: var(--icon-600);
-    cursor: pointer;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease;
-  }
-
-  .dw-settings-close:hover {
-    transform: scale(1.05);
-    background: var(--glass-surface-2);
-  }
-
-  .dw-settings-close:active {
-    transform: scale(0.95);
   }
 
   .dw-settings-field {
@@ -1261,6 +1247,102 @@
     color: var(--text-800);
   }
 
+  .dw-model-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .dw-model-row .dw-settings-select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Working directory */
+  .dw-dir-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .dw-dir-display {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-input-border);
+    background: var(--glass-bg-input);
+    color: var(--text-800);
+    font-size: 13px;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .dw-dir-path {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+
+  .dw-dir-btn {
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-input-border);
+    background: var(--glass-bg-input);
+    color: var(--text-800);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dw-dir-btn:hover {
+    background: var(--glass-surface);
+    border-color: var(--glass-bg-card-subtle);
+  }
+
+  .dw-dir-clear {
+    width: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dw-fetch-models-btn {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    border: 1px solid var(--glass-input-border);
+    background: var(--glass-bg-input);
+    color: var(--icon-600);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dw-fetch-models-btn:hover {
+    background: var(--glass-surface);
+    border-color: var(--glass-bg-card-subtle);
+  }
+
+  .dw-fetch-models-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .dw-test-btn {
     display: flex;
     align-items: center;
@@ -1276,18 +1358,12 @@
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
-    transition: transform 0.15s cubic-bezier(0.32, 0.72, 0, 1), background 0.15s ease, border-color
-      0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease;
   }
 
   .dw-test-btn:hover {
-    transform: scale(1.02);
     background: var(--glass-surface);
     border-color: var(--glass-bg-card-subtle);
-  }
-
-  .dw-test-btn:active {
-    transform: scale(0.98);
   }
 
   .dw-test-btn:focus-visible {
