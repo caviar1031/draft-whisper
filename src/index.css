@@ -265,6 +265,9 @@
     height: 100%;
     border-radius: 16px;
     overflow: hidden;
+    /* 全局禁止文字选择 — 卡片区域需要支持原生拖拽 */
+    user-select: none;
+    -webkit-user-select: none;
   }
 }
 
@@ -648,6 +651,8 @@
     width: 16px;
     height: 16px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
     color: var(--glass-handle);
     cursor: grab;
     transition: color 0.15s ease;
@@ -1069,6 +1074,9 @@
     outline: none;
     box-shadow: 0 0 0 3px var(--glass-focus-ring);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    /* 恢复文字选择 */
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   .dw-editing-textarea::placeholder {
@@ -1222,6 +1230,9 @@
     font-family: inherit;
     outline: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    /* 恢复文字选择 */
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   .dw-settings-input::placeholder {
@@ -1297,6 +1308,126 @@
   .dw-test-btn.is-error {
     color: var(--state-error);
     border-color: var(--state-error);
+  }
+
+  /* ===== Context menu (right-click on sentence card) ===== */
+  .dw-context-menu {
+    position: fixed;
+    min-width: 160px;
+    padding: 4px;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--glass-popover-bg);
+    border: 1px solid var(--glass-bg-card);
+    border-radius: 10px;
+    box-shadow: var(--glass-popover-shadow);
+    z-index: 100;
+  }
+
+  .dw-context-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-800);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s ease;
+  }
+
+  .dw-context-item:hover {
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-context-item:active {
+    background: var(--glass-surface-2);
+  }
+
+  /* ===== Import dialog ===== */
+  .dw-import-dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 380px;
+    max-height: calc(100% - 48px);
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 20px;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--glass-popover-bg);
+    border: 1px solid var(--glass-bg-card);
+    border-radius: 16px;
+    box-shadow: var(--glass-popover-shadow);
+    z-index: 20;
+  }
+
+  .dw-import-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .dw-import-textarea {
+    width: 100%;
+    min-height: 180px;
+    max-height: 320px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-input-border);
+    background: var(--glass-bg-input);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-800);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    flex: 1;
+    margin-bottom: 16px;
+    /* 恢复文字选择 */
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .dw-import-textarea::placeholder {
+    color: var(--text-300);
+  }
+
+  .dw-import-textarea:focus {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+  }
+
+  .dw-import-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .dw-import-left,
+  .dw-import-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dw-import-count {
+    font-size: 12px;
+    color: var(--text-400);
+    white-space: nowrap;
   }
 }
 

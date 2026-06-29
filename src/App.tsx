@@ -1,35 +1,21 @@
 import { EmptyState } from "@/components/dw/empty-state"
+import { ImportDialog } from "@/components/dw/import-dialog"
 import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
 import { SettingsPopover } from "@/components/dw/settings-popover"
 import { TitleBar } from "@/components/dw/title-bar"
 import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
 import { SPEED_OPTIONS, VOICE_OPTIONS } from "@/lib/options"
+import { generateSentenceAudio, readAudioAsUrl } from "@/services/tts"
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
 import { splitTextToSentences } from "@/utils/sentence"
+import { getCurrentWindow } from "@tauri-apps/api/window"
 import { RefreshCw, TriangleAlert } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 
-// 示例脚本 — 与设计稿示例句子保持一致的英文产品展示文案
-const SAMPLE_SCRIPT =
-  "Welcome to our product showcase. Today we're going to explore something truly remarkable. The design philosophy behind this product centers on simplicity and elegance. Every detail has been carefully considered to create a seamless user experience. From the moment you open the app, you'll notice the attention to craftsmanship. Let's walk through the key features together, step by step."
-
-const FAILURE_RATE = 0.3
-const GEN_DELAY_MIN = 500
-const GEN_DELAY_MAX = 900
-const PLAY_DURATION = 3000
-
 type Phase = "empty" | "imported" | "generating" | "complete"
-
-function delay(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms))
-}
-
-function randomBetween(min: number, max: number) {
-  return min + Math.random() * (max - min)
-}
 
 function App() {
   const sentences = useProjectStore((s) => s.sentences)
@@ -45,15 +31,18 @@ function App() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
 
-  // 生成流程的运行令牌 — 新一轮开始时旧的循环会自行中止
   const genRunId = useRef(0)
-  const playTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     return () => {
-      if (playTimer.current) clearTimeout(playTimer.current)
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
     }
   }, [])
 
@@ -69,32 +58,53 @@ function App() {
 
   const failedCount = sentences.filter((s) => s.status === "failed").length
 
-  // 导入脚本 — 切分为句子并初始化为 pending
-  const handleImportScript = useCallback(() => {
-    setSentences(splitTextToSentences(SAMPLE_SCRIPT))
-    setPlayingId(null)
-    setEditingId(null)
-    setEditMode(false)
-  }, [setSentences])
-
-  // 顺序模拟生成流程：逐句 generating → completed/failed
+  // --- 真实 TTS 生成 ---
   const runGeneration = useCallback(
     async (ids: string[]) => {
       const runId = ++genRunId.current
+      const settings = useSettingsStore.getState()
+      const params = {
+        baseUrl: settings.baseUrl,
+        apiKey: settings.apiKey,
+        model: settings.model,
+        voice: settings.voice,
+        speed: settings.speed,
+      }
       for (const id of ids) {
         if (genRunId.current !== runId) return
+        const sentence = useProjectStore.getState().sentences.find((s) => s.id === id)
+        if (!sentence) continue
         updateSentence(id, { status: "generating" })
-        await delay(randomBetween(GEN_DELAY_MIN, GEN_DELAY_MAX))
-        if (genRunId.current !== runId) return
-        const failed = Math.random() < FAILURE_RATE
-        updateSentence(id, {
-          status: failed ? "failed" : ("completed" as SentenceStatus),
-          audioPath: failed ? null : `mock://${id}.wav`,
-          duration: failed ? null : 3.2,
-        })
+        try {
+          const result = await generateSentenceAudio(id, sentence.text, params)
+          if (genRunId.current !== runId) return
+          updateSentence(id, { status: "completed", audioPath: result.audioPath })
+        } catch {
+          if (genRunId.current !== runId) return
+          updateSentence(id, { status: "failed" })
+        }
       }
     },
     [updateSentence],
+  )
+
+  // --- 导入 ---
+  const handleOpenImport = useCallback(() => {
+    setImportDialogOpen(true)
+  }, [])
+
+  const handleImport = useCallback(
+    (text: string) => {
+      const newSentences = splitTextToSentences(text)
+      setSentences(newSentences)
+      setImportDialogOpen(false)
+      setPlayingId(null)
+      setEditingId(null)
+      setEditMode(false)
+      // 切句完成后自动开始生成
+      void runGeneration(newSentences.map((s) => s.id))
+    },
+    [setSentences, runGeneration],
   )
 
   const handleGenerateAll = useCallback(() => {
@@ -116,26 +126,59 @@ function App() {
     [runGeneration],
   )
 
-  // 播放控制 — mock 持续 3s 后自动停止
-  const handlePlay = useCallback((id: string) => {
-    setPlayingId(id)
-    if (playTimer.current) clearTimeout(playTimer.current)
-    playTimer.current = setTimeout(() => setPlayingId(null), PLAY_DURATION)
-  }, [])
+  // --- 真实音频播放 ---
+  const handlePlay = useCallback(
+    async (id: string) => {
+      const sentence = useProjectStore.getState().sentences.find((s) => s.id === id)
+      if (!sentence?.audioPath) return
+
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+
+      try {
+        const url = await readAudioAsUrl(sentence.audioPath)
+        const audio = new Audio(url)
+        audioRef.current = audio
+        setPlayingId(id)
+
+        audio.addEventListener("loadedmetadata", () => {
+          updateSentence(id, { duration: audio.duration })
+        })
+        audio.addEventListener("ended", () => {
+          setPlayingId(null)
+          audioRef.current = null
+        })
+        audio.addEventListener("error", () => {
+          setPlayingId(null)
+          audioRef.current = null
+        })
+
+        await audio.play()
+      } catch {
+        setPlayingId(null)
+      }
+    },
+    [updateSentence],
+  )
 
   const handlePause = useCallback(() => {
-    if (playTimer.current) clearTimeout(playTimer.current)
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
     setPlayingId(null)
   }, [])
 
-  // 编辑控制
+  // --- 编辑 ---
   const handleEditCard = useCallback((id: string) => {
     setEditingId(id)
   }, [])
 
   const handleCommitEdit = useCallback(
     (id: string, text: string) => {
-      updateSentence(id, { text })
+      updateSentence(id, { text, status: "pending", audioPath: null, duration: null })
       setEditingId(null)
     },
     [updateSentence],
@@ -145,7 +188,19 @@ function App() {
     setEditingId(null)
   }, [])
 
-  // 工具栏语音/速度循环切换（暂无下拉组件，点击循环演示）
+  // --- AlwaysOnTop ---
+  const handleToggleAlwaysOnTop = useCallback(async () => {
+    const newValue = !alwaysOnTop
+    setAlwaysOnTop(newValue)
+    try {
+      const win = getCurrentWindow()
+      await win.setAlwaysOnTop(newValue)
+    } catch {
+      // web dev 模式下忽略
+    }
+  }, [alwaysOnTop])
+
+  // --- 语音/速度循环切换 ---
   const handleVoiceClick = useCallback(() => {
     const idx = VOICE_OPTIONS.findIndex((v) => v.value === voice)
     setVoice(VOICE_OPTIONS[(idx + 1) % VOICE_OPTIONS.length].value)
@@ -156,7 +211,7 @@ function App() {
     setSpeed(SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length])
   }, [speed, setSpeed])
 
-  // 工具栏主操作随阶段变化
+  // --- 工具栏 ---
   const toolbarAction: ToolbarAction =
     phase === "complete"
       ? editMode
@@ -169,7 +224,7 @@ function App() {
     else if (toolbarAction.kind === "regenerate-all") handleRegenerateAll()
   }, [toolbarAction, handleGenerateAll, handleRegenerateAll])
 
-  // 句子卡片视图派生：状态 + 播放/编辑叠加
+  // --- 卡片视图 ---
   const cardView = useCallback(
     (sentenceId: string, status: SentenceStatus): CardView => {
       if (editingId === sentenceId) return "editing"
@@ -181,7 +236,7 @@ function App() {
     [editingId, playingId],
   )
 
-  // 状态栏文案与色调 — 与设计稿各状态保持一致
+  // --- 状态栏 ---
   const statusBar = (() => {
     const count = sentences.length
     if (phase === "empty") return { statusText: "Ready", statusTone: "default" as const }
@@ -208,14 +263,14 @@ function App() {
         settingsOpen={settingsOpen}
         alwaysOnTop={alwaysOnTop}
         onToggleSettings={() => setSettingsOpen((v) => !v)}
-        onToggleAlwaysOnTop={() => setAlwaysOnTop((v) => !v)}
+        onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
       />
       <Toolbar
         voice={voice}
         speed={speed}
         action={toolbarAction}
         editMode={editMode}
-        onImportScript={handleImportScript}
+        onImportScript={handleOpenImport}
         onToggleEdit={phase === "complete" ? () => setEditMode((v) => !v) : undefined}
         onVoiceClick={handleVoiceClick}
         onSpeedClick={handleSpeedClick}
@@ -249,7 +304,7 @@ function App() {
               errorMessage={
                 sentence.status === "failed" ? "Generation failed — check API settings" : undefined
               }
-              onPlay={() => handlePlay(sentence.id)}
+              onPlay={() => void handlePlay(sentence.id)}
               onPause={handlePause}
               onRegenerate={() => handleRegenerateCard(sentence.id)}
               onRetry={() => handleRegenerateCard(sentence.id)}
@@ -264,6 +319,9 @@ function App() {
       <StatusBar count={sentences.length} {...statusBar} />
 
       {settingsOpen && <SettingsPopover onClose={() => setSettingsOpen(false)} />}
+      {importDialogOpen && (
+        <ImportDialog onImport={handleImport} onClose={() => setImportDialogOpen(false)} />
+      )}
     </WindowShell>
   )
 }

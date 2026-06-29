@@ -27,3 +27,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 base64 = "0.22"
 # macOS 动态毛玻璃 (Vibrancy) — Tauri 2 直接在 setup 中应用
 window-vibrancy = "0.5"
+# macOS 原生文件拖拽 — 用于将音频文件拖入剪映/Premiere 等剪辑软件
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
+objc = "0.2"

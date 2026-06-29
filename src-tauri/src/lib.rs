@@ -38,6 +38,9 @@ pub fn run() {
       tts::tts_generate,
       tts::tts_test,
       tts::tts_read_audio,
+      tts::tts_copy_to_clipboard,
+      tts::tts_show_in_finder,
+      tts::tts_drag_file,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

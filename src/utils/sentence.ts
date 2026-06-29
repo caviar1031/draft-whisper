@@ -1,5 +1,5 @@
 import type { Sentence } from "@/types"
-import { generateId } from "./id"
+import { generateSentenceId } from "./id"
 
 export function splitTextToSentences(text: string): Sentence[] {
   // 匹配一段非分隔符文本 + 可选的分隔符（中英文句末标点），保留原标点
@@ -9,8 +9,8 @@ export function splitTextToSentences(text: string): Sentence[] {
   return matches
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
-    .map((sentenceText) => ({
-      id: generateId(),
+    .map((sentenceText, index) => ({
+      id: generateSentenceId(index, sentenceText),
       text: sentenceText,
       status: "pending" as const,
       audioPath: null,

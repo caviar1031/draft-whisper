@@ -1,13 +1,18 @@
+import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/tts"
 import type { Sentence } from "@/types"
 import {
+  Check,
   CirclePause,
   CirclePlay,
+  Copy,
+  FolderOpen,
   GripVertical,
   Pencil,
   RefreshCw,
   TriangleAlert,
 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 
 // 卡片可视状态 — 由 status 派生 + 播放/编辑等 UI 状态叠加
 export type CardView = "queued" | "generating" | "ready" | "playing" | "failed" | "editing"
@@ -41,6 +46,60 @@ export function SentenceCard({
   onCommitEdit,
   onCancelEdit,
 }: SentenceCardProps) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  // 原生文件拖拽 — 鼠标按下拖拽手柄后启动原生 NSDraggingSession。
+  // 原生 session 会拦截所有后续鼠标事件（moved/up），与 Finder 拖拽行为一致。
+  // 使用 setTimeout 确保 invoke 在浏览器处理完 mousedown 事件后才执行。
+  const handleDragMouseDown = useCallback(() => {
+    if (!sentence.audioPath || view !== "ready") return
+    // 延迟一帧调用 Rust，避免与浏览器的 mousedown 处理冲突
+    const path = sentence.audioPath
+    setTimeout(() => void nativeDragFile(path), 0)
+  }, [sentence.audioPath, view])
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (view !== "ready" || !sentence.audioPath) return
+      e.preventDefault()
+      e.stopPropagation()
+      setContextMenu({ x: e.clientX, y: e.clientY })
+      setCopyState("idle")
+    },
+    [view, sentence.audioPath],
+  )
+
+  const handleCopy = useCallback(async () => {
+    if (!sentence.audioPath) return
+    try {
+      await copyAudioToClipboard(sentence.audioPath)
+      setCopyState("copied")
+    } catch {
+      setCopyState("error")
+    }
+    setTimeout(() => setContextMenu(null), 600)
+  }, [sentence.audioPath])
+
+  const handleShowInFinder = useCallback(async () => {
+    if (!sentence.audioPath) return
+    try {
+      await showInFinder(sentence.audioPath)
+    } catch {
+      // ignore
+    }
+    setContextMenu(null)
+  }, [sentence.audioPath])
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    if (!contextMenu) return
+    const close = () => setContextMenu(null)
+    document.addEventListener("click", close)
+    return () => document.removeEventListener("click", close)
+  }, [contextMenu])
+
   const cardClassName = [
     "dw-sentence-card",
     view === "playing" ? "is-playing" : "",
@@ -69,8 +128,44 @@ export function SentenceCard({
   const statusLabel = viewLabel(view, queuedLabel)
 
   return (
-    <div className={cardClassName} data-sentence-id={sentence.id}>
-      <GripVertical className="dw-drag-handle" size={16} strokeWidth={2} />
+    <div
+      ref={cardRef}
+      className={cardClassName}
+      data-sentence-id={sentence.id}
+      onContextMenu={handleContextMenu}
+    >
+      <div className="dw-drag-handle" onMouseDown={handleDragMouseDown}>
+        <GripVertical size={16} strokeWidth={2} />
+      </div>
+
+      {contextMenu &&
+        createPortal(
+          <div
+            className="dw-context-menu"
+            role="menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.key === "Escape" && setContextMenu(null)}
+          >
+            <button type="button" className="dw-context-item" onClick={() => void handleCopy()}>
+              {copyState === "copied" ? (
+                <Check size={14} strokeWidth={2} style={{ color: "var(--state-success)" }} />
+              ) : (
+                <Copy size={14} strokeWidth={2} />
+              )}
+              {copyState === "copied" ? "Copied" : "Copy Audio"}
+            </button>
+            <button
+              type="button"
+              className="dw-context-item"
+              onClick={() => void handleShowInFinder()}
+            >
+              <FolderOpen size={14} strokeWidth={2} />
+              Show in Finder
+            </button>
+          </div>,
+          document.body,
+        )}
       <div className="dw-sentence-body">
         <div className={`dw-sentence-text${view === "queued" ? " dw-sentence-text--muted" : ""}`}>
           {sentence.text}
@@ -204,7 +299,9 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
 
   return (
     <div className={className}>
-      <GripVertical className="dw-drag-handle" size={16} strokeWidth={2} style={{ marginTop: 2 }} />
+      <div className="dw-drag-handle" style={{ marginTop: 2 }}>
+        <GripVertical size={16} strokeWidth={2} />
+      </div>
       <div className="dw-sentence-body">
         <div
           style={{

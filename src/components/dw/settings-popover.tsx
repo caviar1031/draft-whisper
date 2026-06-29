@@ -1,7 +1,8 @@
 import { MODEL_OPTIONS, SPEED_OPTIONS, VOICE_OPTIONS } from "@/lib/options"
+import { testTts } from "@/services/tts"
 import { useSettingsStore } from "@/stores/settings-store"
 import { RefreshCw, X } from "lucide-react"
-import { useState } from "react"
+import { useCallback, useState } from "react"
 
 // 测试 API 按钮的三种反馈态
 type TestState = "idle" | "testing" | "success" | "error"
@@ -14,13 +15,21 @@ export function SettingsPopover({ onClose }: SettingsPopoverProps) {
   const settings = useSettingsStore()
   const [testState, setTestState] = useState<TestState>("idle")
 
-  const handleTest = () => {
+  const handleTest = useCallback(async () => {
     setTestState("testing")
-    // 模拟一次 API 测试：800ms 后随机成功/失败
-    window.setTimeout(() => {
-      setTestState(Math.random() > 0.3 ? "success" : "error")
-    }, 800)
-  }
+    try {
+      await testTts({
+        baseUrl: settings.baseUrl,
+        apiKey: settings.apiKey,
+        model: settings.model,
+        voice: settings.voice,
+        speed: settings.speed,
+      })
+      setTestState("success")
+    } catch {
+      setTestState("error")
+    }
+  }, [settings.baseUrl, settings.apiKey, settings.model, settings.voice, settings.speed])
 
   const testLabel =
     testState === "testing"

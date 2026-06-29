@@ -106,6 +106,8 @@ draft-whisper/
 
 - Conventional Commits（`feat:`、`fix:`、`chore:` 等）。
 - 不主动创建文档文件（`.md`），除非明确要求。
+- 不主动提交 commit。
+- 提交 git 前需检查.gitignore 文件是否有不合适上传到 github 的文件
 
 ---
 
@@ -128,17 +130,95 @@ draft-whisper/
 要点：
 
 - **状态在前端**：Zustand store 持有 settings 与 project（见 [src/stores](src/stores)）。后端无状态，每次调用由前端把 settings 作为参数传入。MVP 不做后端持久化（PRD 验收要求重启后配置保留 → 由前端持久化到本地，待实现）。
-- **协议**：MVP 固定使用小米 MiMo v2.5 TTS（chat-completions 风格，非 OpenAI `/audio/speech`）。详见第 9 节。
+- **协议**：MVP 固定使用小米 MiMo v2.5 TTS（chat-completions 风格，非 OpenAI `/audio/speech`）。详见第 10 节。
 - **音频落盘**：后端把音频写到 `audio/{sentence_id}.wav`，重新生成同名覆盖。返回绝对路径字符串。目录选择有三级 fallback：`app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`（macOS sandbox 下前两个可能被 TCC 拒绝写入，最终用本地目录兜底）。前端拿到的是绝对路径，不关心具体落在哪。
 - **播放方式**：前端通过 `tts_read_audio` 命令取回字节，转 `Blob URL` 播放（无需配置 asset 协议/权限，跨平台稳定）。封装见 `src/services/tts.ts` 的 `readAudioAsUrl`。
 
 ---
 
-## 7. IPC 接口契约（前端必读）
+## 7. 文件命名规范
+
+### 7.1 sentenceId 生成规则
+
+**前端**：[src/utils/id.ts](src/utils/id.ts) 的 `generateSentenceId(index, text)` 函数
+
+```ts
+export function generateSentenceId(index: number, text: string): string {
+  // 3 位序号，从 001 开始
+  const seq = String(index + 1).padStart(3, "0")
+
+  // 文本摘要：取前 20 个字符，清理特殊字符
+  const cleaned = text
+    .replace(/[。！？；.!?\n\r]/g, "") // 移除句末标点
+    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, "") // 只保留中文、英文、数字
+    .substring(0, 20)
+
+  // 4 位短 ID，保证唯一性
+  const shortId = Math.random().toString(36).substring(2, 6)
+
+  return `${seq}_${cleaned}_${shortId}`
+}
+```
+
+- **格式**：`{3位序号}_{文本摘要}_{4位短ID}`
+- **序号**：从 `001` 开始，按句子顺序递增
+- **文本摘要**：取原文前 20 个字符，只保留中文/英文/数字
+- **短 ID**：4 位随机字符串，避免同序号同文本冲突
+- **示例**：`001_今天我们学习Agent_k7x9`
+
+### 7.2 文件名清理规则
+
+**后端**：[src-tauri/src/tts.rs](src-tauri/src/tts.rs) 的 `sanitize_filename()` 函数
+
+```rust
+fn sanitize_filename(name: &str) -> String {
+  name
+    .chars()
+    .map(|c| {
+      if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+        c
+      } else {
+        '_'
+      }
+    })
+    .collect()
+}
+```
+
+- 保留字符：ASCII 字母数字（`a-z`、`A-Z`、`0-9`）、`-`、`_`
+- 其他字符：替换为 `_`
+- 目的：确保文件名在所有操作系统上安全
+
+### 7.3 最终文件名格式
+
+```
+{audioDir}/{sanitized_sentenceId}.wav
+```
+
+- `audioDir`：音频目录（三级 fallback，见第 6 节）
+- `sanitized_sentenceId`：经过 `sanitize_filename()` 清理的 sentenceId
+- 扩展名：`.wav`（固定，与 TTS 输出格式一致）
+
+### 7.4 示例
+
+| 原文 | sentenceId | 清理后 | 最终文件名 |
+|------|------------|--------|------------|
+| `今天我们学习 Agent。` | `001_今天我们学习Agent_k7x9` | `001_今天我们学习Agent_k7x9` | `001_今天我们学习Agent_k7x9.wav` |
+| `它是什么？` | `002_它是什么_m2n4` | `002_它是什么_m2n4` | `002_它是什么_m2n4.wav` |
+| `Hello World!` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8.wav` |
+
+### 7.5 重新生成行为
+
+- 同一 sentenceId 重新生成时，**同名覆盖**原文件
+- 前端通过 `invalidateAudioUrl(result.audioPath)` 清除旧的 Blob URL 缓存
+
+---
+
+## 8. IPC 接口契约（前端必读）
 
 前端通过 `@tauri-apps/api/core` 的 `invoke` 调用以下命令。已封装在 [src/services/tts.ts](src/services/tts.ts)，**前端请直接 import service，不要手写 invoke**。
 
-### 7.1 `tts_generate`
+### 8.1 `tts_generate`
 
 为某一句文本生成音频并缓存到本地。
 
@@ -192,7 +272,7 @@ interface TtsParams {
 
 行为：用一段极短测试文本 `"测试"` 发起一次真实 TTS 请求，成功即返回，失败返回错误。
 
-### 7.3 `tts_read_audio`
+### 8.3 `tts_read_audio`
 
 读取本地音频文件字节，前端转 Blob URL 播放。
 
@@ -212,7 +292,7 @@ const url = await readAudioAsUrl(sentence.audioPath) // blob:...
 
 ---
 
-## 8. 数据模型
+## 9. 数据模型
 
 见 [src/types](src/types)。前端定义即权威，后端用对应 serde 结构。
 
@@ -243,7 +323,7 @@ interface Project { voice: string; model: string; speed: number; sentences: Sent
 
 ---
 
-## 9. TTS 实现要点
+## 10. TTS 实现要点
 
 - 协议：小米 MiMo v2.5 TTS，`POST {baseUrl}/chat/completions`（chat-completions 风格，**非** OpenAI `/audio/speech`）。文档：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
 - 认证：`api-key: <apiKey>` 请求头（不是 `Authorization: Bearer`）。
@@ -259,9 +339,9 @@ interface Project { voice: string; model: string; speed: number; sentences: Sent
 
 ---
 
-## 10. 扩展指引
+## 11. 扩展指引
 
-- 新增 Tauri 命令：在 [src-tauri/src/tts.rs](src-tauri/src/tts.rs)（或新建模块）写 `#[tauri::command]`，在 [lib.rs](src-tauri/src/lib.rs) 的 `invoke_handler![...]` 注册，并在本文件第 7 节补契约。
+- 新增 Tauri 命令：在 [src-tauri/src/tts.rs](src-tauri/src/tts.rs)（或新建模块）写 `#[tauri::command]`，在 [lib.rs](src-tauri/src/lib.rs) 的 `invoke_handler![...]` 注册，并在本文件第 8 节补契约。
 - 新增前端 service：放 `src/services/`，命名 kebab-case；通过 `index.ts` re-export。
 - 新增依赖：前端用 `npm i`；后端改 [Cargo.toml](src-tauri/Cargo.toml) 后 `cargo check`。
 - 涉及文件系统/网络新权限：改 [src-tauri/capabilities/default.json](src-tauri/capabilities/default.json)。

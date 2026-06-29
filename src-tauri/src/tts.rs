@@ -230,3 +230,235 @@ pub fn tts_read_audio(path: String) -> Result<Response, String> {
   let bytes = std::fs::read(&path).map_err(|e| format!("读取音频文件失败: {e}"))?;
   Ok(Response::new(bytes))
 }
+
+/// 将音频文件复制到 macOS 系统剪贴板（文件引用，非文本）。
+///
+/// 使用 AppleScript 的 `set the clipboard to (POSIX file "...")` 实现。
+/// 用户随后可以在 Finder / 剪映 / Premiere 等应用中 Cmd+V 粘贴文件。
+///
+/// 前端调用: `invoke("tts_copy_to_clipboard", { path })`
+#[tauri::command]
+pub fn tts_copy_to_clipboard(path: String) -> Result<(), String> {
+  if !std::path::Path::new(&path).exists() {
+    return Err(format!("文件不存在: {path}"));
+  }
+
+  let script = format!("set the clipboard to (POSIX file \"{}\")", path.replace('"', "\\\""));
+
+  #[cfg(target_os = "macos")]
+  {
+    let output = std::process::Command::new("osascript")
+      .args(["-e", &script])
+      .output()
+      .map_err(|e| format!("执行 osascript 失败: {e}"))?;
+
+    if !output.status.success() {
+      let stderr = String::from_utf8_lossy(&output.stderr);
+      return Err(format!("复制到剪贴板失败: {stderr}"));
+    }
+  }
+
+  #[cfg(not(target_os = "macos"))]
+  {
+    let _ = script; // 非 macOS 平台暂不支持
+    return Err("文件复制到剪贴板仅支持 macOS".into());
+  }
+
+  Ok(())
+}
+
+/// 在 Finder 中显示音频文件。
+///
+/// 使用 `open -R <path>` 打开 Finder 并选中该文件。
+///
+/// 前端调用: `invoke("tts_show_in_finder", { path })`
+#[tauri::command]
+pub fn tts_show_in_finder(path: String) -> Result<(), String> {
+  if !std::path::Path::new(&path).exists() {
+    return Err(format!("文件不存在: {path}"));
+  }
+
+  #[cfg(target_os = "macos")]
+  {
+    std::process::Command::new("open")
+      .args(["-R", &path])
+      .spawn()
+      .map_err(|e| format!("打开 Finder 失败: {e}"))?;
+  }
+
+  #[cfg(not(target_os = "macos"))]
+  {
+    let _ = path;
+    return Err("Show in Finder 仅支持 macOS".into());
+  }
+
+  Ok(())
+}
+
+/// 发起 macOS 原生文件拖拽，将音频文件拖入剪映/Premiere 等剪辑软件。
+///
+/// 使用 `NSView::beginDraggingSessionWithItems:event:source:` 创建真正的
+/// NSDraggingSession，与 Finder 拖拽行为一致。
+/// WebView 的 HTML5 拖拽只传文本数据，剪映不认；原生拖拽传 NSURL，
+/// 剪映/Premiere 等都能正确接收。
+///
+/// 前端调用: `invoke("tts_drag_file", { path })`
+#[tauri::command]
+#[cfg(target_os = "macos")]
+pub fn tts_drag_file(path: String, window: tauri::Window) -> Result<(), String> {
+  use objc::class;
+  use objc::declare::ClassDecl;
+  use objc::msg_send;
+  use objc::runtime::{Class, Object, Sel};
+  use objc::sel;
+  use objc::sel_impl;
+  use std::ffi::{c_double, CString};
+
+  if !std::path::Path::new(&path).exists() {
+    return Err(format!("文件不存在: {path}"));
+  }
+
+  let ns_view_ptr = window.ns_view().map_err(|e| format!("获取 ns_view 失败: {e}"))?;
+
+  unsafe {
+    let content_view = ns_view_ptr as *mut Object;
+
+    // --- Dynamic class for NSDraggingSource ---
+    let drag_source_class = {
+      static mut CLS: *const Class = std::ptr::null();
+      static ONCE: std::sync::Once = std::sync::Once::new();
+      ONCE.call_once(|| {
+        let mut decl =
+          ClassDecl::new("DWFileDragSource", class!(NSObject)).unwrap();
+        decl.add_method(
+          sel!(draggingSession:sourceOperationMaskForDraggingContext:),
+          dragging_source_op_mask as extern "C" fn(&Object, Sel, *mut Object, isize) -> u64,
+        );
+        CLS = decl.register();
+      });
+      CLS
+    };
+
+    extern "C" fn dragging_source_op_mask(
+      _this: &Object,
+      _sel: Sel,
+      _session: *mut Object,
+      _context: isize,
+    ) -> u64 {
+      1 // NSDragOperationCopy
+    }
+
+    // --- Drag source instance ---
+    let source: *mut Object = msg_send![drag_source_class, new];
+
+    // --- File URL ---
+    // CString 确保 \0 结尾；stringWithUTF8String: 要求 C 风格字符串（null-terminated）
+    let c_path = CString::new(path).map_err(|e| format!("路径含非法字符: {e}"))?;
+    let path_str: *mut Object =
+      msg_send![class!(NSString), stringWithUTF8String: c_path.as_ptr()];
+    let file_url: *mut Object = msg_send![class!(NSURL), fileURLWithPath: path_str];
+
+    // --- Audio file icon ---
+    let icon_name: *mut Object =
+      msg_send![class!(NSString), stringWithUTF8String: b"NSAudioFile\0".as_ptr()];
+    let drag_image: *mut Object = msg_send![class!(NSImage), imageNamed: icon_name];
+    if drag_image.is_null() {
+      let _: () = msg_send![source, release];
+      return Err("获取音频图标失败".into());
+    }
+
+    // --- Mouse location (global, in screen coordinates) ---
+    let mouse_loc: NSPoint = msg_send![class!(NSEvent), mouseLocation];
+
+    // --- Window number ---
+    let ns_window: *mut Object = msg_send![content_view, window];
+    let window_number: i64 = msg_send![ns_window, windowNumber];
+
+    // --- Synthesize mouse-down event ---
+    let event_type: u64 = 1; // NSLeftMouseDown
+    let mod_flags: u64 = 0;
+    let ts: c_double = 0.0;
+    let ctx: *mut Object = std::ptr::null_mut();
+    let ev_num: i64 = 0;
+    let click_count: i64 = 1;
+    let pressure: f32 = 1.0;
+    let event: *mut Object = msg_send![
+      class!(NSEvent),
+      mouseEventWithType: event_type
+      location: mouse_loc
+      modifierFlags: mod_flags
+      timestamp: ts
+      windowNumber: window_number
+      context: ctx
+      eventNumber: ev_num
+      clickCount: click_count
+      pressure: pressure
+    ];
+
+    // --- NSDraggingItem with the file URL as pasteboard content ---
+    let item: *mut Object = msg_send![class!(NSDraggingItem), alloc];
+    let item: *mut Object = msg_send![item, initWithPasteboardWriter: file_url];
+
+    // Set the drag image at mouse location (64×64 icon)
+    let drag_frame = NSRect {
+      origin: NSPoint {
+        x: mouse_loc.x - 32.0,
+        y: mouse_loc.y - 32.0,
+      },
+      size: NSSize {
+        width: 64.0,
+        height: 64.0,
+      },
+    };
+    let _: () = msg_send![item, setDraggingFrame: drag_frame contents: drag_image];
+
+    // --- NSArray with the dragging item ---
+    let items: *mut Object = msg_send![class!(NSArray), arrayWithObject: item];
+
+    // --- Begin native dragging session from the content view ---
+    // Returns an NSDraggingSession (autoreleased); the session retains
+    // items and source internally, so they survive after this function returns.
+    let _session: *mut Object = msg_send![
+      content_view,
+      beginDraggingSessionWithItems: items
+      event: event
+      source: source
+    ];
+
+    log::info!("原生文件拖拽已启动: {}", c_path.to_string_lossy());
+  }
+
+  Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub fn tts_drag_file(path: String, _window: tauri::Window) -> Result<(), String> {
+  let _ = path;
+  Err("原生文件拖拽仅支持 macOS".into())
+}
+
+// NSPoint / NSSize / NSRect — 与 CoreGraphics / AppKit 布局一致
+#[cfg(target_os = "macos")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct NSPoint {
+  x: f64,
+  y: f64,
+}
+
+#[cfg(target_os = "macos")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct NSSize {
+  width: f64,
+  height: f64,
+}
+
+#[cfg(target_os = "macos")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct NSRect {
+  origin: NSPoint,
+  size: NSSize,
+}

@@ -8,6 +8,7 @@ export function EmptyState() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
+        flex: 1,
         padding: "80px 32px",
         textAlign: "center",
       }}

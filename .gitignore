@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Rust
+src-tauri/target
+
 # TTS 音频缓存（dev 模式 sandbox fallback 会写到项目本地）
 .cache
 

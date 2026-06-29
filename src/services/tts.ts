@@ -72,3 +72,31 @@ export async function readAudioAsUrl(path: string): Promise<string> {
   audioUrlCache.set(path, url)
   return url
 }
+
+/**
+ * 将音频文件复制到 macOS 系统剪贴板（文件引用）。
+ * 用户随后可以在 Finder / 剪映 / Premiere 等应用中 Cmd+V 粘贴文件。
+ *
+ * 后端: invoke("tts_copy_to_clipboard", { path })
+ */
+export async function copyAudioToClipboard(path: string): Promise<void> {
+  await invoke<void>("tts_copy_to_clipboard", { path })
+}
+
+/**
+ * 在 Finder 中显示音频文件。
+ *
+ * 后端: invoke("tts_show_in_finder", { path })
+ */
+export async function showInFinder(path: string): Promise<void> {
+  await invoke<void>("tts_show_in_finder", { path })
+}
+
+/**
+ * 发起 macOS 原生文件拖拽（将音频文件拖入剪映/Premiere 等剪辑软件）。
+ *
+ * 后端: invoke("tts_drag_file", { path, window })
+ */
+export async function nativeDragFile(path: string): Promise<void> {
+  await invoke<void>("tts_drag_file", { path })
+}
