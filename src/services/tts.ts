@@ -1,6 +1,5 @@
 import type { Settings } from "@/types"
 import { invoke } from "@tauri-apps/api/core"
-import { open } from "@tauri-apps/plugin-dialog"
 
 /** TTS 调用参数，与 Settings 字段一一对应，传给 Rust 后端。 */
 export type TtsParams = Settings
@@ -37,15 +36,15 @@ export function revokeAllAudioUrls(): void {
  * 为某一句文本生成音频并缓存到本地。
  * 成功后自动 invalidate 该路径的旧 Blob URL（重新生成场景）。
  *
- * 后端: invoke("tts_generate", { sentenceId, text, params, outputDir })
+ * 后端: invoke("tts_generate", { sentenceId, text, params, project })
  */
 export async function generateSentenceAudio(
   sentenceId: string,
   text: string,
   params: TtsParams,
-  outputDir?: string | null,
+  project?: string | null,
 ): Promise<TtsResult> {
-  const result = await invoke<TtsResult>("tts_generate", { sentenceId, text, params, outputDir })
+  const result = await invoke<TtsResult>("tts_generate", { sentenceId, text, params, project })
   invalidateAudioUrl(result.audioPath)
   return result
 }
@@ -69,19 +68,21 @@ export async function listModels(baseUrl: string, apiKey: string): Promise<strin
 }
 
 /**
- * 弹出系统目录选择对话框，返回选中的目录路径。
- * 用户取消时返回 `null`。
+ * 列出所有已有项目名称。
  *
- * 后端: `@tauri-apps/plugin-dialog` 的 `open` 方法
+ * 后端: invoke("tts_list_projects") → string[]
  */
-export async function pickDir(): Promise<string | null> {
-  const result = await open({
-    directory: true,
-    multiple: false,
-  })
-  if (!result) return null
-  if (Array.isArray(result)) return result[0] ?? null
-  return result
+export async function listProjects(): Promise<string[]> {
+  return invoke<string[]>("tts_list_projects")
+}
+
+/**
+ * 创建新项目，返回创建后的完整项目列表。
+ *
+ * 后端: invoke("tts_create_project", { name }) → string[]
+ */
+export async function createProject(name: string): Promise<string[]> {
+  return invoke<string[]>("tts_create_project", { name })
 }
 
 /**

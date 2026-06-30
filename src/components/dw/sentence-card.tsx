@@ -2,6 +2,8 @@ import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/t
 import type { Sentence } from "@/types"
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
   CirclePause,
   CirclePlay,
   Copy,
@@ -11,7 +13,7 @@ import {
   RefreshCw,
   TriangleAlert,
 } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 
 // 卡片可视状态 — 由 status 派生 + 播放/编辑等 UI 状态叠加
@@ -30,6 +32,7 @@ interface SentenceCardProps {
   onEdit: () => void
   onCommitEdit: (text: string) => void
   onCancelEdit: () => void
+  onSwitchVersion: (historyIndex: number) => void
 }
 
 export function SentenceCard({
@@ -45,10 +48,17 @@ export function SentenceCard({
   onEdit,
   onCommitEdit,
   onCancelEdit,
+  onSwitchVersion,
 }: SentenceCardProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
   const cardRef = useRef<HTMLDivElement>(null)
+
+  const historyCount = sentence.audioHistory.length
+  const currentIndex = useMemo(() => {
+    if (!sentence.audioPath || historyCount === 0) return -1
+    return sentence.audioHistory.findIndex((v) => v.audioPath === sentence.audioPath)
+  }, [sentence.audioPath, sentence.audioHistory, historyCount])
 
   // 原生文件拖拽 — 鼠标按下拖拽手柄后启动原生 NSDraggingSession。
   // 原生 session 会拦截所有后续鼠标事件（moved/up），与 Finder 拖拽行为一致。
@@ -173,6 +183,31 @@ export function SentenceCard({
         <div className="dw-sentence-meta">
           <span className={statusDotClass} />
           <span className={statusTextClass}>{statusLabel}</span>
+          {view === "ready" && historyCount > 1 && (
+            <div className="dw-version-nav">
+              <button
+                type="button"
+                className="dw-version-btn"
+                disabled={currentIndex <= 0}
+                onClick={() => onSwitchVersion(currentIndex - 1)}
+                aria-label="Previous version"
+              >
+                <ChevronLeft size={12} strokeWidth={2.5} />
+              </button>
+              <span className="dw-version-label">
+                {currentIndex + 1}/{historyCount}
+              </span>
+              <button
+                type="button"
+                className="dw-version-btn"
+                disabled={currentIndex >= historyCount - 1}
+                onClick={() => onSwitchVersion(currentIndex + 1)}
+                aria-label="Next version"
+              >
+                <ChevronRight size={12} strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
           {view === "playing" && <Waveform bars={5} />}
           {view === "generating" && (
             <>

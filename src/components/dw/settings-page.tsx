@@ -1,7 +1,7 @@
 import { MODEL_OPTIONS } from "@/lib/options"
-import { listModels, pickDir, testTts } from "@/services/tts"
+import { listModels, testTts } from "@/services/tts"
 import { useSettingsStore } from "@/stores/settings-store"
-import { Download, FolderOpen, RefreshCw, X } from "lucide-react"
+import { Download, RefreshCw } from "lucide-react"
 import { useCallback, useRef, useState } from "react"
 
 // 测试 API 按钮的三种反馈态
@@ -49,19 +49,6 @@ export function SettingsPage() {
       setTestState("error")
     }
   }, [settings.baseUrl, settings.apiKey, settings.model, settings.voice, settings.speed])
-
-  const handlePickDir = useCallback(async () => {
-    try {
-      const dir = await pickDir()
-      if (dir) settings.setWorkingDir(dir)
-    } catch {
-      // 取消或失败时忽略
-    }
-  }, [settings])
-
-  const handleClearDir = useCallback(() => {
-    settings.setWorkingDir(null)
-  }, [settings])
 
   const testLabel =
     testState === "testing"
@@ -132,35 +119,6 @@ export function SettingsPage() {
         </div>
       </Field>
 
-      <Field label="Working Directory">
-        <div className="dw-dir-row">
-          <div className="dw-dir-display">
-            <FolderOpen size={14} strokeWidth={2} />
-            <span className="dw-dir-path">
-              {settings.workingDir || "Default (app cache)"}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="dw-dir-btn"
-            onClick={handlePickDir}
-            title="Choose directory"
-          >
-            Choose
-          </button>
-          {settings.workingDir && (
-            <button
-              type="button"
-              className="dw-dir-btn dw-dir-clear"
-              onClick={handleClearDir}
-              title="Reset to default"
-            >
-              <X size={14} strokeWidth={2} />
-            </button>
-          )}
-        </div>
-      </Field>
-
       <Field label="Concurrency">
         <input
           className="dw-settings-input"
@@ -181,9 +139,7 @@ export function SettingsPage() {
         onClick={handleTest}
         disabled={testState === "testing"}
       >
-        {testState === "testing" && (
-          <RefreshCw size={14} strokeWidth={2} className="dw-spinner" />
-        )}
+        {testState === "testing" && <RefreshCw size={14} strokeWidth={2} className="dw-spinner" />}
         {testState === "success" && <span>✓ </span>}
         {testLabel}
       </button>

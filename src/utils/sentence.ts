@@ -14,6 +14,7 @@ export function splitTextToSentences(text: string): Sentence[] {
       text: sentenceText,
       status: "pending" as const,
       audioPath: null,
+      audioHistory: [],
       duration: null,
     }))
 }

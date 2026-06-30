@@ -2,6 +2,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{ipc::Response, AppHandle, Manager};
 
 /// 与前端 Settings 一一对应的 TTS 调用参数。
@@ -30,6 +31,65 @@ pub struct TtsParams {
 #[serde(rename_all = "camelCase")]
 pub struct TtsResult {
   pub audio_path: String,
+}
+
+// ---- 项目管理 ----
+
+/// 获取项目根目录：`{audio_cache_dir}/projects/`。
+fn projects_root(app: &AppHandle) -> Result<PathBuf, String> {
+  let base = ensure_audio_dir(app)?;
+  let root = base.join("projects");
+  std::fs::create_dir_all(&root)
+    .map_err(|e| format!("创建项目根目录失败: {e}"))?;
+  Ok(root)
+}
+
+/// 列出所有已有项目名称。
+///
+/// 前端调用: `invoke("tts_list_projects")` → `string[]`
+#[tauri::command]
+pub fn tts_list_projects(app: AppHandle) -> Result<Vec<String>, String> {
+  let root = projects_root(&app)?;
+  let mut names: Vec<String> = Vec::new();
+  for entry in std::fs::read_dir(&root)
+    .map_err(|e| format!("读取项目目录失败: {e}"))?
+  {
+    let entry = entry.map_err(|e| format!("读取条目失败: {e}"))?;
+    if entry
+      .file_type()
+      .map_err(|e| format!("获取文件类型失败: {e}"))?
+      .is_dir()
+    {
+      if let Some(name) = entry.file_name().to_str() {
+        names.push(name.to_string());
+      }
+    }
+  }
+  names.sort();
+  Ok(names)
+}
+
+/// 创建新项目（在 caches 目录下创建子文件夹）。
+///
+/// 前端调用: `invoke("tts_create_project", { name })` → `string[]`（创建后的完整列表）
+#[tauri::command]
+pub fn tts_create_project(name: String, app: AppHandle) -> Result<Vec<String>, String> {
+  let trimmed = name.trim().to_string();
+  if trimmed.is_empty() {
+    return Err("项目名称不能为空".into());
+  }
+  if trimmed.contains('/') || trimmed.contains('\\') || trimmed.starts_with('.') {
+    return Err("项目名称不能包含 /、\\ 或以 . 开头".into());
+  }
+  let root = projects_root(&app)?;
+  let dir = root.join(&trimmed);
+  if dir.exists() {
+    return Err(format!("项目「{trimmed}」已存在"));
+  }
+  std::fs::create_dir_all(&dir)
+    .map_err(|e| format!("创建项目目录失败: {e}"))?;
+  log::info!("✓ 已创建项目: {}", dir.display());
+  tts_list_projects(app)
 }
 
 /// 规范化 base_url 为 MiMo 的 `/v1/chat/completions` 端点。
@@ -195,16 +255,17 @@ async fn request_speech(params: &TtsParams, text: &str) -> Result<Vec<u8>, Strin
     .map_err(|e| format!("base64 解码失败: {e}"))
 }
 
-/// 为某一句文本生成音频并写入本地缓存（同名覆盖）。
+/// 为某一句文本生成音频并写入本地缓存（每次生成使用唯一文件名，不覆盖历史版本）。
 ///
-/// 前端调用: `invoke("tts_generate", { sentenceId, text, params, outputDir })`
-/// - `output_dir`（可选）: 自定义输出目录；为 `None` 时使用默认三级 fallback 目录
+/// 前端调用: `invoke("tts_generate", { sentenceId, text, params, project })`
+/// - `project`（可选）: 项目名称，音频存入 `{cache}/audio/projects/{project}/`；为 `None` 时存入 `{cache}/audio/`
+/// - 文件名格式: `{sanitized_sentenceId}_{timestamp_ms}.wav`，确保每次生成不覆盖旧文件
 #[tauri::command]
 pub async fn tts_generate(
   sentence_id: String,
   text: String,
   params: TtsParams,
-  output_dir: Option<String>,
+  project: Option<String>,
   app: AppHandle,
 ) -> Result<TtsResult, String> {
   if text.trim().is_empty() {
@@ -214,16 +275,27 @@ pub async fn tts_generate(
     return Err("缺少 baseUrl 或 apiKey，请先在设置中填写".into());
   }
 
-  let audio_dir = if let Some(dir) = output_dir {
-    let path = PathBuf::from(&dir);
-    std::fs::create_dir_all(&path)
-      .map_err(|e| format!("创建输出目录失败: {dir} -> {e}"))?;
-    path
+  let audio_dir = if let Some(ref proj) = project {
+    let trimmed = proj.trim();
+    if trimmed.is_empty() {
+      ensure_audio_dir(&app)?
+    } else {
+      let root = projects_root(&app)?;
+      let dir = root.join(trimmed);
+      std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("创建项目目录失败: {e}"))?;
+      dir
+    }
   } else {
     ensure_audio_dir(&app)?
   };
-  let file_name = format!("{}.wav", sanitize_filename(&sentence_id));
-  let file_path = audio_dir.join(file_name);
+
+  let timestamp = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_millis();
+  let file_name = format!("{}_{}.wav", sanitize_filename(&sentence_id), timestamp);
+  let file_path = audio_dir.join(&file_name);
 
   let bytes = request_speech(&params, &text).await?;
 

@@ -9,7 +9,7 @@ interface SettingsState extends Settings {
   setVoice: (voice: string) => void
   setSpeed: (speed: number) => void
   setConcurrency: (concurrency: number) => void
-  setWorkingDir: (workingDir: string | null) => void
+  setProject: (project: string | null) => void
   updateSettings: (settings: Partial<Settings>) => void
 }
 
@@ -23,7 +23,7 @@ export const useSettingsStore = create<SettingsState>()(
       voice: "冰糖",
       speed: 1,
       concurrency: 1,
-      workingDir: null,
+      project: null,
 
       setBaseUrl: (baseUrl) => set({ baseUrl }),
       setApiKey: (apiKey) => set({ apiKey }),
@@ -31,7 +31,7 @@ export const useSettingsStore = create<SettingsState>()(
       setVoice: (voice) => set({ voice }),
       setSpeed: (speed) => set({ speed }),
       setConcurrency: (concurrency) => set({ concurrency }),
-      setWorkingDir: (workingDir) => set({ workingDir }),
+      setProject: (project) => set({ project }),
       updateSettings: (settings) => set((state) => ({ ...state, ...settings })),
     }),
     { name: "dw-settings" },

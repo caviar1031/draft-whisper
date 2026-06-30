@@ -1,11 +1,12 @@
 import { EmptyState } from "@/components/dw/empty-state"
 import { ImportDialog } from "@/components/dw/import-dialog"
+import { ProjectConfigCard } from "@/components/dw/project-config-card"
 import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
 import { SettingsPage } from "@/components/dw/settings-page"
 import { TitleBar } from "@/components/dw/title-bar"
 import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
-import { generateSentenceAudio, readAudioAsUrl } from "@/services/tts"
+import { createProject, generateSentenceAudio, listProjects, readAudioAsUrl } from "@/services/tts"
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
@@ -20,18 +21,21 @@ function App() {
   const sentences = useProjectStore((s) => s.sentences)
   const setSentences = useProjectStore((s) => s.setSentences)
   const updateSentence = useProjectStore((s) => s.updateSentence)
+  const switchAudioVersion = useProjectStore((s) => s.switchAudioVersion)
 
   const voice = useSettingsStore((s) => s.voice)
-  const speed = useSettingsStore((s) => s.speed)
   const setVoice = useSettingsStore((s) => s.setVoice)
-  const setSpeed = useSettingsStore((s) => s.setSpeed)
+  const project = useSettingsStore((s) => s.project)
+  const setProject = useSettingsStore((s) => s.setProject)
 
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [projectConfigOpen, setProjectConfigOpen] = useState(false)
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
+  const [projects, setProjects] = useState<string[]>([])
 
   const genRunId = useRef(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -44,6 +48,49 @@ function App() {
       }
     }
   }, [])
+
+  // 获取项目列表
+  const fetchProjects = useCallback(async () => {
+    try {
+      const projectList = await listProjects()
+      setProjects(projectList)
+    } catch (error) {
+      console.error("Failed to fetch projects:", error)
+    }
+  }, [])
+
+  // 打开项目配置卡片
+  const handleOpenProjectConfig = useCallback(() => {
+    void fetchProjects()
+    setProjectConfigOpen(true)
+  }, [fetchProjects])
+
+  // 关闭项目配置卡片
+  const handleCloseProjectConfig = useCallback(() => {
+    setProjectConfigOpen(false)
+  }, [])
+
+  // 选择项目
+  const handleSelectProject = useCallback(
+    (selectedProject: string | null) => {
+      setProject(selectedProject)
+    },
+    [setProject],
+  )
+
+  // 创建项目
+  const handleCreateProject = useCallback(
+    async (name: string) => {
+      try {
+        const updatedProjects = await createProject(name)
+        setProjects(updatedProjects)
+        setProject(name)
+      } catch (error) {
+        console.error("Failed to create project:", error)
+      }
+    },
+    [setProject],
+  )
 
   // 由句子状态派生的高层阶段
   const phase: Phase =
@@ -70,7 +117,7 @@ function App() {
         speed: settings.speed,
       }
       const concurrency = settings.concurrency
-      const workingDir = settings.workingDir
+      const project = settings.project
 
       // 先把所有句子标记为 queued（等待中）
       for (const id of ids) {
@@ -87,10 +134,18 @@ function App() {
           if (!sentence) continue
           updateSentence(id, { status: "generating" })
           try {
-            const result = await generateSentenceAudio(id, sentence.text, params, workingDir)
+            const result = await generateSentenceAudio(id, sentence.text, params, project)
             if (genRunId.current !== runId) return
-            updateSentence(id, { status: "completed", audioPath: result.audioPath })
-          } catch {
+            const newVersion = { audioPath: result.audioPath, createdAt: Date.now() }
+            const currentHistory =
+              useProjectStore.getState().sentences.find((s) => s.id === id)?.audioHistory ?? []
+            updateSentence(id, {
+              status: "completed",
+              audioPath: result.audioPath,
+              audioHistory: [...currentHistory, newVersion],
+            })
+          } catch (e) {
+            console.error("TTS generate failed:", id, e)
             if (genRunId.current !== runId) return
             updateSentence(id, { status: "failed" })
           }
@@ -185,6 +240,18 @@ function App() {
     setPlayingId(null)
   }, [])
 
+  const handleSwitchVersion = useCallback(
+    (id: string, historyIndex: number) => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      setPlayingId(null)
+      switchAudioVersion(id, historyIndex)
+    },
+    [switchAudioVersion],
+  )
+
   // --- 编辑 ---
   const handleEditCard = useCallback((id: string) => {
     setEditingId(id)
@@ -192,7 +259,13 @@ function App() {
 
   const handleCommitEdit = useCallback(
     (id: string, text: string) => {
-      updateSentence(id, { text, status: "pending", audioPath: null, duration: null })
+      updateSentence(id, {
+        text,
+        status: "pending",
+        audioPath: null,
+        audioHistory: [],
+        duration: null,
+      })
       setEditingId(null)
     },
     [updateSentence],
@@ -279,24 +352,18 @@ function App() {
         <>
           <Toolbar
             voice={voice}
-            speed={speed}
             action={toolbarAction}
             editMode={editMode}
             onImportScript={handleOpenImport}
             onToggleEdit={phase === "complete" ? () => setEditMode((v) => !v) : undefined}
             onVoiceChange={setVoice}
-            onSpeedChange={setSpeed}
             onAction={handleToolbarAction}
           />
 
           {failedCount > 0 && (
             <div className="dw-retry-all-bar">
               <span className="dw-retry-all-label">
-                <TriangleAlert
-                  size={14}
-                  strokeWidth={2}
-                  style={{ color: "var(--state-error)" }}
-                />
+                <TriangleAlert size={14} strokeWidth={2} style={{ color: "var(--state-error)" }} />
                 {failedCount} {failedCount === 1 ? "generation" : "generations"} failed
               </span>
               <button type="button" className="dw-retry-all-btn" onClick={handleRetryAll}>
@@ -329,17 +396,33 @@ function App() {
                   onEdit={() => handleEditCard(sentence.id)}
                   onCommitEdit={(text) => handleCommitEdit(sentence.id, text)}
                   onCancelEdit={handleCancelEdit}
+                  onSwitchVersion={(historyIndex) => handleSwitchVersion(sentence.id, historyIndex)}
                 />
               ))}
             </div>
           )}
 
-          <StatusBar count={sentences.length} {...statusBar} />
+          <StatusBar
+            count={sentences.length}
+            {...statusBar}
+            project={project}
+            onProjectClick={handleOpenProjectConfig}
+          />
         </>
       )}
 
       {importDialogOpen && (
         <ImportDialog onImport={handleImport} onClose={() => setImportDialogOpen(false)} />
+      )}
+
+      {projectConfigOpen && (
+        <ProjectConfigCard
+          currentProject={project}
+          projects={projects}
+          onSelect={handleSelectProject}
+          onCreate={handleCreateProject}
+          onClose={handleCloseProjectConfig}
+        />
       )}
     </WindowShell>
   )

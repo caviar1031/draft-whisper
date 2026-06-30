@@ -889,8 +889,6 @@
     color: var(--text-500);
   }
 
-  
-
   /* Playing card accent */
   .dw-sentence-card.is-playing {
     animation: dw-pulse-glow 2s ease-in-out infinite;
@@ -973,6 +971,50 @@
     50% {
       transform: scaleY(1);
     }
+  }
+
+  /* ===== Version Navigation ===== */
+  .dw-version-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 4px;
+    flex-shrink: 0;
+  }
+
+  .dw-version-btn {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-400);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .dw-version-btn:hover:not(:disabled) {
+    color: var(--text-100);
+    background: var(--glass-bg-card-light);
+  }
+
+  .dw-version-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .dw-version-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-400);
+    min-width: 24px;
+    text-align: center;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
   }
 
   /* ===== Spinner ===== */
@@ -1164,6 +1206,29 @@
     font-size: 13px;
     font-weight: 400;
     color: var(--text-400);
+    white-space: nowrap;
+  }
+
+  .dw-status-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dw-status-bar-project {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-400);
+  }
+
+  .dw-status-bar-project-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-600);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -1504,6 +1569,230 @@
     font-size: 12px;
     color: var(--text-400);
     white-space: nowrap;
+  }
+
+  /* ===== Project config card ===== */
+  .dw-project-config-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 420px;
+    max-height: calc(100% - 48px);
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 20px;
+    backdrop-filter: blur(36px) saturate(180%);
+    -webkit-backdrop-filter: blur(36px) saturate(180%);
+    background: var(--glass-popover-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25), 0 8px 32px rgba(0, 0, 0, 0.15);
+    z-index: 20;
+    overflow: hidden;
+  }
+
+  .dw-project-config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .dw-project-config-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .dw-project-config-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dw-project-config-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .dw-project-current {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--glass-blue-tint-medium);
+    color: var(--brand-500);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .dw-project-none {
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--glass-surface);
+    color: var(--text-400);
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  .dw-project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--glass-surface);
+  }
+
+  .dw-project-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-700);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .dw-project-item:hover {
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-project-item.is-active {
+    background: var(--glass-blue-tint-medium);
+    color: var(--brand-500);
+    font-weight: 500;
+  }
+
+  .dw-project-empty {
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--glass-surface);
+    color: var(--text-400);
+    font-size: 14px;
+    text-align: center;
+    font-style: italic;
+  }
+
+  .dw-project-create-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px dashed var(--glass-divider-strong);
+    background: transparent;
+    color: var(--text-500);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .dw-project-create-btn:hover {
+    background: var(--glass-surface);
+    border-color: var(--brand-500);
+    color: var(--brand-500);
+  }
+
+  .dw-project-create-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .dw-project-input {
+    flex: 1;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-input-border);
+    background: var(--glass-bg-input);
+    color: var(--text-800);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .dw-project-input::placeholder {
+    color: var(--text-400);
+    font-size: 13px;
+  }
+
+  .dw-project-input:focus {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+  }
+
+  .dw-project-remove-btn {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-400);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .dw-project-remove-btn:hover {
+    background: var(--glass-surface);
+    color: var(--state-error);
+  }
+
+  .dw-settings-close {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-400);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .dw-settings-close:hover {
+    background: var(--glass-surface);
+    color: var(--text-600);
+  }
+
+  .dw-dim-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: none;
+    cursor: pointer;
+    z-index: 19;
   }
 }
 

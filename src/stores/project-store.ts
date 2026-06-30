@@ -9,6 +9,7 @@ interface ProjectState extends Project {
   updateSentence: (id: string, updates: Partial<Sentence>) => void
   addSentence: (sentence: Sentence) => void
   removeSentence: (id: string) => void
+  switchAudioVersion: (id: string, historyIndex: number) => void
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -32,5 +33,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
   removeSentence: (id) =>
     set((state) => ({
       sentences: state.sentences.filter((s) => s.id !== id),
+    })),
+  switchAudioVersion: (id, historyIndex) =>
+    set((state) => ({
+      sentences: state.sentences.map((s) => {
+        if (s.id !== id) return s
+        const version = s.audioHistory[historyIndex]
+        if (!version) return s
+        return { ...s, audioPath: version.audioPath, duration: null }
+      }),
     })),
 }))

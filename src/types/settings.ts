@@ -5,5 +5,5 @@ export interface Settings {
   voice: string
   speed: number
   concurrency: number
-  workingDir: string | null
+  project: string | null
 }
