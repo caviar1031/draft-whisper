@@ -1794,6 +1794,228 @@
     cursor: pointer;
     z-index: 19;
   }
+
+  /* ===== Script Editor (unified Import + Edit) ===== */
+  .dw-script-editor {
+    position: absolute;
+    inset: 12px;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 16px 20px;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--glass-popover-bg);
+    border: 1px solid var(--glass-bg-card);
+    border-radius: 16px;
+    box-shadow: var(--glass-popover-shadow);
+    z-index: 20;
+  }
+
+  .dw-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+  }
+
+  /* ---- Mode toggle (Auto / Manual) ---- */
+  .dw-mode-toggle {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    background: var(--glass-surface);
+    flex-shrink: 0;
+  }
+
+  .dw-mode-btn {
+    flex: 1;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-500);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .dw-mode-btn:hover {
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-mode-btn.is-active {
+    background: var(--glass-bg-card);
+    color: var(--text-800);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  /* ---- Editor textarea (auto mode) ---- */
+  .dw-editor-textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-input-border);
+    background: var(--glass-bg-input);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-800);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    flex: 1;
+    margin-bottom: 16px;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .dw-editor-textarea::placeholder {
+    color: var(--text-300);
+  }
+
+  .dw-editor-textarea:focus {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+  }
+
+  /* ---- Editor container (manual mode: line numbers + textarea) ---- */
+  .dw-editor-container {
+    display: flex;
+    flex: 1;
+    min-height: 200px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-input-border);
+    background: var(--glass-bg-input);
+    overflow: hidden;
+    margin-bottom: 16px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .dw-editor-container:focus-within {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+  }
+
+  .dw-line-numbers {
+    width: 44px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    background: var(--glass-surface);
+    border-right: 1px solid var(--glass-divider);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .dw-line-num {
+    position: absolute;
+    height: 21px;
+    line-height: 21px;
+    width: 100%;
+    padding: 0 10px 0 0;
+    box-sizing: border-box;
+    text-align: right;
+    font-size: 12px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    color: var(--text-400);
+  }
+
+  .dw-editor-textarea--manual {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    margin-bottom: 0;
+    min-height: auto;
+    flex: 1;
+    resize: none;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px;
+    line-height: 21px;
+    padding: 12px;
+  }
+
+  .dw-editor-textarea--manual::placeholder {
+    color: var(--text-300);
+  }
+
+  .dw-editor-textarea--manual:focus {
+    box-shadow: none;
+    border-color: transparent;
+  }
+
+  /* ---- Auto-split preview ---- */
+  .dw-auto-preview {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--glass-surface);
+    border: 1px solid var(--glass-divider);
+    flex-shrink: 0;
+  }
+
+  .dw-auto-preview-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-500);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .dw-auto-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dw-auto-preview-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+  }
+
+  .dw-auto-preview-num {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-400);
+    min-width: 20px;
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dw-auto-preview-text {
+    font-size: 13px;
+    color: var(--text-700);
+    line-height: 1.4;
+  }
+
+  /* ---- Editor footer ---- */
+  .dw-editor-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .dw-editor-left,
+  .dw-editor-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 }
 
 /* Reduced motion */

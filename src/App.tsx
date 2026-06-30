@@ -1,6 +1,6 @@
 import { EmptyState } from "@/components/dw/empty-state"
-import { ImportDialog } from "@/components/dw/import-dialog"
 import { ProjectConfigCard } from "@/components/dw/project-config-card"
+import { ScriptEditor } from "@/components/dw/script-editor"
 import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
 import { SettingsPage } from "@/components/dw/settings-page"
 import { TitleBar } from "@/components/dw/title-bar"
@@ -10,6 +10,7 @@ import { createProject, generateSentenceAudio, listProjects, readAudioAsUrl } fr
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
+import { generateSentenceId } from "@/utils/id"
 import { splitTextToSentences } from "@/utils/sentence"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { RefreshCw, TriangleAlert } from "lucide-react"
@@ -30,9 +31,8 @@ function App() {
 
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editMode, setEditMode] = useState(false)
+  const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [projectConfigOpen, setProjectConfigOpen] = useState(false)
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [projects, setProjects] = useState<string[]>([])
@@ -157,23 +157,57 @@ function App() {
     [updateSentence],
   )
 
-  // --- 导入 ---
-  const handleOpenImport = useCallback(() => {
-    setImportDialogOpen(true)
+  // --- Script Editor ---
+  const handleOpenScriptEditor = useCallback(() => {
+    setScriptEditorOpen(true)
   }, [])
 
-  const handleImport = useCallback(
-    (text: string) => {
-      const newSentences = splitTextToSentences(text)
-      setSentences(newSentences)
-      setImportDialogOpen(false)
+  const handleSaveScript = useCallback(
+    (text: string, splitMode: "auto" | "manual") => {
+      setScriptEditorOpen(false)
       setPlayingId(null)
       setEditingId(null)
-      setEditMode(false)
-      // 切句完成后自动开始生成
-      void runGeneration(newSentences.map((s) => s.id))
+
+      if (splitMode === "auto") {
+        const newSentences = splitTextToSentences(text)
+        setSentences(newSentences)
+        void runGeneration(newSentences.map((s) => s.id))
+      } else {
+        const lines = text.split("\n").filter((l) => l.trim().length > 0)
+        if (sentences.length === 0) {
+          // 无内容 → 新建全部句子
+          const newSentences = lines.map((t, i) => ({
+            id: generateSentenceId(i, t.trim()),
+            text: t.trim(),
+            status: "pending" as SentenceStatus,
+            audioPath: null,
+            audioHistory: [],
+            duration: null,
+          }))
+          setSentences(newSentences)
+          void runGeneration(newSentences.map((s) => s.id))
+        } else {
+          // 有内容 → 按位置对比，变化的重新生成
+          const newSentences = lines.map((t, i) => {
+            const old = sentences[i]
+            const trimmed = t.trim()
+            if (old && old.text === trimmed) return old
+            return {
+              id: old?.id ?? generateSentenceId(i, trimmed),
+              text: trimmed,
+              status: "pending" as SentenceStatus,
+              audioPath: null,
+              audioHistory: [],
+              duration: null,
+            }
+          })
+          setSentences(newSentences)
+          const pendingIds = newSentences.filter((s) => s.status === "pending").map((s) => s.id)
+          if (pendingIds.length > 0) void runGeneration(pendingIds)
+        }
+      }
     },
-    [setSentences, runGeneration],
+    [sentences, setSentences, runGeneration],
   )
 
   const handleGenerateAll = useCallback(() => {
@@ -267,8 +301,10 @@ function App() {
         duration: null,
       })
       setEditingId(null)
+      // 编辑后自动触发重新生成
+      void runGeneration([id])
     },
-    [updateSentence],
+    [updateSentence, runGeneration],
   )
 
   const handleCancelEdit = useCallback(() => {
@@ -292,9 +328,7 @@ function App() {
   // --- 工具栏 ---
   const toolbarAction: ToolbarAction =
     phase === "complete"
-      ? editMode
-        ? { kind: "regenerate-selected", disabled: true }
-        : { kind: "regenerate-all" }
+      ? { kind: "regenerate-all" }
       : { kind: "generate", disabled: phase === "empty" || phase === "generating" }
 
   const handleToolbarAction = useCallback(() => {
@@ -353,9 +387,8 @@ function App() {
           <Toolbar
             voice={voice}
             action={toolbarAction}
-            editMode={editMode}
-            onImportScript={handleOpenImport}
-            onToggleEdit={phase === "complete" ? () => setEditMode((v) => !v) : undefined}
+            hasContent={sentences.length > 0}
+            onOpenScriptEditor={handleOpenScriptEditor}
             onVoiceChange={setVoice}
             onAction={handleToolbarAction}
           />
@@ -411,8 +444,13 @@ function App() {
         </>
       )}
 
-      {importDialogOpen && (
-        <ImportDialog onImport={handleImport} onClose={() => setImportDialogOpen(false)} />
+      {scriptEditorOpen && (
+        <ScriptEditor
+          mode={sentences.length > 0 ? "edit" : "import"}
+          initialText={sentences.length > 0 ? sentences.map((s) => s.text).join("\n") : ""}
+          onSave={handleSaveScript}
+          onClose={() => setScriptEditorOpen(false)}
+        />
       )}
 
       {projectConfigOpen && (

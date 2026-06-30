@@ -6,14 +6,12 @@ import { useCallback, useEffect, useRef, useState } from "react"
 export type ToolbarAction =
   | { kind: "generate"; disabled?: boolean }
   | { kind: "regenerate-all" }
-  | { kind: "regenerate-selected"; disabled?: boolean }
 
 interface ToolbarProps {
   voice: string
   action: ToolbarAction
-  editMode?: boolean
-  onImportScript: () => void
-  onToggleEdit?: () => void
+  hasContent: boolean
+  onOpenScriptEditor: () => void
   onVoiceChange: (voice: string) => void
   onAction: () => void
 }
@@ -21,9 +19,8 @@ interface ToolbarProps {
 export function Toolbar({
   voice,
   action,
-  editMode = false,
-  onImportScript,
-  onToggleEdit,
+  hasContent,
+  onOpenScriptEditor,
   onVoiceChange,
   onAction,
 }: ToolbarProps) {
@@ -48,20 +45,10 @@ export function Toolbar({
   return (
     <div className="dw-toolbar">
       <div className="dw-toolbar-left">
-        <button type="button" className="dw-pill-btn" onClick={onImportScript}>
-          <File size={14} strokeWidth={2} />
-          Import Script
+        <button type="button" className="dw-pill-btn" onClick={onOpenScriptEditor}>
+          {hasContent ? <Pencil size={14} strokeWidth={2} /> : <File size={14} strokeWidth={2} />}
+          {hasContent ? "Edit Script" : "Import Script"}
         </button>
-        {onToggleEdit && (
-          <button
-            type="button"
-            className={`dw-pill-btn${editMode ? " is-active" : ""}`}
-            onClick={onToggleEdit}
-          >
-            <Pencil size={14} strokeWidth={2} />
-            Edit
-          </button>
-        )}
       </div>
       <div className="dw-toolbar-right">
         <div className="dw-select-wrapper" ref={voiceRef}>
@@ -115,24 +102,16 @@ function ActionButton({
       </button>
     )
   }
-  if (action.kind === "regenerate-all") {
-    return (
-      <button
-        type="button"
-        className="dw-pill-btn"
-        onClick={onAction}
-        style={{ color: "var(--text-500)" }}
-      >
-        <ArrowRight size={14} strokeWidth={2} />
-        Regenerate All
-      </button>
-    )
-  }
-  // regenerate-selected
+  // regenerate-all
   return (
-    <button type="button" className="dw-primary-btn" onClick={onAction} disabled={action.disabled}>
+    <button
+      type="button"
+      className="dw-pill-btn"
+      onClick={onAction}
+      style={{ color: "var(--text-500)" }}
+    >
       <ArrowRight size={14} strokeWidth={2} />
-      Regenerate
+      Regenerate All
     </button>
   )
 }
