@@ -23,9 +23,17 @@ function App() {
   const setSentences = useProjectStore((s) => s.setSentences)
   const updateSentence = useProjectStore((s) => s.updateSentence)
   const switchAudioVersion = useProjectStore((s) => s.switchAudioVersion)
+  const loadProject = useProjectStore((s) => s.loadProject)
 
-  const voice = useSettingsStore((s) => s.voice)
-  const setVoice = useSettingsStore((s) => s.setVoice)
+  const projectMode = useProjectStore((s) => s.mode)
+  const projectVoice = useProjectStore((s) => s.voice)
+  const projectVoiceDesignPrompt = useProjectStore((s) => s.voiceDesignPrompt)
+  const projectVoiceClonePath = useProjectStore((s) => s.voiceClonePath)
+  const setProjectMode = useProjectStore((s) => s.setMode)
+  const setProjectVoice = useProjectStore((s) => s.setVoice)
+  const setProjectVoiceDesignPrompt = useProjectStore((s) => s.setVoiceDesignPrompt)
+  const setProjectVoiceClonePath = useProjectStore((s) => s.setVoiceClonePath)
+
   const project = useSettingsStore((s) => s.project)
   const setProject = useSettingsStore((s) => s.setProject)
 
@@ -49,6 +57,12 @@ function App() {
     }
   }, [])
 
+  // 启动时加载上次选中的项目的句子
+  useEffect(() => {
+    const savedProject = useSettingsStore.getState().project
+    loadProject(savedProject)
+  }, [loadProject])
+
   // 获取项目列表
   const fetchProjects = useCallback(async () => {
     try {
@@ -70,12 +84,13 @@ function App() {
     setProjectConfigOpen(false)
   }, [])
 
-  // 选择项目
+  // 选择项目：保存当前 → 加载目标 → 更新 settings
   const handleSelectProject = useCallback(
     (selectedProject: string | null) => {
+      loadProject(selectedProject)
       setProject(selectedProject)
     },
-    [setProject],
+    [loadProject, setProject],
   )
 
   // 创建项目
@@ -84,12 +99,13 @@ function App() {
       try {
         const updatedProjects = await createProject(name)
         setProjects(updatedProjects)
+        loadProject(name)
         setProject(name)
       } catch (error) {
         console.error("Failed to create project:", error)
       }
     },
-    [setProject],
+    [loadProject, setProject],
   )
 
   // 由句子状态派生的高层阶段
@@ -109,15 +125,17 @@ function App() {
     async (ids: string[]) => {
       const runId = ++genRunId.current
       const settings = useSettingsStore.getState()
+      const projState = useProjectStore.getState()
       const params = {
         baseUrl: settings.baseUrl,
         apiKey: settings.apiKey,
-        model: settings.model,
-        voice: settings.voice,
-        speed: settings.speed,
+        mode: projState.mode,
+        voice: projState.voice,
+        voiceDesignPrompt: projState.voiceDesignPrompt,
+        voiceClonePath: projState.voiceClonePath,
       }
       const concurrency = settings.concurrency
-      const project = settings.project
+      const currentProject = settings.project
 
       // 先把所有句子标记为 queued（等待中）
       for (const id of ids) {
@@ -134,7 +152,7 @@ function App() {
           if (!sentence) continue
           updateSentence(id, { status: "generating" })
           try {
-            const result = await generateSentenceAudio(id, sentence.text, params, project)
+            const result = await generateSentenceAudio(id, sentence.text, params, currentProject)
             if (genRunId.current !== runId) return
             const newVersion = { audioPath: result.audioPath, createdAt: Date.now() }
             const currentHistory =
@@ -323,8 +341,6 @@ function App() {
     }
   }, [alwaysOnTop])
 
-  // --- 语音/速度选择 ---
-
   // --- 工具栏 ---
   const toolbarAction: ToolbarAction =
     phase === "complete"
@@ -385,11 +401,9 @@ function App() {
       ) : (
         <>
           <Toolbar
-            voice={voice}
             action={toolbarAction}
             hasContent={sentences.length > 0}
             onOpenScriptEditor={handleOpenScriptEditor}
-            onVoiceChange={setVoice}
             onAction={handleToolbarAction}
           />
 
@@ -448,8 +462,16 @@ function App() {
         <ScriptEditor
           mode={sentences.length > 0 ? "edit" : "import"}
           initialText={sentences.length > 0 ? sentences.map((s) => s.text).join("\n") : ""}
+          ttsMode={projectMode}
+          voice={projectVoice}
+          voiceDesignPrompt={projectVoiceDesignPrompt}
+          voiceClonePath={projectVoiceClonePath}
           onSave={handleSaveScript}
           onClose={() => setScriptEditorOpen(false)}
+          onModeChange={setProjectMode}
+          onVoiceChange={setProjectVoice}
+          onVoiceDesignPromptChange={setProjectVoiceDesignPrompt}
+          onVoiceClonePathChange={setProjectVoiceClonePath}
         />
       )}
 

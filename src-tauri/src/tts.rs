@@ -7,23 +7,22 @@ use tauri::{ipc::Response, AppHandle, Manager};
 
 /// 与前端 Settings 一一对应的 TTS 调用参数。
 ///
-/// MVP 阶段固定使用 MiMo v2.5 TTS 协议（小米 mimo-v2.5-tts）。
-/// - `base_url` 默认 `https://api.xiaomimimo.com/v1`
-/// - `model` 默认 `mimo-v2.5-tts`
-/// - `voice` 预置音色，如 `冰糖` / `苏打` / `Chloe` / `mimo_default`
-/// - `speed` MiMo 无原生 speed 字段；当 speed != 1 时，会以自然语言
-///   指令「语速 X 倍」写入 user message 交给模型理解。
+/// 支持三种模式：
+/// - `basic`：基础模式，使用预置音色（model=mimo-v2.5-tts）
+/// - `voice-design`：声音设计（model=mimo-v2.5-tts-voicedesign）
+/// - `voice-clone`：声音克隆（model=mimo-v2.5-tts-voiceclone）
 ///
 /// `rename_all = "camelCase"`：前端传 camelCase（baseUrl/apiKey），
 /// Rust 内部仍用 snake_case（base_url/api_key）。
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TtsParams {
-  pub base_url: String,
-  pub api_key: String,
-  pub model: String,
-  pub voice: String,
-  pub speed: f32,
+    pub base_url: String,
+    pub api_key: String,
+    pub mode: String,              // "basic" | "voice-design" | "voice-clone"
+    pub voice: String,             // 基础模式的预置音色名
+    pub voice_design_prompt: String,  // 声音设计的描述
+    pub voice_clone_path: Option<String>,     // 声音克隆的参考音频路径（本地路径）
 }
 
 /// `tts_generate` 的返回值。
@@ -188,71 +187,99 @@ fn sanitize_filename(name: &str) -> String {
 
 /// 发起一次 MiMo v2.5 TTS 请求，返回 wav 音频字节。
 ///
-/// 协议：POST {base}/chat/completions
-/// - Header: `api-key: {apiKey}`
-/// - Body: `{ model, messages:[{role:user,content:指令?},{role:assistant,content:text}], audio:{format:"wav", voice} }`
-/// - Response: JSON，音频在 `choices[0].message.audio.data`（base64）
-async fn request_speech(params: &TtsParams, text: &str) -> Result<Vec<u8>, String> {
-  let endpoint = build_chat_endpoint(&params.base_url);
+/// 三种模式共用同一个 chat-completions 端点，区别在于 model 和 messages/audio 字段：
+/// - basic: model=mimo-v2.5-tts, audio.voice=预置音色名
+/// - voice-design: model=mimo-v2.5-tts-voicedesign, user message=音色描述, 无 audio.voice
+/// - voice-clone: model=mimo-v2.5-tts-voiceclone, audio.voice=base64 参考音频
+async fn request_speech(params: &TtsParams, text: &str, voice_audio_base64: Option<&str>) -> Result<Vec<u8>, String> {
+    let endpoint = build_chat_endpoint(&params.base_url);
 
-  // messages：assistant 放目标文本（必填）；speed != 1 时追加 user 自然语言指令
-  let mut messages = Vec::<Value>::with_capacity(2);
-  if (params.speed - 1.0).abs() > 0.01 {
-    messages.push(serde_json::json!({
-      "role": "user",
-      "content": format!("语速 {} 倍", params.speed),
-    }));
-  }
-  messages.push(serde_json::json!({
-    "role": "assistant",
-    "content": text,
-  }));
+    // 根据 mode 决定 model
+    let model = match params.mode.as_str() {
+        "voice-design" => "mimo-v2.5-tts-voicedesign",
+        "voice-clone" => "mimo-v2.5-tts-voiceclone",
+        _ => "mimo-v2.5-tts",
+    };
 
-  let body = serde_json::json!({
-    "model": params.model,
-    "messages": messages,
-    "audio": {
-      "format": "wav",
-      "voice": params.voice,
+    // messages：构建角色消息
+    let mut messages = Vec::<Value>::with_capacity(2);
+
+    // voice-design 模式：音色描述作为 user message（必填）
+    if params.mode == "voice-design" && !params.voice_design_prompt.is_empty() {
+        messages.push(serde_json::json!({
+            "role": "user",
+            "content": &params.voice_design_prompt,
+        }));
     }
-  });
 
-  let client = reqwest::Client::new();
-  let resp = client
-    .post(&endpoint)
-    .header("api-key", &params.api_key)
-    .header("Content-Type", "application/json")
-    .json(&body)
-    .send()
-    .await
-    .map_err(|e| format!("请求失败: {e}"))?;
+    // 目标文本放在 assistant 消息中
+    messages.push(serde_json::json!({
+        "role": "assistant",
+        "content": text,
+    }));
 
-  let status = resp.status();
-  if !status.is_success() {
-    let text = resp.text().await.unwrap_or_default();
-    return Err(format!("HTTP {status}: {text}"));
-  }
+    // audio 字段：不同模式不同结构
+    let audio = match params.mode.as_str() {
+        "voice-design" => {
+            serde_json::json!({
+                "format": "wav"
+            })
+        }
+        "voice-clone" => {
+            serde_json::json!({
+                "format": "wav",
+                "voice": voice_audio_base64.unwrap_or("")
+            })
+        }
+        _ => {
+            serde_json::json!({
+                "format": "wav",
+                "voice": &params.voice
+            })
+        }
+    };
 
-  // MiMo 返回 JSON，音频在 choices[0].message.audio.data（base64）
-  let json: Value = resp
-    .json()
-    .await
-    .map_err(|e| format!("解析响应 JSON 失败: {e}"))?;
+    let body = serde_json::json!({
+        "model": model,
+        "messages": messages,
+        "audio": audio
+    });
 
-  let audio_data = json
-    .get("choices")
-    .and_then(|c| c.get(0))
-    .and_then(|c| c.get("message"))
-    .and_then(|m| m.get("audio"))
-    .and_then(|a| a.get("data"))
-    .and_then(|d| d.as_str())
-    .ok_or_else(|| {
-      format!("响应中缺少 choices[0].message.audio.data: {}", json)
-    })?;
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(&endpoint)
+        .header("api-key", &params.api_key)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {e}"))?;
 
-  STANDARD
-    .decode(audio_data)
-    .map_err(|e| format!("base64 解码失败: {e}"))
+    let status = resp.status();
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("HTTP {status}: {text}"));
+    }
+
+    let json: Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("解析响应 JSON 失败: {e}"))?;
+
+    let audio_data = json
+        .get("choices")
+        .and_then(|c| c.get(0))
+        .and_then(|c| c.get("message"))
+        .and_then(|m| m.get("audio"))
+        .and_then(|a| a.get("data"))
+        .and_then(|d| d.as_str())
+        .ok_or_else(|| {
+            format!("响应中缺少 choices[0].message.audio.data: {}", json)
+        })?;
+
+    STANDARD
+        .decode(audio_data)
+        .map_err(|e| format!("base64 解码失败: {e}"))
 }
 
 /// 为某一句文本生成音频并写入本地缓存（每次生成使用唯一文件名，不覆盖历史版本）。
@@ -297,7 +324,24 @@ pub async fn tts_generate(
   let file_name = format!("{}_{}.wav", sanitize_filename(&sentence_id), timestamp);
   let file_path = audio_dir.join(&file_name);
 
-  let bytes = request_speech(&params, &text).await?;
+  // 声音克隆模式：读取参考音频文件为 base64
+  let voice_audio_base64 = if params.mode == "voice-clone" {
+    if let Some(ref path) = params.voice_clone_path {
+      if !path.is_empty() {
+        let audio_bytes = std::fs::read(path)
+          .map_err(|e| format!("读取声音克隆参考音频失败: {e}"))?;
+        Some(STANDARD.encode(&audio_bytes))
+      } else {
+        None
+      }
+    } else {
+      None
+    }
+  } else {
+    None
+  };
+
+  let bytes = request_speech(&params, &text, voice_audio_base64.as_deref()).await?;
 
   std::fs::write(&file_path, &bytes)
     .map_err(|e| format!("写入音频文件失败: {file_path:?} -> {e}"))?;
@@ -315,7 +359,25 @@ pub async fn tts_test(params: TtsParams) -> Result<(), String> {
   if params.base_url.trim().is_empty() || params.api_key.trim().is_empty() {
     return Err("缺少 baseUrl 或 apiKey".into());
   }
-  request_speech(&params, "测试").await?;
+
+  // 测试模式：声音克隆需要参考音频
+    let voice_audio_base64 = if params.mode == "voice-clone" {
+      if let Some(ref path) = params.voice_clone_path {
+        if !path.is_empty() {
+          let audio_bytes = std::fs::read(path)
+            .map_err(|e| format!("读取声音克隆参考音频失败: {e}"))?;
+          Some(STANDARD.encode(&audio_bytes))
+        } else {
+          None
+        }
+      } else {
+        None
+      }
+    } else {
+      None
+    };
+
+    request_speech(&params, "测试", voice_audio_base64.as_deref()).await?;
   Ok(())
 }
 

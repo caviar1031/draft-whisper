@@ -1,8 +1,15 @@
-import type { Settings } from "@/types"
+import type { TtsMode } from "@/types"
 import { invoke } from "@tauri-apps/api/core"
 
-/** TTS 调用参数，与 Settings 字段一一对应，传给 Rust 后端。 */
-export type TtsParams = Settings
+/** TTS 调用参数，与 Rust TtsParams struct 一一对应。 */
+export interface TtsParams {
+  baseUrl: string
+  apiKey: string
+  mode: TtsMode
+  voice: string
+  voiceDesignPrompt: string
+  voiceClonePath: string | null
+}
 
 /** `tts_generate` 的返回值。 */
 export interface TtsResult {

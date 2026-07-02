@@ -240,7 +240,6 @@ interface TtsParams {
   apiKey: string    // MiMo API Key（通过 api-key 头传递，非 Bearer）
   model: string     // 默认 mimo-v2.5-tts；另有 mimo-v2.5-tts-voicedesign / mimo-v2.5-tts-voiceclone
   voice: string     // 预置音色：冰糖 / 茉莉 / 苏打 / 白桦 / Mia / Chloe / Milo / Dean / mimo_default
-  speed: number      // 1.0 为默认；!= 1 时后端会以「语速 X 倍」自然语言指令写入 user message
 }
 ```
 
@@ -251,7 +250,6 @@ interface TtsParams {
   {
     "model": "<model>",
     "messages": [
-      {"role": "user", "content": "语速 X 倍"},   // 仅 speed != 1 时追加
       {"role": "assistant", "content": "<text>"}
     ],
     "audio": {"format": "wav", "voice": "<voice>"}
@@ -314,13 +312,14 @@ interface Sentence {
 ### Settings / TtsParams
 
 ```ts
-interface Settings { baseUrl: string; apiKey: string; model: string; voice: string; speed: number }
+interface Settings { baseUrl: string; apiKey: string; concurrency: number; project: string | null }
 ```
 
 ### Project
 
 ```ts
-interface Project { voice: string; model: string; speed: number; sentences: Sentence[] }
+type TtsMode = "basic" | "voice-design" | "voice-clone"
+interface Project { mode: TtsMode; voice: string; voiceDesignPrompt: string; voiceClonePath: string | null; sentences: Sentence[] }
 ```
 
 ---
@@ -330,7 +329,7 @@ interface Project { voice: string; model: string; speed: number; sentences: Sent
 - 协议：小米 MiMo v2.5 TTS，`POST {baseUrl}/chat/completions`（chat-completions 风格，**非** OpenAI `/audio/speech`）。文档：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
 - 认证：`api-key: <apiKey>` 请求头（不是 `Authorization: Bearer`）。
 - 请求体：`{ model, messages:[{role:assistant,content:text}], audio:{format:"wav", voice} }`。目标文本必须放 `role: assistant`。
-- 风格/语速控制：放 `role: user` 的 `content`，用自然语言指令。后端在 `speed != 1` 时自动追加「语速 X 倍」。
+- 风格控制：通过 `role: user` 的 `content` 传入自然语言指令（如"温柔活泼的语调"），MiMo 不提供原生 speed 参数。
 - 响应：JSON，音频在 `choices[0].message.audio.data`，**base64 编码**，后端解码后落盘。
 - `audio.format` 固定 `wav`（非流式，浏览器 `<audio>` 通用支持）。
 - HTTP 由 Rust 侧 `reqwest` 发起，**不需要** `tauri-plugin-http` 或前端 `fetch` 权限。

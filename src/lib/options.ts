@@ -1,4 +1,4 @@
-// 语音、速度、模型可选项 — MiMo v2.5 TTS
+// 语音、模型可选项 — MiMo v2.5 TTS
 
 export interface VoiceOption {
   value: string
@@ -18,8 +18,6 @@ export const VOICE_OPTIONS: VoiceOption[] = [
   { value: "mimo_default", label: "Default" },
 ]
 
-export const SPEED_OPTIONS: number[] = [0.5, 0.75, 1, 1.25, 1.5, 2]
-
 export const CONCURRENCY_OPTIONS: number[] = [1, 2, 3, 4, 5]
 
 export const MODEL_OPTIONS: string[] = [
@@ -27,10 +25,6 @@ export const MODEL_OPTIONS: string[] = [
   "mimo-v2.5-tts-voicedesign",
   "mimo-v2.5-tts-voiceclone",
 ]
-
-export function formatSpeed(speed: number): string {
-  return `${speed.toFixed(speed < 1 ? 2 : 1)}x`
-}
 
 export function voiceLabel(value: string): string {
   return VOICE_OPTIONS.find((v) => v.value === value)?.label ?? value

@@ -1798,7 +1798,10 @@
   /* ===== Script Editor (unified Import + Edit) ===== */
   .dw-script-editor {
     position: absolute;
-    inset: 12px;
+    top: 24px;
+    bottom: 24px;
+    left: 12px;
+    right: 12px;
     display: flex;
     flex-direction: column;
     margin: 0;
