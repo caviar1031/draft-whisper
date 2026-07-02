@@ -1,4 +1,5 @@
 import { VOICE_OPTIONS } from "@/lib/options"
+import { useSettingsStore } from "@/stores/settings-store"
 import { splitTextToSentences } from "@/utils/sentence"
 import type { TtsMode } from "@/types"
 import { X } from "lucide-react"
@@ -11,12 +12,14 @@ interface ScriptEditorProps {
   mode: "import" | "edit"
   initialText?: string
   ttsMode: TtsMode
+  model: string
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
   onSave: (text: string, splitMode: SplitMode) => void
   onClose: () => void
   onModeChange: (mode: TtsMode) => void
+  onModelChange: (model: string) => void
   onVoiceChange: (voice: string) => void
   onVoiceDesignPromptChange: (prompt: string) => void
   onVoiceClonePathChange: (path: string | null) => void
@@ -70,12 +73,14 @@ export function ScriptEditor({
   mode,
   initialText = "",
   ttsMode,
+  model,
   voice,
   voiceDesignPrompt,
   voiceClonePath,
   onSave,
   onClose,
   onModeChange,
+  onModelChange,
   onVoiceChange,
   onVoiceDesignPromptChange,
   onVoiceClonePathChange,
@@ -330,6 +335,13 @@ export function ScriptEditor({
               </label>
             </div>
 
+            {/* 模型选择（按当前 mode 过滤） */}
+            <ModelSelector
+              mode={ttsMode}
+              value={model}
+              onChange={onModelChange}
+            />
+
             {/* Basic TTS: 音色 */}
             {ttsMode === "basic" && (
                 <div className="dw-settings-field">
@@ -453,5 +465,48 @@ export function ScriptEditor({
         </div>
       </div>
     </>
+  )
+}
+
+/** 模型选择器：按当前 TTS 模式过滤已配置的模型 */
+function ModelSelector({
+  mode,
+  value,
+  onChange,
+}: {
+  mode: TtsMode
+  value: string
+  onChange: (model: string) => void
+}) {
+  const allModels = useSettingsStore((s) => s.models)
+  const filtered = allModels.filter((m) => m.mode === mode)
+
+  if (filtered.length === 0) {
+    return (
+      <div className="dw-settings-field">
+        <div className="dw-editing-hint">
+          <span>No models configured for this mode. Add one in Settings.</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="dw-settings-field">
+      <label className="dw-settings-label">
+        Model
+        <select
+          className="dw-settings-select"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {filtered.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
   )
 }

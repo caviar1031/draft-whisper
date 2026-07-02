@@ -236,10 +236,13 @@ fn sanitize_filename(name: &str) -> String {
 
 ```ts
 interface TtsParams {
-  baseUrl: string   // MiMo API 根地址，默认 https://api.xiaomimimo.com/v1
-  apiKey: string    // MiMo API Key（通过 api-key 头传递，非 Bearer）
-  model: string     // 默认 mimo-v2.5-tts；另有 mimo-v2.5-tts-voicedesign / mimo-v2.5-tts-voiceclone
-  voice: string     // 预置音色：冰糖 / 茉莉 / 苏打 / 白桦 / Mia / Chloe / Milo / Dean / mimo_default
+  baseUrl: string          // MiMo API 根地址
+  apiKey: string           // api-key 头
+  model: string            // 用户选择的模型 ID
+  mode: TtsMode            // "basic" | "voice-design" | "voice-clone"
+  voice: string            // 基础模式的预置音色名
+  voiceDesignPrompt: string // 声音设计的音色描述
+  voiceClonePath: string | null // 声音克隆的参考音频路径
 }
 ```
 
@@ -313,13 +316,15 @@ interface Sentence {
 
 ```ts
 interface Settings { baseUrl: string; apiKey: string; concurrency: number; project: string | null }
+interface ModelConfig { id: string; name: string; mode: TtsMode }
+// settings-store.models: ModelConfig[] — 用户配置的模型列表
 ```
 
 ### Project
 
 ```ts
 type TtsMode = "basic" | "voice-design" | "voice-clone"
-interface Project { mode: TtsMode; voice: string; voiceDesignPrompt: string; voiceClonePath: string | null; sentences: Sentence[] }
+interface Project { mode: TtsMode; model: string; voice: string; voiceDesignPrompt: string; voiceClonePath: string | null; sentences: Sentence[] }
 ```
 
 ---

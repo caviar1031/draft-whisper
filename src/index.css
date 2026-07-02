@@ -1323,6 +1323,113 @@
     min-width: 0;
   }
 
+  /* Models management section */
+  .dw-models-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--glass-divider);
+  }
+
+  .dw-models-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .dw-models-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .dw-model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .dw-model-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--glass-bg-card);
+    border: 1px solid var(--glass-divider);
+  }
+
+  .dw-model-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dw-model-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dw-model-mode-select {
+    width: auto;
+    min-width: 80px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-divider);
+    background: var(--glass-surface);
+    color: var(--text-600);
+    font-size: 11px;
+    font-family: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .dw-model-mode-select:focus {
+    border-color: var(--brand-500);
+  }
+
+  .dw-model-remove {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-400);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .dw-model-remove:hover {
+    background: var(--glass-red-tint-medium);
+    color: var(--state-error);
+  }
+
+  .dw-manual-add {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--glass-bg-card);
+    border: 1px solid var(--glass-divider);
+  }
+
   /* Working directory */
   .dw-dir-row {
     display: flex;

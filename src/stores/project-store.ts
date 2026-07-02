@@ -21,6 +21,7 @@ function normalizeSentences(sentences: Sentence[]): Sentence[] {
 
 interface ProjectData {
   mode: TtsMode
+  model: string
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
@@ -29,6 +30,7 @@ interface ProjectData {
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
   mode: "basic",
+  model: "mimo-v2.5-tts",
   voice: "冰糖",
   voiceDesignPrompt: "",
   voiceClonePath: null,
@@ -59,6 +61,7 @@ function loadProjectData(project: string | null): ProjectData {
 
     return {
       mode: (state.mode as TtsMode) ?? "basic",
+      model: (state.model as string) ?? "mimo-v2.5-tts",
       voice: (state.voice as string) ?? "冰糖",
       voiceDesignPrompt: (state.voiceDesignPrompt as string) ?? "",
       voiceClonePath: (state.voiceClonePath as string | null) ?? null,
@@ -81,6 +84,7 @@ function saveProjectData(project: string | null, data: ProjectData): void {
 interface ProjectState extends Project {
   currentProject: string | null
   setMode: (mode: TtsMode) => void
+  setModel: (model: string) => void
   setVoice: (voice: string) => void
   setVoiceDesignPrompt: (prompt: string) => void
   setVoiceClonePath: (path: string | null) => void
@@ -96,6 +100,7 @@ interface ProjectState extends Project {
 export const useProjectStore = create<ProjectState>((set, get) => ({
   currentProject: null,
   mode: "basic",
+  model: "mimo-v2.5-tts",
   voice: "冰糖",
   voiceDesignPrompt: "",
   voiceClonePath: null,
@@ -103,6 +108,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setMode: (mode) => {
     set({ mode })
+    saveCurrentProject(get())
+  },
+  setModel: (model) => {
+    set({ model })
     saveCurrentProject(get())
   },
   setVoice: (voice) => {
@@ -161,6 +170,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({
       currentProject: project,
       mode: data.mode,
+      model: data.model,
       voice: data.voice,
       voiceDesignPrompt: data.voiceDesignPrompt,
       voiceClonePath: data.voiceClonePath,
@@ -173,6 +183,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 function saveCurrentProject(state: ProjectState): void {
   saveProjectData(state.currentProject, {
     mode: state.mode,
+    model: state.model,
     voice: state.voice,
     voiceDesignPrompt: state.voiceDesignPrompt,
     voiceClonePath: state.voiceClonePath,

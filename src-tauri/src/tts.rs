@@ -19,6 +19,7 @@ use tauri::{ipc::Response, AppHandle, Manager};
 pub struct TtsParams {
     pub base_url: String,
     pub api_key: String,
+    pub model: String,               // 用户选择的模型 ID
     pub mode: String,              // "basic" | "voice-design" | "voice-clone"
     pub voice: String,             // 基础模式的预置音色名
     pub voice_design_prompt: String,  // 声音设计的描述
@@ -194,13 +195,6 @@ fn sanitize_filename(name: &str) -> String {
 async fn request_speech(params: &TtsParams, text: &str, voice_audio_base64: Option<&str>) -> Result<Vec<u8>, String> {
     let endpoint = build_chat_endpoint(&params.base_url);
 
-    // 根据 mode 决定 model
-    let model = match params.mode.as_str() {
-        "voice-design" => "mimo-v2.5-tts-voicedesign",
-        "voice-clone" => "mimo-v2.5-tts-voiceclone",
-        _ => "mimo-v2.5-tts",
-    };
-
     // messages：构建角色消息
     let mut messages = Vec::<Value>::with_capacity(2);
 
@@ -240,7 +234,7 @@ async fn request_speech(params: &TtsParams, text: &str, voice_audio_base64: Opti
     };
 
     let body = serde_json::json!({
-        "model": model,
+        "model": params.model,
         "messages": messages,
         "audio": audio
     });

@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core"
 export interface TtsParams {
   baseUrl: string
   apiKey: string
+  model: string
   mode: TtsMode
   voice: string
   voiceDesignPrompt: string

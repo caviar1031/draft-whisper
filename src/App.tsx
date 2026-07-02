@@ -26,10 +26,12 @@ function App() {
   const loadProject = useProjectStore((s) => s.loadProject)
 
   const projectMode = useProjectStore((s) => s.mode)
+  const projectModel = useProjectStore((s) => s.model)
   const projectVoice = useProjectStore((s) => s.voice)
   const projectVoiceDesignPrompt = useProjectStore((s) => s.voiceDesignPrompt)
   const projectVoiceClonePath = useProjectStore((s) => s.voiceClonePath)
   const setProjectMode = useProjectStore((s) => s.setMode)
+  const setProjectModel = useProjectStore((s) => s.setModel)
   const setProjectVoice = useProjectStore((s) => s.setVoice)
   const setProjectVoiceDesignPrompt = useProjectStore((s) => s.setVoiceDesignPrompt)
   const setProjectVoiceClonePath = useProjectStore((s) => s.setVoiceClonePath)
@@ -129,6 +131,7 @@ function App() {
       const params = {
         baseUrl: settings.baseUrl,
         apiKey: settings.apiKey,
+        model: projState.model,
         mode: projState.mode,
         voice: projState.voice,
         voiceDesignPrompt: projState.voiceDesignPrompt,
@@ -463,12 +466,14 @@ function App() {
           mode={sentences.length > 0 ? "edit" : "import"}
           initialText={sentences.length > 0 ? sentences.map((s) => s.text).join("\n") : ""}
           ttsMode={projectMode}
+          model={projectModel}
           voice={projectVoice}
           voiceDesignPrompt={projectVoiceDesignPrompt}
           voiceClonePath={projectVoiceClonePath}
           onSave={handleSaveScript}
           onClose={() => setScriptEditorOpen(false)}
           onModeChange={setProjectMode}
+          onModelChange={setProjectModel}
           onVoiceChange={setProjectVoice}
           onVoiceDesignPromptChange={setProjectVoiceDesignPrompt}
           onVoiceClonePathChange={setProjectVoiceClonePath}
