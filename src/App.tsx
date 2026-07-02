@@ -6,15 +6,17 @@ import { SettingsPage } from "@/components/dw/settings-page"
 import { TitleBar } from "@/components/dw/title-bar"
 import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
-import { createProject, generateSentenceAudio, listProjects, readAudioAsUrl } from "@/services/tts"
-import { useProjectStore } from "@/stores/project-store"
+import { useAudioPlayback } from "@/hooks/use-audio-playback"
+import { useTtsGeneration } from "@/hooks/use-tts-generation"
+import { createProject, listProjects } from "@/services/tts"
+import { flushCurrentProject, useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
 import { generateSentenceId } from "@/utils/id"
 import { splitTextToSentences } from "@/utils/sentence"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { RefreshCw, TriangleAlert } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 type Phase = "empty" | "imported" | "generating" | "complete"
 
@@ -39,7 +41,9 @@ function App() {
   const project = useSettingsStore((s) => s.project)
   const setProject = useSettingsStore((s) => s.setProject)
 
-  const [playingId, setPlayingId] = useState<string | null>(null)
+  const { playingId, handlePlay, handlePause } = useAudioPlayback()
+  const { runGeneration, generateAll, retryFailed } = useTtsGeneration()
+
   const [editingId, setEditingId] = useState<string | null>(null)
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -47,23 +51,22 @@ function App() {
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [projects, setProjects] = useState<string[]>([])
 
-  const genRunId = useRef(0)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-    }
-  }, [])
-
   // 启动时加载上次选中的项目的句子
   useEffect(() => {
     const savedProject = useSettingsStore.getState().project
     loadProject(savedProject)
   }, [loadProject])
+
+  // 窗口关闭前立即保存项目数据（绕过 debounce）
+  useEffect(() => {
+    const win = getCurrentWindow()
+    const unlisten = win.onCloseRequested(() => {
+      flushCurrentProject()
+    })
+    return () => {
+      void unlisten.then((fn) => fn())
+    }
+  }, [])
 
   // 获取项目列表
   const fetchProjects = useCallback(async () => {
@@ -122,62 +125,6 @@ function App() {
 
   const failedCount = sentences.filter((s) => s.status === "failed").length
 
-  // --- 真实 TTS 生成（支持并行） ---
-  const runGeneration = useCallback(
-    async (ids: string[]) => {
-      const runId = ++genRunId.current
-      const settings = useSettingsStore.getState()
-      const projState = useProjectStore.getState()
-      const params = {
-        baseUrl: settings.baseUrl,
-        apiKey: settings.apiKey,
-        model: projState.model,
-        mode: projState.mode,
-        voice: projState.voice,
-        voiceDesignPrompt: projState.voiceDesignPrompt,
-        voiceClonePath: projState.voiceClonePath,
-      }
-      const concurrency = settings.concurrency
-      const currentProject = settings.project
-
-      // 先把所有句子标记为 queued（等待中）
-      for (const id of ids) {
-        updateSentence(id, { status: "queued" })
-      }
-
-      // 并行 worker 池
-      const queue = [...ids]
-      const workers = Array.from({ length: Math.min(concurrency, ids.length) }, async () => {
-        while (queue.length > 0) {
-          if (genRunId.current !== runId) return
-          const id = queue.shift()!
-          const sentence = useProjectStore.getState().sentences.find((s) => s.id === id)
-          if (!sentence) continue
-          updateSentence(id, { status: "generating" })
-          try {
-            const result = await generateSentenceAudio(id, sentence.text, params, currentProject)
-            if (genRunId.current !== runId) return
-            const newVersion = { audioPath: result.audioPath, createdAt: Date.now() }
-            const currentHistory =
-              useProjectStore.getState().sentences.find((s) => s.id === id)?.audioHistory ?? []
-            updateSentence(id, {
-              status: "completed",
-              audioPath: result.audioPath,
-              audioHistory: [...currentHistory, newVersion],
-            })
-          } catch (e) {
-            console.error("TTS generate failed:", id, e)
-            if (genRunId.current !== runId) return
-            updateSentence(id, { status: "failed" })
-          }
-        }
-      })
-
-      await Promise.all(workers)
-    },
-    [updateSentence],
-  )
-
   // --- Script Editor ---
   const handleOpenScriptEditor = useCallback(() => {
     setScriptEditorOpen(true)
@@ -186,7 +133,7 @@ function App() {
   const handleSaveScript = useCallback(
     (text: string, splitMode: "auto" | "manual") => {
       setScriptEditorOpen(false)
-      setPlayingId(null)
+      handlePause()
       setEditingId(null)
 
       if (splitMode === "auto") {
@@ -228,20 +175,20 @@ function App() {
         }
       }
     },
-    [sentences, setSentences, runGeneration],
+    [sentences, setSentences, runGeneration, handlePause],
   )
 
   const handleGenerateAll = useCallback(() => {
-    void runGeneration(sentences.map((s) => s.id))
-  }, [sentences, runGeneration])
+    generateAll(sentences.map((s) => s.id))
+  }, [sentences, generateAll])
 
   const handleRegenerateAll = useCallback(() => {
-    void runGeneration(sentences.map((s) => s.id))
-  }, [sentences, runGeneration])
+    generateAll(sentences.map((s) => s.id))
+  }, [sentences, generateAll])
 
   const handleRetryAll = useCallback(() => {
-    void runGeneration(sentences.filter((s) => s.status === "failed").map((s) => s.id))
-  }, [sentences, runGeneration])
+    retryFailed(sentences.filter((s) => s.status === "failed").map((s) => s.id))
+  }, [sentences, retryFailed])
 
   const handleRegenerateCard = useCallback(
     (id: string) => {
@@ -250,61 +197,13 @@ function App() {
     [runGeneration],
   )
 
-  // --- 真实音频播放 ---
-  const handlePlay = useCallback(
-    async (id: string) => {
-      const sentence = useProjectStore.getState().sentences.find((s) => s.id === id)
-      if (!sentence?.audioPath) return
-
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-
-      try {
-        const url = await readAudioAsUrl(sentence.audioPath)
-        const audio = new Audio(url)
-        audioRef.current = audio
-        setPlayingId(id)
-
-        audio.addEventListener("loadedmetadata", () => {
-          updateSentence(id, { duration: audio.duration })
-        })
-        audio.addEventListener("ended", () => {
-          setPlayingId(null)
-          audioRef.current = null
-        })
-        audio.addEventListener("error", () => {
-          setPlayingId(null)
-          audioRef.current = null
-        })
-
-        await audio.play()
-      } catch {
-        setPlayingId(null)
-      }
-    },
-    [updateSentence],
-  )
-
-  const handlePause = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
-    }
-    setPlayingId(null)
-  }, [])
-
+  // --- 音频版本切换 ---
   const handleSwitchVersion = useCallback(
     (id: string, historyIndex: number) => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-      setPlayingId(null)
+      handlePause()
       switchAudioVersion(id, historyIndex)
     },
-    [switchAudioVersion],
+    [handlePause, switchAudioVersion],
   )
 
   // --- 编辑 ---

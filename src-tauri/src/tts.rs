@@ -2,8 +2,55 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::OnceLock;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{ipc::Response, AppHandle, Manager};
+
+/// 全局共享的 HTTP Client（复用连接池 + 超时配置）。
+fn http_client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
+            .build()
+            .expect("failed to build HTTP client")
+    })
+}
+
+/// 校验路径是否在音频缓存目录内（防止路径遍历攻击）。
+///
+/// 会 canonicalize 路径以解析 `..` 等遍历符号。
+/// 文件不存在时（如 delete 场景），校验其父目录。
+fn is_in_audio_dir(app: &AppHandle, path: &str) -> Result<PathBuf, String> {
+    let audio_dir = ensure_audio_dir(app)?;
+    let canonical_dir = audio_dir
+        .canonicalize()
+        .map_err(|e| format!("canonicalize audio dir 失败: {e}"))?;
+
+    let target = std::path::Path::new(path);
+    let canonical_path = if target.exists() {
+        target
+            .canonicalize()
+            .map_err(|e| format!("路径无法解析: {e}"))?
+    } else {
+        // 文件不存在时，验证其父目录在音频目录内，再拼回文件名
+        let parent = target.parent().unwrap_or(target);
+        let canonical_parent = parent
+            .canonicalize()
+            .map_err(|e| format!("父目录不存在或无法解析: {e}"))?;
+        canonical_parent.join(target.file_name().unwrap_or_default())
+    };
+
+    if !canonical_path.starts_with(&canonical_dir) {
+        return Err(format!(
+            "路径不在音频目录内: {} (允许的目录: {})",
+            path,
+            audio_dir.display()
+        ));
+    }
+    Ok(canonical_path)
+}
 
 /// 与前端 Settings 一一对应的 TTS 调用参数。
 ///
@@ -239,7 +286,7 @@ async fn request_speech(params: &TtsParams, text: &str, voice_audio_base64: Opti
         "audio": audio
     });
 
-    let client = reqwest::Client::new();
+    let client = http_client();
     let resp = client
         .post(&endpoint)
         .header("api-key", &params.api_key)
@@ -388,7 +435,7 @@ pub async fn tts_list_models(base_url: String, api_key: String) -> Result<Vec<St
   let endpoint = build_models_endpoint(&base_url);
   log::info!("获取模型列表: {endpoint}");
 
-  let client = reqwest::Client::new();
+  let client = http_client();
   let resp = client
     .get(&endpoint)
     .header("api-key", &api_key)
@@ -429,8 +476,9 @@ pub async fn tts_list_models(base_url: String, api_key: String) -> Result<Vec<St
 ///
 /// 前端调用: `invoke("tts_read_audio", { path })` → ArrayBuffer
 #[tauri::command]
-pub fn tts_read_audio(path: String) -> Result<Response, String> {
-  let bytes = std::fs::read(&path).map_err(|e| format!("读取音频文件失败: {e}"))?;
+pub fn tts_read_audio(path: String, app: AppHandle) -> Result<Response, String> {
+  let safe_path = is_in_audio_dir(&app, &path)?;
+  let bytes = std::fs::read(&safe_path).map_err(|e| format!("读取音频文件失败: {e}"))?;
   Ok(Response::new(bytes))
 }
 
@@ -479,11 +527,88 @@ pub fn save_voice_sample(
 ///
 /// 前端调用: `invoke("delete_voice_sample", { path })`
 #[tauri::command]
-pub fn delete_voice_sample(path: String) -> Result<(), String> {
-    let p = std::path::Path::new(&path);
-    if p.exists() {
-        std::fs::remove_file(p).map_err(|e| format!("删除样本文件失败: {e}"))?;
-        log::info!("✓ 已删除音色样本: {path}");
+pub fn delete_voice_sample(path: String, app: AppHandle) -> Result<(), String> {
+    let safe_path = is_in_audio_dir(&app, &path)?;
+    if safe_path.exists() {
+        std::fs::remove_file(&safe_path).map_err(|e| format!("删除样本文件失败: {e}"))?;
+        log::info!("✓ 已删除音色样本: {}", safe_path.display());
+    }
+    Ok(())
+}
+
+// ---- API Key 安全存储（macOS Keychain） ----
+
+const KEYCHAIN_SERVICE: &str = "com.draft-whisper.api-key";
+const KEYCHAIN_ACCOUNT: &str = "default";
+
+/// 将 API Key 存入 macOS Keychain。
+///
+/// 前端调用: `invoke("save_api_key", { apiKey })`
+#[tauri::command]
+pub fn save_api_key(api_key: String) -> Result<(), String> {
+    // 先尝试更新，失败则新增
+    let updated = std::process::Command::new("security")
+        .args([
+            "add-generic-password",
+            "-s", KEYCHAIN_SERVICE,
+            "-a", KEYCHAIN_ACCOUNT,
+            "-w", &api_key,
+            "-U", // update if exists
+        ])
+        .output()
+        .map_err(|e| format!("执行 security 命令失败: {e}"))?;
+
+    if !updated.status.success() {
+        let stderr = String::from_utf8_lossy(&updated.stderr);
+        return Err(format!("保存 API Key 到 Keychain 失败: {stderr}"));
+    }
+    Ok(())
+}
+
+/// 从 macOS Keychain 读取 API Key。
+///
+/// 前端调用: `invoke("load_api_key")` → `string | null`
+#[tauri::command]
+pub fn load_api_key() -> Result<Option<String>, String> {
+    let output = std::process::Command::new("security")
+        .args([
+            "find-generic-password",
+            "-s", KEYCHAIN_SERVICE,
+            "-a", KEYCHAIN_ACCOUNT,
+            "-w", // output password only
+        ])
+        .output()
+        .map_err(|e| format!("执行 security 命令失败: {e}"))?;
+
+    if !output.status.success() {
+        // errSecItemNotFound (-25300) — 正常情况，表示尚未存储
+        return Ok(None);
+    }
+
+    let key = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if key.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(key))
+}
+
+/// 从 macOS Keychain 删除 API Key。
+///
+/// 前端调用: `invoke("delete_api_key")`
+#[tauri::command]
+pub fn delete_api_key() -> Result<(), String> {
+    let output = std::process::Command::new("security")
+        .args([
+            "delete-generic-password",
+            "-s", KEYCHAIN_SERVICE,
+            "-a", KEYCHAIN_ACCOUNT,
+        ])
+        .output()
+        .map_err(|e| format!("执行 security 命令失败: {e}"))?;
+
+    // 即使条目不存在也视为成功
+    if !output.status.success() {
+        log::warn!("delete_api_key: security 命令返回非零，可能条目不存在");
     }
     Ok(())
 }
@@ -495,12 +620,15 @@ pub fn delete_voice_sample(path: String) -> Result<(), String> {
 ///
 /// 前端调用: `invoke("tts_copy_to_clipboard", { path })`
 #[tauri::command]
-pub fn tts_copy_to_clipboard(path: String) -> Result<(), String> {
-  if !std::path::Path::new(&path).exists() {
-    return Err(format!("文件不存在: {path}"));
-  }
+pub fn tts_copy_to_clipboard(path: String, app: AppHandle) -> Result<(), String> {
+  let safe_path = is_in_audio_dir(&app, &path)?;
 
-  let script = format!("set the clipboard to (POSIX file \"{}\")", path.replace('"', "\\\""));
+  // 先转义反斜杠，再转义双引号（顺序不能反）
+  let escaped = safe_path
+    .to_string_lossy()
+    .replace('\\', "\\\\")
+    .replace('"', "\\\"");
+  let script = format!("set the clipboard to (POSIX file \"{}\")", escaped);
 
   #[cfg(target_os = "macos")]
   {
@@ -530,22 +658,21 @@ pub fn tts_copy_to_clipboard(path: String) -> Result<(), String> {
 ///
 /// 前端调用: `invoke("tts_show_in_finder", { path })`
 #[tauri::command]
-pub fn tts_show_in_finder(path: String) -> Result<(), String> {
-  if !std::path::Path::new(&path).exists() {
-    return Err(format!("文件不存在: {path}"));
-  }
+pub fn tts_show_in_finder(path: String, app: AppHandle) -> Result<(), String> {
+  let safe_path = is_in_audio_dir(&app, &path)?;
+  let safe_path_str = safe_path.to_string_lossy().to_string();
 
   #[cfg(target_os = "macos")]
   {
     std::process::Command::new("open")
-      .args(["-R", &path])
+      .args(["-R", &safe_path_str])
       .spawn()
       .map_err(|e| format!("打开 Finder 失败: {e}"))?;
   }
 
   #[cfg(not(target_os = "macos"))]
   {
-    let _ = path;
+    let _ = safe_path_str;
     return Err("Show in Finder 仅支持 macOS".into());
   }
 
@@ -562,7 +689,10 @@ pub fn tts_show_in_finder(path: String) -> Result<(), String> {
 /// 前端调用: `invoke("tts_drag_file", { path })`
 #[tauri::command]
 #[cfg(target_os = "macos")]
-pub fn tts_drag_file(path: String, window: tauri::Window) -> Result<(), String> {
+pub fn tts_drag_file(path: String, window: tauri::Window, app: AppHandle) -> Result<(), String> {
+  let safe_path = is_in_audio_dir(&app, &path)?;
+  let safe_path_str = safe_path.to_string_lossy().to_string();
+
   use objc::class;
   use objc::declare::ClassDecl;
   use objc::msg_send;
@@ -570,10 +700,6 @@ pub fn tts_drag_file(path: String, window: tauri::Window) -> Result<(), String> 
   use objc::sel;
   use objc::sel_impl;
   use std::ffi::{c_double, CString};
-
-  if !std::path::Path::new(&path).exists() {
-    return Err(format!("文件不存在: {path}"));
-  }
 
   let ns_view_ptr = window.ns_view().map_err(|e| format!("获取 ns_view 失败: {e}"))?;
 
@@ -610,7 +736,7 @@ pub fn tts_drag_file(path: String, window: tauri::Window) -> Result<(), String> 
 
     // --- File URL ---
     // CString 确保 \0 结尾；stringWithUTF8String: 要求 C 风格字符串（null-terminated）
-    let c_path = CString::new(path).map_err(|e| format!("路径含非法字符: {e}"))?;
+    let c_path = CString::new(safe_path_str).map_err(|e| format!("路径含非法字符: {e}"))?;
     let path_str: *mut Object =
       msg_send![class!(NSString), stringWithUTF8String: c_path.as_ptr()];
     let file_url: *mut Object = msg_send![class!(NSURL), fileURLWithPath: path_str];
@@ -687,8 +813,8 @@ pub fn tts_drag_file(path: String, window: tauri::Window) -> Result<(), String> 
 
 #[cfg(not(target_os = "macos"))]
 #[tauri::command]
-pub fn tts_drag_file(path: String, _window: tauri::Window) -> Result<(), String> {
-  let _ = path;
+pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Result<(), String> {
+  let _ = (path, app);
   Err("原生文件拖拽仅支持 macOS".into())
 }
 

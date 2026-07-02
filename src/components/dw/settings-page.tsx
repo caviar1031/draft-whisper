@@ -11,6 +11,7 @@ export function SettingsPage() {
   const settings = useSettingsStore()
   const [testState, setTestState] = useState<TestState>("idle")
   const [fetchingModels, setFetchingModels] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [addingManual, setAddingManual] = useState(false)
   const [manualId, setManualId] = useState("")
   const [manualMode, setManualMode] = useState<TtsMode>("basic")
@@ -37,10 +38,10 @@ export function SettingsPage() {
   const handleFetchModels = useCallback(async () => {
     if (!settings.baseUrl.trim() || !settings.apiKey.trim()) return
     setFetchingModels(true)
+    setFetchError(null)
     try {
       const ids = await listModels(settings.baseUrl, settings.apiKey)
       const existingIds = new Set(settings.models.map((m) => m.id))
-      let added = 0
       for (const id of ids) {
         if (existingIds.has(id)) continue
         settings.addModel({
@@ -48,13 +49,9 @@ export function SettingsPage() {
           name: id,
           mode: inferTtsMode(id),
         })
-        added++
       }
-      if (added === 0) {
-        // All models already configured — no-op
-      }
-    } catch {
-      // Error handled silently — user can see no models were added
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : String(e))
     } finally {
       setFetchingModels(false)
     }
@@ -164,6 +161,12 @@ export function SettingsPage() {
           </div>
         </div>
 
+        {fetchError && (
+          <div className="dw-editing-hint" style={{ color: "var(--state-error)" }}>
+            <span>{fetchError}</span>
+          </div>
+        )}
+
         {/* 模型列表 */}
         {settings.models.length > 0 ? (
           <div className="dw-model-list">
@@ -192,7 +195,6 @@ export function SettingsPage() {
                 if (e.key === "Enter") handleAddManual()
                 if (e.key === "Escape") setAddingManual(false)
               }}
-              autoFocus
             />
             <select
               className="dw-settings-select"

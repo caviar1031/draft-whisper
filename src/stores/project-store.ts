@@ -1,3 +1,4 @@
+import { invalidateAudioUrl, revokeAllAudioUrls } from "@/services/tts"
 import type { Project, Sentence, TtsMode } from "@/types"
 import { create } from "zustand"
 
@@ -72,15 +73,6 @@ function loadProjectData(project: string | null): ProjectData {
   }
 }
 
-/** 将当前项目数据保存到 localStorage */
-function saveProjectData(project: string | null, data: ProjectData): void {
-  try {
-    localStorage.setItem(storageKey(project), JSON.stringify(data))
-  } catch {
-    // localStorage 满或不可用时静默失败
-  }
-}
-
 interface ProjectState extends Project {
   currentProject: string | null
   setMode: (mode: TtsMode) => void
@@ -132,9 +124,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
   updateSentence: (id, updates) => {
     set((state) => ({
-      sentences: state.sentences.map((s) =>
-        s.id === id ? { ...s, ...updates } : s,
-      ),
+      sentences: state.sentences.map((s) => (s.id === id ? { ...s, ...updates } : s)),
     }))
     saveCurrentProject(get())
   },
@@ -145,6 +135,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     saveCurrentProject(get())
   },
   removeSentence: (id) => {
+    // 在删除前清理该句子的 Blob URL 缓存
+    const sentence = get().sentences.find((s) => s.id === id)
+    if (sentence?.audioPath) invalidateAudioUrl(sentence.audioPath)
     set((state) => ({
       sentences: state.sentences.filter((s) => s.id !== id),
     }))
@@ -156,6 +149,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         if (s.id !== id) return s
         const version = s.audioHistory[historyIndex]
         if (!version) return s
+        // 不 invalidate 旧 URL，因为其他版本可能还在用
         return { ...s, audioPath: version.audioPath, duration: null }
       }),
     }))
@@ -164,7 +158,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   loadProject: (project) => {
     const state = get()
     // 先保存当前项目
-    saveCurrentProject(state)
+    flushAndSave(state)
+    // 切换项目时清理所有 Blob URL 缓存
+    revokeAllAudioUrls()
     // 加载目标项目
     const data = loadProjectData(project)
     set({
@@ -180,7 +176,36 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 }))
 
 /** 辅助函数：保存当前项目的完整数据 */
+function saveProjectData(project: string | null, data: ProjectData): void {
+  try {
+    localStorage.setItem(storageKey(project), JSON.stringify(data))
+  } catch {
+    // localStorage 满或不可用时静默失败
+  }
+}
+
+/** 保存当前项目（debounced，300ms） */
+let saveTimer: ReturnType<typeof setTimeout> | null = null
 function saveCurrentProject(state: ProjectState): void {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    saveProjectData(state.currentProject, {
+      mode: state.mode,
+      model: state.model,
+      voice: state.voice,
+      voiceDesignPrompt: state.voiceDesignPrompt,
+      voiceClonePath: state.voiceClonePath,
+      sentences: state.sentences,
+    })
+  }, 300)
+}
+
+/** 立即保存（取消 debounce，用于项目切换等关键场景） */
+function flushAndSave(state: ProjectState): void {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
   saveProjectData(state.currentProject, {
     mode: state.mode,
     model: state.model,
@@ -189,4 +214,12 @@ function saveCurrentProject(state: ProjectState): void {
     voiceClonePath: state.voiceClonePath,
     sentences: state.sentences,
   })
+}
+
+/**
+ * 立即保存当前项目（供外部调用，如窗口关闭前）。
+ * 取消 debounce 定时器并同步写入 localStorage。
+ */
+export function flushCurrentProject(): void {
+  flushAndSave(useProjectStore.getState())
 }

@@ -63,6 +63,9 @@ pub fn run() {
       tts::tts_create_project,
       tts::save_voice_sample,
       tts::delete_voice_sample,
+      tts::save_api_key,
+      tts::load_api_key,
+      tts::delete_api_key,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

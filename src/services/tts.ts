@@ -154,3 +154,30 @@ export async function saveVoiceSample(sourcePath: string, sampleId: string): Pro
 export async function deleteVoiceSample(path: string): Promise<void> {
   await invoke<void>("delete_voice_sample", { path })
 }
+
+/**
+ * 将 API Key 存入 macOS Keychain。
+ *
+ * 后端: invoke("save_api_key", { apiKey })
+ */
+export async function saveApiKey(apiKey: string): Promise<void> {
+  await invoke<void>("save_api_key", { apiKey })
+}
+
+/**
+ * 从 macOS Keychain 读取 API Key。
+ *
+ * 后端: invoke("load_api_key") → string | null
+ */
+export async function loadApiKey(): Promise<string | null> {
+  return invoke<string | null>("load_api_key")
+}
+
+/**
+ * 从 macOS Keychain 删除 API Key。
+ *
+ * 后端: invoke("delete_api_key")
+ */
+export async function deleteApiKey(): Promise<void> {
+  await invoke<void>("delete_api_key")
+}
