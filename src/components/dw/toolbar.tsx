@@ -1,9 +1,7 @@
 import { ArrowRight, CirclePlay, File, Pencil } from "lucide-react"
 
 // 工具栏主操作类型
-export type ToolbarAction =
-  | { kind: "generate"; disabled?: boolean }
-  | { kind: "regenerate-all" }
+export type ToolbarAction = { kind: "generate"; disabled?: boolean } | { kind: "regenerate-all" }
 
 interface ToolbarProps {
   action: ToolbarAction
@@ -12,12 +10,7 @@ interface ToolbarProps {
   onAction: () => void
 }
 
-export function Toolbar({
-  action,
-  hasContent,
-  onOpenScriptEditor,
-  onAction,
-}: ToolbarProps) {
+export function Toolbar({ action, hasContent, onOpenScriptEditor, onAction }: ToolbarProps) {
   return (
     <div className="dw-toolbar">
       <div className="dw-toolbar-left">
