@@ -1167,6 +1167,58 @@
     justify-content: space-between;
   }
 
+  /* ===== Voice Sample Selector ===== */
+  .dw-sample-add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .dw-sample-add-label {
+    font-size: 11px;
+    color: var(--text-400);
+    flex-shrink: 0;
+  }
+
+  .dw-sample-name-input {
+    flex: 1;
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-surface);
+    color: var(--text-100);
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .dw-sample-name-input:focus {
+    border-color: var(--brand-500);
+  }
+
+  .dw-sample-manage-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dw-sample-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--glass-surface);
+  }
+
+  .dw-sample-name {
+    font-size: 12px;
+    color: var(--text-200);
+  }
+
   .dw-changed-badge {
     display: inline-flex;
     align-items: center;

@@ -136,3 +136,21 @@ export async function showInFinder(path: string): Promise<void> {
 export async function nativeDragFile(path: string): Promise<void> {
   await invoke<void>("tts_drag_file", { path })
 }
+
+/**
+ * 将外部音频文件复制到音色样本库目录，返回存储后的绝对路径。
+ *
+ * 后端: invoke("save_voice_sample", { sourcePath, sampleId }) → string
+ */
+export async function saveVoiceSample(sourcePath: string, sampleId: string): Promise<string> {
+  return invoke<string>("save_voice_sample", { sourcePath, sampleId })
+}
+
+/**
+ * 删除音色样本文件。
+ *
+ * 后端: invoke("delete_voice_sample", { path })
+ */
+export async function deleteVoiceSample(path: string): Promise<void> {
+  await invoke<void>("delete_voice_sample", { path })
+}

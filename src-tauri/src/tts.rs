@@ -434,6 +434,60 @@ pub fn tts_read_audio(path: String) -> Result<Response, String> {
   Ok(Response::new(bytes))
 }
 
+/// 返回音色样本库目录，不存在则创建。
+///
+/// 路径：`{audio_base_dir}/voice-samples/`。
+fn voice_samples_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let base = ensure_audio_dir(app)?;
+    let dir = base.join("voice-samples");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("创建音色样本目录失败: {e}"))?;
+    Ok(dir)
+}
+
+/// 将外部音频文件复制到音色样本库。
+///
+/// 前端调用: `invoke("save_voice_sample", { sourcePath, sampleId })` → `string`（存储后的绝对路径）
+#[tauri::command]
+pub fn save_voice_sample(
+    source_path: String,
+    sample_id: String,
+    app: AppHandle,
+) -> Result<String, String> {
+    let src = std::path::Path::new(&source_path);
+    if !src.exists() {
+        return Err(format!("源文件不存在: {source_path}"));
+    }
+
+    let dir = voice_samples_dir(&app)?;
+
+    // 保留原始扩展名
+    let ext = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("wav");
+    let file_name = format!("{}.{}", sanitize_filename(&sample_id), ext);
+    let dest = dir.join(&file_name);
+
+    std::fs::copy(src, &dest).map_err(|e| format!("复制音频文件失败: {e}"))?;
+
+    log::info!("✓ 已保存音色样本: {}", dest.display());
+    Ok(dest.to_string_lossy().to_string())
+}
+
+/// 删除音色样本文件。
+///
+/// 前端调用: `invoke("delete_voice_sample", { path })`
+#[tauri::command]
+pub fn delete_voice_sample(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if p.exists() {
+        std::fs::remove_file(p).map_err(|e| format!("删除样本文件失败: {e}"))?;
+        log::info!("✓ 已删除音色样本: {path}");
+    }
+    Ok(())
+}
+
 /// 将音频文件复制到 macOS 系统剪贴板（文件引用，非文本）。
 ///
 /// 使用 AppleScript 的 `set the clipboard to (POSIX file "...")` 实现。

@@ -1,9 +1,10 @@
 import { VOICE_OPTIONS } from "@/lib/options"
 import { useSettingsStore } from "@/stores/settings-store"
-import { splitTextToSentences } from "@/utils/sentence"
 import type { TtsMode } from "@/types"
+import { splitTextToSentences } from "@/utils/sentence"
 import { X } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { VoiceSampleSelector } from "./voice-sample-selector"
 
 type SplitMode = "auto" | "manual"
 type EditorTab = "script" | "voice"
@@ -91,7 +92,6 @@ export function ScriptEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (activeTab === "script") {
@@ -182,16 +182,6 @@ export function ScriptEditor({
       }
     },
     [handleSave, onClose],
-  )
-
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (!file) return
-      onVoiceClonePathChange(file.name)
-      e.target.value = ""
-    },
-    [onVoiceClonePathChange],
   )
 
   const showSplitModeToggle = mode === "import"
@@ -336,31 +326,27 @@ export function ScriptEditor({
             </div>
 
             {/* 模型选择（按当前 mode 过滤） */}
-            <ModelSelector
-              mode={ttsMode}
-              value={model}
-              onChange={onModelChange}
-            />
+            <ModelSelector mode={ttsMode} value={model} onChange={onModelChange} />
 
             {/* Basic TTS: 音色 */}
             {ttsMode === "basic" && (
-                <div className="dw-settings-field">
-                  <label className="dw-settings-label">
-                    Voice
-                    <select
-                      className="dw-settings-select"
-                      value={voice}
-                      onChange={(e) => onVoiceChange(e.target.value)}
-                    >
-                      {VOICE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                          {opt.desc ? ` (${opt.desc})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+              <div className="dw-settings-field">
+                <label className="dw-settings-label">
+                  Voice
+                  <select
+                    className="dw-settings-select"
+                    value={voice}
+                    onChange={(e) => onVoiceChange(e.target.value)}
+                  >
+                    {VOICE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                        {opt.desc ? ` (${opt.desc})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             )}
 
             {/* Voice Design: 文本描述 */}
@@ -384,47 +370,12 @@ export function ScriptEditor({
               </div>
             )}
 
-            {/* Voice Clone: 参考音频 */}
+            {/* Voice Clone: 音色样本库 */}
             {ttsMode === "voice-clone" && (
-              <div className="dw-settings-field">
-                <label className="dw-settings-label">
-                  Reference Audio
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span
-                      className="dw-import-count"
-                      style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}
-                    >
-                      {voiceClonePath ?? "未选择参考音频"}
-                    </span>
-                    <button
-                      type="button"
-                      className="dw-pill-btn"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      选择文件
-                    </button>
-                    {voiceClonePath && (
-                      <button
-                        type="button"
-                        className="dw-pill-btn"
-                        onClick={() => onVoiceClonePathChange(null)}
-                      >
-                        清除
-                      </button>
-                    )}
-                  </div>
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="audio/*"
-                  style={{ display: "none" }}
-                  onChange={handleFileSelect}
-                />
-                <div className="dw-editing-hint" style={{ marginTop: 4 }}>
-                  <span>支持 wav/mp3/m4a 等格式，几秒即可</span>
-                </div>
-              </div>
+              <VoiceSampleSelector
+                selectedPath={voiceClonePath}
+                onSelect={onVoiceClonePathChange}
+              />
             )}
           </div>
         )}
