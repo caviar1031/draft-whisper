@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::{ipc::Response, AppHandle, Manager};
+use tauri::{AppHandle, Manager};
 
 /// 全局共享的 HTTP Client（复用连接池 + 超时配置）。
 fn http_client() -> &'static reqwest::Client {
@@ -473,14 +473,15 @@ pub async fn tts_list_models(base_url: String, api_key: String) -> Result<Vec<St
   Ok(ids)
 }
 
-/// 读取本地音频文件字节，供前端转 Blob URL 播放。
+/// 读取本地音频文件，返回 base64 编码的字符串。
 ///
-/// 前端调用: `invoke("tts_read_audio", { path })` → ArrayBuffer
+/// 前端调用: `invoke("tts_read_audio", { path })` → string (base64)
+/// 使用 base64 而非原始 bytes，避免 Tauri v2 IPC 对二进制数据的序列化问题。
 #[tauri::command]
-pub fn tts_read_audio(path: String, app: AppHandle) -> Result<Response, String> {
+pub fn tts_read_audio(path: String, app: AppHandle) -> Result<String, String> {
   let safe_path = is_in_audio_dir(&app, &path)?;
   let bytes = std::fs::read(&safe_path).map_err(|e| format!("Failed to read audio file: {e}"))?;
-  Ok(Response::new(bytes))
+  Ok(STANDARD.encode(&bytes))
 }
 
 /// 返回音色样本库目录，不存在则创建。

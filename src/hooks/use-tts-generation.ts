@@ -1,4 +1,4 @@
-import { generateSentenceAudio } from "@/services/tts"
+import { generateSentenceAudio, readAudioAsUrl } from "@/services/tts"
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
@@ -50,6 +50,9 @@ export function useTtsGeneration() {
               audioPath: result.audioPath,
               audioHistory: [...currentHistory, newVersion],
             })
+            // 预缓存 Blob URL，确保点击播放时 readAudioAsUrl 能从缓存瞬间返回，
+            // 避免 async IPC 打断用户手势链导致 WKWebView autoplay 策略阻止播放。
+            readAudioAsUrl(result.audioPath).catch(() => {})
           } catch (e) {
             console.error("TTS generate failed:", id, e)
             if (genRunId.current !== runId) return

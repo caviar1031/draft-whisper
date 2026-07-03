@@ -8,7 +8,7 @@ import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useTtsGeneration } from "@/hooks/use-tts-generation"
-import { createProject, listProjects } from "@/services/tts"
+import { createProject, listProjects, readAudioAsUrl } from "@/services/tts"
 import { flushCurrentProject, useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
@@ -16,7 +16,7 @@ import { generateSentenceId } from "@/utils/id"
 import { splitTextToSentences } from "@/utils/sentence"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { RefreshCw, TriangleAlert } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 type Phase = "empty" | "imported" | "generating" | "complete"
 
@@ -67,6 +67,18 @@ function App() {
       void unlisten.then((fn) => fn())
     }
   }, [])
+
+  // 预缓存已有音频的 Blob URL（启动/切换项目时），确保点击播放时瞬间返回，
+  // 避免 async IPC 打断用户手势链导致 WKWebView autoplay 策略阻止播放。
+  const preloadedPathsRef = useRef(new Set<string>())
+  useEffect(() => {
+    for (const s of sentences) {
+      if (s.audioPath && !preloadedPathsRef.current.has(s.audioPath)) {
+        preloadedPathsRef.current.add(s.audioPath)
+        readAudioAsUrl(s.audioPath).catch(() => {})
+      }
+    }
+  }, [sentences])
 
   // 获取项目列表
   const fetchProjects = useCallback(async () => {

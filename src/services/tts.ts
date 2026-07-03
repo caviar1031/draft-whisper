@@ -94,16 +94,22 @@ export async function createProject(name: string): Promise<string[]> {
 }
 
 /**
- * 读取本地音频文件字节并转为可播放的 Blob URL（带缓存）。
+ * 读取本地音频文件并转为可播放的 Blob URL（带缓存）。
  * 直接给 <audio src={url}> 使用即可。
  *
- * 后端: invoke("tts_read_audio", { path }) -> ArrayBuffer
+ * 后端返回 base64 编码的字符串，前端解码为 ArrayBuffer 再创建 Blob URL。
+ * 使用 base64 避免 Tauri v2 IPC 对二进制数据的序列化问题。
  */
 export async function readAudioAsUrl(path: string): Promise<string> {
   const cached = audioUrlCache.get(path)
   if (cached) return cached
 
-  const bytes = await invoke<ArrayBuffer>("tts_read_audio", { path })
+  const base64 = await invoke<string>("tts_read_audio", { path })
+  const binaryString = atob(base64)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
   const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }))
   audioUrlCache.set(path, url)
   return url

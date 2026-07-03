@@ -43,13 +43,15 @@ export function useAudioPlayback() {
           setPlayingId(null)
           audioRef.current = null
         }
-        audio.onerror = () => {
+        audio.onerror = (e) => {
+          console.error("Audio playback error:", e, audio.error)
           setPlayingId(null)
           audioRef.current = null
         }
 
         await audio.play()
-      } catch {
+      } catch (e) {
+        console.error("handlePlay failed:", e)
         if (!disposedRef.current) setPlayingId(null)
       }
     },
