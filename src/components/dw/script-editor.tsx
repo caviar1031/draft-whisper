@@ -1,7 +1,7 @@
 import { VOICE_OPTIONS } from "@/lib/options"
-import { useSettingsStore } from "@/stores/settings-store"
 import type { TtsMode } from "@/types"
 import { splitTextToSentences } from "@/utils/sentence"
+import { MODEL_BY_MODE } from "@/utils/tts-config"
 import { X } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { VoiceSampleSelector } from "./voice-sample-selector"
@@ -17,6 +17,7 @@ interface ScriptEditorProps {
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
+  performancePrompt: string
   onSave: (text: string, splitMode: SplitMode) => void
   onClose: () => void
   onModeChange: (mode: TtsMode) => void
@@ -24,6 +25,7 @@ interface ScriptEditorProps {
   onVoiceChange: (voice: string) => void
   onVoiceDesignPromptChange: (prompt: string) => void
   onVoiceClonePathChange: (path: string | null) => void
+  onPerformancePromptChange: (prompt: string) => void
 }
 
 const MODE_OPTIONS: { value: TtsMode; label: string; desc: string }[] = [
@@ -78,6 +80,7 @@ export function ScriptEditor({
   voice,
   voiceDesignPrompt,
   voiceClonePath,
+  performancePrompt,
   onSave,
   onClose,
   onModeChange,
@@ -85,6 +88,7 @@ export function ScriptEditor({
   onVoiceChange,
   onVoiceDesignPromptChange,
   onVoiceClonePathChange,
+  onPerformancePromptChange,
 }: ScriptEditorProps) {
   const [activeTab, setActiveTab] = useState<EditorTab>("script")
   const [text, setText] = useState(initialText)
@@ -372,10 +376,31 @@ export function ScriptEditor({
 
             {/* Voice Clone: 音色样本库 */}
             {ttsMode === "voice-clone" && (
-              <VoiceSampleSelector
-                selectedPath={voiceClonePath}
-                onSelect={onVoiceClonePathChange}
-              />
+              <>
+                <VoiceSampleSelector
+                  selectedPath={voiceClonePath}
+                  onSelect={onVoiceClonePathChange}
+                  model={model}
+                  performancePrompt={performancePrompt}
+                />
+                <div className="dw-settings-field">
+                  <label className="dw-settings-label">
+                    演绎指令（可选）
+                    <textarea
+                      className="dw-editor-textarea"
+                      style={{ minHeight: 84 }}
+                      placeholder="自由描述语气、情绪、语速或场景，例如：温柔但略显疲惫，语速稍慢，像在深夜低声讲故事。"
+                      value={performancePrompt}
+                      onChange={(event) => onPerformancePromptChange(event.target.value)}
+                      maxLength={500}
+                    />
+                  </label>
+                  <div className="dw-editing-hint" style={{ marginTop: 4 }}>
+                    <span>内容会作为 user 消息发送，不会出现在合成语音中</span>
+                    <span>{performancePrompt.length} / 500</span>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -429,18 +454,7 @@ function ModelSelector({
   value: string
   onChange: (model: string) => void
 }) {
-  const allModels = useSettingsStore((s) => s.models)
-  const filtered = allModels.filter((m) => m.mode === mode)
-
-  if (filtered.length === 0) {
-    return (
-      <div className="dw-settings-field">
-        <div className="dw-editing-hint">
-          <span>No models configured for this mode. Add one in Settings.</span>
-        </div>
-      </div>
-    )
-  }
+  const expectedModel = MODEL_BY_MODE[mode]
 
   return (
     <div className="dw-settings-field">
@@ -451,11 +465,7 @@ function ModelSelector({
           value={value}
           onChange={(e) => onChange(e.target.value)}
         >
-          {filtered.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
+          <option value={expectedModel}>{expectedModel}</option>
         </select>
       </label>
     </div>

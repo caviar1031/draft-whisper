@@ -3,6 +3,7 @@ import test from "node:test"
 import { MAX_AUDIO_VERSIONS, retainRecentAudioVersions } from "../src/utils/audio-history.ts"
 import { generateSentenceId } from "../src/utils/id.ts"
 import { splitTextToSentences } from "../src/utils/sentence.ts"
+import { MODEL_BY_MODE, getTtsConfigurationError } from "../src/utils/tts-config.ts"
 
 test("splits Chinese and English sentence punctuation while preserving it", () => {
   const sentences = splitTextToSentences("今天开始。\nAre you ready? 好！最后一句")
@@ -34,4 +35,43 @@ test("retains only the five most recent audio versions", () => {
     ["/audio/2.wav", "/audio/3.wav", "/audio/4.wav", "/audio/5.wav", "/audio/6.wav"],
   )
   assert.deepEqual(result.evictedPaths, ["/audio/0.wav", "/audio/1.wav"])
+})
+
+test("binds each TTS mode to the required MiMo v2.5 model", () => {
+  assert.equal(MODEL_BY_MODE.basic, "mimo-v2.5-tts")
+  assert.equal(MODEL_BY_MODE["voice-design"], "mimo-v2.5-tts-voicedesign")
+  assert.equal(MODEL_BY_MODE["voice-clone"], "mimo-v2.5-tts-voiceclone")
+})
+
+test("blocks voice clone generation until a supported sample is selected", () => {
+  assert.equal(
+    getTtsConfigurationError({
+      mode: "voice-clone",
+      model: MODEL_BY_MODE["voice-clone"],
+      voiceDesignPrompt: "",
+      voiceClonePath: null,
+    }),
+    "请先选择 WAV 或 MP3 声音样本",
+  )
+  assert.equal(
+    getTtsConfigurationError({
+      mode: "voice-clone",
+      model: MODEL_BY_MODE["voice-clone"],
+      voiceDesignPrompt: "",
+      voiceClonePath: "/audio/sample.wav",
+    }),
+    null,
+  )
+})
+
+test("requires a free-text description for voice design", () => {
+  assert.equal(
+    getTtsConfigurationError({
+      mode: "voice-design",
+      model: MODEL_BY_MODE["voice-design"],
+      voiceDesignPrompt: "   ",
+      voiceClonePath: null,
+    }),
+    "请先填写声音设计描述",
+  )
 })

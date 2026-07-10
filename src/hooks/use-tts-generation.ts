@@ -4,6 +4,7 @@ import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
 import { retainRecentAudioVersions } from "@/utils/audio-history"
 import { GenerationTaskRegistry } from "@/utils/generation-tasks"
+import { getTtsConfigurationError } from "@/utils/tts-config"
 import { useCallback, useRef } from "react"
 
 export function useTtsGeneration() {
@@ -41,9 +42,12 @@ export function useTtsGeneration() {
         voice: projState.voice,
         voiceDesignPrompt: projState.voiceDesignPrompt,
         voiceClonePath: projState.voiceClonePath,
+        performancePrompt: projState.performancePrompt,
       }
       const concurrency = settings.concurrency
       const currentProject = projState.currentProject
+      const configurationError = getTtsConfigurationError(projState)
+      if (configurationError) return
 
       // 每个句子独立拥有最新任务令牌：新任务只替换相同句子，不会误取消其他生成。
       const queuedTasks = tasks.current.start(ids, currentProject)

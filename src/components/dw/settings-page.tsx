@@ -2,6 +2,7 @@ import { listModels, testTts } from "@/services/tts"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { ModelConfig, TtsMode } from "@/types"
 import { inferTtsMode } from "@/types"
+import { MODEL_BY_MODE } from "@/utils/tts-config"
 import { Download, Plus, RefreshCw, X } from "lucide-react"
 import { useCallback, useState } from "react"
 
@@ -22,15 +23,15 @@ export function SettingsPage() {
     setTestError(null)
     try {
       await settings.flushApiKey()
-      const firstModel = settings.models.find((m) => m.mode === "basic")
       await testTts({
         baseUrl: settings.baseUrl,
         apiKey: settings.apiKey,
-        model: firstModel?.id ?? "mimo-v2.5-tts",
+        model: MODEL_BY_MODE.basic,
         mode: "basic",
         voice: "冰糖",
         voiceDesignPrompt: "",
         voiceClonePath: null,
+        performancePrompt: "",
       })
       setTestState("success")
     } catch (error) {

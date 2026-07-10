@@ -1,5 +1,6 @@
 import { cleanupAudioFiles, invalidateAudioUrl, revokeAllAudioUrls } from "@/services/tts"
 import type { Project, Sentence, TtsMode } from "@/types"
+import { MODEL_BY_MODE } from "@/utils/tts-config"
 import { create } from "zustand"
 
 const STORAGE_PREFIX = "dw-project:"
@@ -41,6 +42,7 @@ interface ProjectData {
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
+  performancePrompt: string
   sentences: Sentence[]
 }
 
@@ -50,6 +52,7 @@ const DEFAULT_PROJECT_DATA: ProjectData = {
   voice: "冰糖",
   voiceDesignPrompt: "",
   voiceClonePath: null,
+  performancePrompt: "",
   sentences: [],
 }
 
@@ -74,13 +77,15 @@ function loadProjectData(project: string | null): ProjectData {
     // 兼容旧版 Zustand persist 格式 { state: { sentences: [...] } }
     const state = (parsed.state as Record<string, unknown>) ?? parsed
     const sentences = (state.sentences as Sentence[]) ?? []
+    const mode = (state.mode as TtsMode) ?? "basic"
 
     return {
-      mode: (state.mode as TtsMode) ?? "basic",
-      model: (state.model as string) ?? "mimo-v2.5-tts",
+      mode,
+      model: MODEL_BY_MODE[mode],
       voice: (state.voice as string) ?? "冰糖",
       voiceDesignPrompt: (state.voiceDesignPrompt as string) ?? "",
       voiceClonePath: (state.voiceClonePath as string | null) ?? null,
+      performancePrompt: (state.performancePrompt as string) ?? "",
       sentences: normalizeSentences(sentences),
     }
   } catch {
@@ -95,6 +100,7 @@ interface ProjectState extends Project {
   setVoice: (voice: string) => void
   setVoiceDesignPrompt: (prompt: string) => void
   setVoiceClonePath: (path: string | null) => void
+  setPerformancePrompt: (prompt: string) => void
   setSentences: (sentences: Sentence[]) => void
   updateSentence: (id: string, updates: Partial<Sentence>) => void
   addSentence: (sentence: Sentence) => void
@@ -111,10 +117,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   voice: "冰糖",
   voiceDesignPrompt: "",
   voiceClonePath: null,
+  performancePrompt: "",
   sentences: [],
 
   setMode: (mode) => {
-    set({ mode })
+    set({ mode, model: MODEL_BY_MODE[mode] })
     saveCurrentProject(get())
   },
   setModel: (model) => {
@@ -131,6 +138,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
   setVoiceClonePath: (voiceClonePath) => {
     set({ voiceClonePath })
+    saveCurrentProject(get())
+  },
+  setPerformancePrompt: (performancePrompt) => {
+    set({ performancePrompt })
     saveCurrentProject(get())
   },
   setSentences: (sentences) => {
@@ -189,6 +200,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       voice: data.voice,
       voiceDesignPrompt: data.voiceDesignPrompt,
       voiceClonePath: data.voiceClonePath,
+      performancePrompt: data.performancePrompt,
       sentences: data.sentences,
     })
   },
@@ -214,6 +226,7 @@ function saveCurrentProject(state: ProjectState): void {
       voice: state.voice,
       voiceDesignPrompt: state.voiceDesignPrompt,
       voiceClonePath: state.voiceClonePath,
+      performancePrompt: state.performancePrompt,
       sentences: state.sentences,
     })
   }, 300)
@@ -231,6 +244,7 @@ function flushAndSave(state: ProjectState): void {
     voice: state.voice,
     voiceDesignPrompt: state.voiceDesignPrompt,
     voiceClonePath: state.voiceClonePath,
+    performancePrompt: state.performancePrompt,
     sentences: state.sentences,
   })
 }
@@ -246,4 +260,27 @@ export function flushCurrentProject(): void {
 /** 删除某个项目在 localStorage 中的元数据。 */
 export function deleteStoredProject(project: string): void {
   localStorage.removeItem(storageKey(project))
+}
+
+/** 清除当前项目和所有已保存项目对已删除声音样本的引用。 */
+export function clearVoiceSampleReferences(filePath: string): void {
+  const current = useProjectStore.getState()
+  if (current.voiceClonePath === filePath) current.setVoiceClonePath(null)
+
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index)
+    if (!key?.startsWith(STORAGE_PREFIX)) continue
+    const raw = localStorage.getItem(key)
+    if (!raw) continue
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      const nestedState = parsed.state as Record<string, unknown> | undefined
+      const data = nestedState ?? parsed
+      if (data.voiceClonePath !== filePath) continue
+      data.voiceClonePath = null
+      localStorage.setItem(key, JSON.stringify(parsed))
+    } catch {
+      // 损坏的旧项目数据由正常加载迁移逻辑处理。
+    }
+  }
 }

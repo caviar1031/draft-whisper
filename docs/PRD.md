@@ -100,6 +100,8 @@ MVP 只验证一件事情：
 
 ✓ 最近 5 个音频版本
 
+✓ 声音设计与声音克隆
+
 ---
 
 ## 不包含
@@ -304,6 +306,35 @@ Model Management
 支持：
 
 Test API。
+
+---
+
+## 6.10 声音模式
+
+支持三个 MiMo v2.5 TTS 模式，切换模式时自动绑定对应模型：
+
+| 模式 | 模型 |
+| --- | --- |
+| 基础音色 | `mimo-v2.5-tts` |
+| 声音设计 | `mimo-v2.5-tts-voicedesign` |
+| 声音克隆 | `mimo-v2.5-tts-voiceclone` |
+
+声音设计：
+
+* 用户输入声音描述，描述不能为空
+* 描述通过 `role: user` 发送，待合成文本通过 `role: assistant` 发送
+
+声音克隆：
+
+* 支持导入和复用 WAV、MP3 样本
+* 导入时校验文件扩展名、真实文件签名和 Base64 Data URI 大小
+* 完整 Data URI 不得超过 10 MB
+* 样本以 `data:{MIME};base64,{DATA}` 形式传给 MiMo
+* 用户可输入自由文本的演绎指令；该字段可选，不提供预设选项
+* 支持输入试听文案并生成独立试听；试听文件不进入项目句子和历史版本
+* 删除样本时清除所有本地项目中对该样本的引用
+
+模式、模型或必填配置不匹配时，批量生成和单句重新生成均禁用并显示原因。
 
 ---
 
@@ -519,7 +550,29 @@ voiceDesignPrompt
 
 voiceClonePath
 
+performancePrompt
+
 sentences[]（包含最近 5 个 audioHistory 版本）
+```
+
+VoiceSample
+
+```
+id
+
+name
+
+filePath
+
+format
+
+mimeType
+
+byteSize
+
+encodedSize
+
+createdAt
 ```
 
 ---

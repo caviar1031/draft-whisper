@@ -1,7 +1,11 @@
 import { ArrowRight, CirclePlay, File, Pencil } from "lucide-react"
 
 // 工具栏主操作类型
-export type ToolbarAction = { kind: "generate"; disabled?: boolean } | { kind: "regenerate-all" }
+export type ToolbarAction = {
+  kind: "generate" | "regenerate-all"
+  disabled?: boolean
+  disabledReason?: string
+}
 
 interface ToolbarProps {
   action: ToolbarAction
@@ -40,6 +44,7 @@ function ActionButton({
         className="dw-primary-btn"
         onClick={onAction}
         disabled={action.disabled}
+        title={action.disabledReason}
       >
         <CirclePlay size={14} strokeWidth={2} />
         Generate All
@@ -52,6 +57,8 @@ function ActionButton({
       type="button"
       className="dw-pill-btn"
       onClick={onAction}
+      disabled={action.disabled}
+      title={action.disabledReason}
       style={{ color: "var(--text-500)" }}
     >
       <ArrowRight size={14} strokeWidth={2} />

@@ -54,6 +54,7 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![
       tts::tts_generate,
+      tts::tts_preview_voice_clone,
       tts::tts_test,
       tts::tts_list_models,
       tts::tts_read_audio,

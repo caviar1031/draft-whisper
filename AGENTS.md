@@ -12,7 +12,7 @@ DraftWhisper 是一款 macOS 优先的 AI 配音桌面工具（Tauri 2 + React�
 
 核心工作流：**改一句文案 → 重新生成 → 试听 → 拖进剪辑软件**。
 
-当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 TTS API、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置页。不做多 Provider、云同步、波形、字幕。
+当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置页。不做多 Provider、云同步、波形、字幕。
 
 ---
 
@@ -234,7 +234,7 @@ fn sanitize_filename(name: &str) -> String {
 | 返回 | `Promise<{ audioPath: string }>` |
 | 失败 | `reject(string)`，可读错误信息（HTTP 状态码 + 响应体） |
 
-参数类型 `TtsParams`（与 `Settings` 字段一一对应，**camelCase**；Rust struct 加了 `#[serde(rename_all = "camelCase")]` 自动映射 snake_case）：
+参数类型 `TtsParams`（由 Settings 与当前 Project 的声音配置共同组成，**camelCase**；Rust struct 加了 `#[serde(rename_all = "camelCase")]` 自动映射 snake_case）：
 
 ```ts
 interface TtsParams {
@@ -245,10 +245,12 @@ interface TtsParams {
   voice: string            // 基础模式的预置音色名
   voiceDesignPrompt: string // 声音设计的音色描述
   voiceClonePath: string | null // 声音克隆的参考音频路径
+  performancePrompt: string // 基础/克隆模式的自由文本演绎指令，可为空
 }
 ```
 
 行为：
+- 模式与模型固定对应：`basic` → `mimo-v2.5-tts`、`voice-design` → `mimo-v2.5-tts-voicedesign`、`voice-clone` → `mimo-v2.5-tts-voiceclone`；不匹配时拒绝请求。
 - 自动规范化 `baseUrl`：去掉尾部 `/`；若已以 `/chat/completions` 结尾则直接用；若以 `/v1` 结尾则补 `/chat/completions`；否则补 `/v1/chat/completions`。
 - 请求体（MiMo chat-completions 风格）：
   ```json
@@ -261,11 +263,14 @@ interface TtsParams {
   }
   ```
   认证头：`api-key: <apiKey>`（**非** `Authorization: Bearer`）。
+- 声音设计将 `voiceDesignPrompt` 作为 `role: user` 消息，且该字段必填。
+- 基础模式和声音克隆将用户自由输入的 `performancePrompt` 作为可选 `role: user` 消息，不使用预设演绎选项。
+- 声音克隆将参考音频编码为 `data:{MIME};base64,{DATA}` 后写入 `audio.voice`；仅支持签名有效的 WAV/MP3，完整 Data URI 不得超过 10 MB。
 - 响应：JSON，音频在 `choices[0].message.audio.data`，**base64 编码**，后端解码后写盘。
 - 成功后写入 `{audioDir}/{sentenceId}_{timestamp_ms}.wav`；命名项目位于 `audio/projects/{project}/`。
 - `sentenceId` 仅含字母数字（来自 `generateId`），可直接作文件名。
 
-### 7.2 `tts_test`
+### 8.2 `tts_test`
 
 测试当前 settings 是否可用（设置页「Test API」按钮）。
 
@@ -300,10 +305,11 @@ const url = await readAudioAsUrl(sentence.audioPath) // blob:...
 | 命令 | 用途 |
 | --- | --- |
 | `tts_list_models` | 从 MiMo-compatible `/v1/models` 获取模型 ID |
+| `tts_preview_voice_clone` | 使用当前克隆样本、自由文本演绎指令和试听文案生成独立试听文件，不写入句子历史 |
 | `tts_list_projects` / `tts_create_project` / `tts_delete_project` | 列出、创建和删除本地项目目录 |
 | `tts_delete_audio_files` | 删除不再被项目元数据引用的缓存音频 |
 | `tts_copy_to_clipboard` / `tts_show_in_finder` / `tts_drag_file` | macOS 文件复制、Finder 定位与原生拖拽 |
-| `save_voice_sample` / `delete_voice_sample` | 管理声音克隆参考样本 |
+| `save_voice_sample` / `delete_voice_sample` | 校验并管理 WAV/MP3 声音克隆样本；保存时返回路径、格式、MIME 和大小元数据 |
 | `save_api_key` / `load_api_key` / `delete_api_key` | 管理 macOS Keychain 中的 API Key |
 
 ---
@@ -339,7 +345,15 @@ interface ModelConfig { id: string; name: string; mode: TtsMode }
 
 ```ts
 type TtsMode = "basic" | "voice-design" | "voice-clone"
-interface Project { mode: TtsMode; model: string; voice: string; voiceDesignPrompt: string; voiceClonePath: string | null; sentences: Sentence[] }
+interface Project {
+  mode: TtsMode
+  model: string
+  voice: string
+  voiceDesignPrompt: string
+  voiceClonePath: string | null
+  performancePrompt: string
+  sentences: Sentence[]
+}
 ```
 
 ---
@@ -348,8 +362,10 @@ interface Project { mode: TtsMode; model: string; voice: string; voiceDesignProm
 
 - 协议：小米 MiMo v2.5 TTS，`POST {baseUrl}/chat/completions`（chat-completions 风格，**非** OpenAI `/audio/speech`）。文档：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
 - 认证：`api-key: <apiKey>` 请求头（不是 `Authorization: Bearer`）。
-- 请求体：`{ model, messages:[{role:assistant,content:text}], audio:{format:"wav", voice} }`。目标文本必须放 `role: assistant`。
-- 风格控制：通过 `role: user` 的 `content` 传入自然语言指令（如"温柔活泼的语调"），MiMo 不提供原生 speed 参数。
+- 模型绑定：基础、声音设计、声音克隆分别固定使用 `mimo-v2.5-tts`、`mimo-v2.5-tts-voicedesign`、`mimo-v2.5-tts-voiceclone`。
+- 请求体：`{ model, messages:[...], audio:{format:"wav", voice} }`。目标文本必须放 `role: assistant`。
+- 风格控制：基础/克隆模式的 `performancePrompt` 是用户自由输入的可选文本；声音设计模式的 `voiceDesignPrompt` 是用户输入的必填文本。二者都通过 `role: user` 发送，MiMo 不提供原生 speed 参数。
+- 声音克隆：参考音频只接受真实 WAV/MP3，以完整 Data URI 传入 `audio.voice`；Base64 Data URI 上限为 10 MB。独立试听文件存放在 `audio/voice-previews/`，不进入项目句子历史。
 - 响应：JSON，音频在 `choices[0].message.audio.data`，**base64 编码**，后端解码后落盘。
 - `audio.format` 固定 `wav`（非流式，浏览器 `<audio>` 通用支持）。
 - HTTP 由 Rust 侧 `reqwest` 发起，**不需要** `tauri-plugin-http` 或前端 `fetch` 权限。

@@ -6,6 +6,12 @@ export interface VoiceSample {
   name: string
   filePath: string
   createdAt: number
+  format?: "wav" | "mp3"
+  mimeType?: "audio/wav" | "audio/mpeg"
+  byteSize?: number
+  encodedSize?: number
+  source?: "uploaded" | "voice-design"
+  designPrompt?: string
 }
 
 interface VoiceSampleState {

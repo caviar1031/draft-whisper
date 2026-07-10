@@ -33,6 +33,8 @@ interface SentenceCardProps {
   onCommitEdit: (text: string) => void
   onCancelEdit: () => void
   onSwitchVersion: (historyIndex: number) => void
+  generationDisabled?: boolean
+  generationDisabledReason?: string
 }
 
 export function SentenceCard({
@@ -49,6 +51,8 @@ export function SentenceCard({
   onCommitEdit,
   onCancelEdit,
   onSwitchVersion,
+  generationDisabled = false,
+  generationDisabledReason,
 }: SentenceCardProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
@@ -245,7 +249,16 @@ export function SentenceCard({
         </div>
       </div>
       <div className="dw-card-actions">
-        {renderActions(view, onPlay, onPause, onRegenerate, onRetry, onEdit)}
+        {renderActions(
+          view,
+          onPlay,
+          onPause,
+          onRegenerate,
+          onRetry,
+          onEdit,
+          generationDisabled,
+          generationDisabledReason,
+        )}
       </div>
     </div>
   )
@@ -258,6 +271,8 @@ function renderActions(
   onRegenerate: () => void,
   onRetry: () => void,
   onEdit: () => void,
+  generationDisabled: boolean,
+  generationDisabledReason?: string,
 ) {
   if (view === "ready") {
     return (
@@ -284,6 +299,8 @@ function renderActions(
           className="dw-action-btn dw-regen-btn"
           aria-label="Regenerate"
           onClick={onRegenerate}
+          disabled={generationDisabled}
+          title={generationDisabledReason}
         >
           <RefreshCw size={16} strokeWidth={2} />
         </button>
@@ -305,7 +322,9 @@ function renderActions(
           type="button"
           className="dw-action-btn dw-regen-btn"
           aria-label="Regenerate"
-          onClick={onRegenerate}
+          disabled
+          aria-hidden="true"
+          tabIndex={-1}
           style={{ opacity: 0 }}
         >
           <RefreshCw size={16} strokeWidth={2} />
@@ -315,7 +334,14 @@ function renderActions(
   }
   if (view === "failed") {
     return (
-      <button type="button" className="dw-retry-btn" aria-label="Retry" onClick={onRetry}>
+      <button
+        type="button"
+        className="dw-retry-btn"
+        aria-label="Retry"
+        onClick={onRetry}
+        disabled={generationDisabled}
+        title={generationDisabledReason}
+      >
         <RefreshCw size={11} strokeWidth={2} />
         Retry
       </button>

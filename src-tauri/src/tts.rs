@@ -75,6 +75,7 @@ pub struct TtsParams {
     pub voice: String,
     pub voice_design_prompt: String,
     pub voice_clone_path: Option<String>,
+    pub performance_prompt: String,
 }
 
 /// `tts_generate` 的返回值。
@@ -82,6 +83,101 @@ pub struct TtsParams {
 #[serde(rename_all = "camelCase")]
 pub struct TtsResult {
   pub audio_path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceSampleResult {
+  pub file_path: String,
+  pub format: String,
+  pub mime_type: String,
+  pub byte_size: u64,
+  pub encoded_size: usize,
+}
+
+const MAX_VOICE_CLONE_DATA_URI_SIZE: usize = 10 * 1024 * 1024;
+
+fn validate_voice_clone_data_uri_size(size: usize) -> Result<(), String> {
+  if size > MAX_VOICE_CLONE_DATA_URI_SIZE {
+    return Err(format!(
+      "Voice clone sample is too large after Base64 encoding ({:.2} MB); maximum is 10 MB",
+      size as f64 / 1024.0 / 1024.0
+    ));
+  }
+  Ok(())
+}
+
+fn expected_model(mode: &TtsMode) -> &'static str {
+  match mode {
+    TtsMode::Basic => "mimo-v2.5-tts",
+    TtsMode::VoiceDesign => "mimo-v2.5-tts-voicedesign",
+    TtsMode::VoiceClone => "mimo-v2.5-tts-voiceclone",
+  }
+}
+
+fn validate_tts_params(params: &TtsParams) -> Result<(), String> {
+  let expected = expected_model(&params.mode);
+  if params.model != expected {
+    return Err(format!(
+      "Model {} does not match mode {:?}; expected {expected}",
+      params.model, params.mode
+    ));
+  }
+  if params.mode == TtsMode::VoiceDesign && params.voice_design_prompt.trim().is_empty() {
+    return Err("Voice design description is required".into());
+  }
+  if params.mode == TtsMode::VoiceClone
+    && params
+      .voice_clone_path
+      .as_deref()
+      .unwrap_or_default()
+      .trim()
+      .is_empty()
+  {
+    return Err("Select a WAV or MP3 voice sample before generating".into());
+  }
+  Ok(())
+}
+
+fn audio_format(path: &std::path::Path) -> Result<(&'static str, &'static str), String> {
+  match path
+    .extension()
+    .and_then(|extension| extension.to_str())
+    .map(str::to_ascii_lowercase)
+    .as_deref()
+  {
+    Some("wav") => Ok(("wav", "audio/wav")),
+    Some("mp3") => Ok(("mp3", "audio/mpeg")),
+    _ => Err("Voice clone samples must be WAV or MP3 files".into()),
+  }
+}
+
+fn validate_audio_signature(format: &str, bytes: &[u8]) -> Result<(), String> {
+  let valid = match format {
+    "wav" => bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE",
+    "mp3" => {
+      bytes.starts_with(b"ID3")
+        || (bytes.len() >= 2 && bytes[0] == 0xff && bytes[1] & 0xe0 == 0xe0)
+    }
+    _ => false,
+  };
+  if valid {
+    Ok(())
+  } else {
+    Err(format!(
+      "The selected file content does not match its .{format} extension"
+    ))
+  }
+}
+
+fn build_voice_clone_data_uri(path: &std::path::Path) -> Result<String, String> {
+  let (format, mime_type) = audio_format(path)?;
+  let bytes = std::fs::read(path)
+    .map_err(|e| format!("Failed to read voice clone reference audio: {e}"))?;
+  validate_audio_signature(format, &bytes)?;
+  let data_uri = format!("data:{mime_type};base64,{}", STANDARD.encode(bytes));
+  validate_voice_clone_data_uri_size(data_uri.len())?;
+  Ok(data_uri)
 }
 
 // ---- 项目管理 ----
@@ -265,7 +361,7 @@ fn sanitize_filename(name: &str) -> String {
 /// 为 voice-clone 模式加载参考音频并编码为 base64。
 ///
 /// 非 voice-clone 模式或路径为空时返回 `None`。
-fn load_voice_clone_audio(params: &TtsParams) -> Result<Option<String>, String> {
+fn load_voice_clone_audio(params: &TtsParams, app: &AppHandle) -> Result<Option<String>, String> {
     if params.mode != TtsMode::VoiceClone {
         return Ok(None);
     }
@@ -275,60 +371,64 @@ fn load_voice_clone_audio(params: &TtsParams) -> Result<Option<String>, String> 
     if path.is_empty() {
         return Ok(None);
     }
-    let audio_bytes = std::fs::read(path)
-        .map_err(|e| format!("Failed to read voice clone reference audio: {e}"))?;
-    Ok(Some(STANDARD.encode(&audio_bytes)))
+    let safe_path = is_in_audio_dir(app, path)?;
+    Ok(Some(build_voice_clone_data_uri(&safe_path)?))
+}
+
+fn build_speech_body(
+  params: &TtsParams,
+  text: &str,
+  voice_audio_data_uri: Option<&str>,
+) -> Result<Value, String> {
+  validate_tts_params(params)?;
+  let mut messages = Vec::<Value>::with_capacity(2);
+
+  let user_prompt = if params.mode == TtsMode::VoiceDesign {
+    params.voice_design_prompt.trim()
+  } else {
+    params.performance_prompt.trim()
+  };
+  if !user_prompt.is_empty() {
+    messages.push(serde_json::json!({
+      "role": "user",
+      "content": user_prompt,
+    }));
+  }
+
+  messages.push(serde_json::json!({
+    "role": "assistant",
+    "content": text,
+  }));
+
+  let audio = match params.mode {
+    TtsMode::VoiceDesign => serde_json::json!({ "format": "wav" }),
+    TtsMode::VoiceClone => serde_json::json!({
+      "format": "wav",
+      "voice": voice_audio_data_uri.ok_or("Voice clone sample data is missing")?
+    }),
+    TtsMode::Basic => serde_json::json!({
+      "format": "wav",
+      "voice": &params.voice
+    }),
+  };
+
+  Ok(serde_json::json!({
+    "model": params.model,
+    "messages": messages,
+    "audio": audio
+  }))
 }
 
 /// 发起一次 MiMo v2.5 TTS 请求，返回 wav 音频字节。
 ///
 /// 三种模式共用同一个 chat-completions 端点，区别在于 model 和 messages/audio 字段。
-async fn request_speech(params: &TtsParams, text: &str, voice_audio_base64: Option<&str>) -> Result<Vec<u8>, String> {
+async fn request_speech(
+  params: &TtsParams,
+  text: &str,
+  voice_audio_data_uri: Option<&str>,
+) -> Result<Vec<u8>, String> {
     let endpoint = build_chat_endpoint(&params.base_url);
-
-    // messages：构建角色消息
-    let mut messages = Vec::<Value>::with_capacity(2);
-
-    // voice-design 模式：音色描述作为 user message（必填）
-    if params.mode == TtsMode::VoiceDesign && !params.voice_design_prompt.is_empty() {
-        messages.push(serde_json::json!({
-            "role": "user",
-            "content": &params.voice_design_prompt,
-        }));
-    }
-
-    // 目标文本放在 assistant 消息中
-    messages.push(serde_json::json!({
-        "role": "assistant",
-        "content": text,
-    }));
-
-    // audio 字段：不同模式不同结构
-    let audio = match params.mode {
-        TtsMode::VoiceDesign => {
-            serde_json::json!({
-                "format": "wav"
-            })
-        }
-        TtsMode::VoiceClone => {
-            serde_json::json!({
-                "format": "wav",
-                "voice": voice_audio_base64.unwrap_or("")
-            })
-        }
-        TtsMode::Basic => {
-            serde_json::json!({
-                "format": "wav",
-                "voice": &params.voice
-            })
-        }
-    };
-
-    let body = serde_json::json!({
-        "model": params.model,
-        "messages": messages,
-        "audio": audio
-    });
+    let body = build_speech_body(params, text, voice_audio_data_uri)?;
 
     let client = http_client();
     let resp = client
@@ -386,6 +486,7 @@ pub async fn tts_generate(
   if params.base_url.trim().is_empty() || params.api_key.trim().is_empty() {
     return Err("Missing baseUrl or apiKey — configure them in Settings".into());
   }
+  validate_tts_params(&params)?;
 
   let audio_dir = if let Some(ref proj) = project {
     let trimmed = proj.trim();
@@ -409,9 +510,9 @@ pub async fn tts_generate(
   let file_path = audio_dir.join(&file_name);
 
   // 声音克隆模式：读取参考音频文件为 base64
-  let voice_audio_base64 = load_voice_clone_audio(&params)?;
+  let voice_audio_data_uri = load_voice_clone_audio(&params, &app)?;
 
-  let bytes = request_speech(&params, &text, voice_audio_base64.as_deref()).await?;
+  let bytes = request_speech(&params, &text, voice_audio_data_uri.as_deref()).await?;
 
   std::fs::write(&file_path, &bytes)
     .map_err(|e| format!("Failed to write audio file: {file_path:?} -> {e}"))?;
@@ -425,16 +526,55 @@ pub async fn tts_generate(
 ///
 /// 前端调用: `invoke("tts_test", { params })`
 #[tauri::command]
-pub async fn tts_test(params: TtsParams) -> Result<(), String> {
+pub async fn tts_test(params: TtsParams, app: AppHandle) -> Result<(), String> {
   if params.base_url.trim().is_empty() || params.api_key.trim().is_empty() {
     return Err("Missing baseUrl or apiKey".into());
   }
 
   // 测试模式：声音克隆需要参考音频
-  let voice_audio_base64 = load_voice_clone_audio(&params)?;
+  validate_tts_params(&params)?;
+  let voice_audio_data_uri = load_voice_clone_audio(&params, &app)?;
 
-  request_speech(&params, "test", voice_audio_base64.as_deref()).await?;
+  request_speech(&params, "test", voice_audio_data_uri.as_deref()).await?;
   Ok(())
+}
+
+fn voice_previews_dir(app: &AppHandle) -> Result<PathBuf, String> {
+  let dir = ensure_audio_dir(app)?.join("voice-previews");
+  std::fs::create_dir_all(&dir)
+    .map_err(|e| format!("Failed to create voice preview directory: {e}"))?;
+  Ok(dir)
+}
+
+/// 使用当前声音克隆配置生成独立试听文件，不写入句子历史。
+#[tauri::command]
+pub async fn tts_preview_voice_clone(
+  text: String,
+  params: TtsParams,
+  app: AppHandle,
+) -> Result<TtsResult, String> {
+  if text.trim().is_empty() {
+    return Err("Preview text is empty".into());
+  }
+  if params.mode != TtsMode::VoiceClone {
+    return Err("Voice clone preview requires voice-clone mode".into());
+  }
+  if params.base_url.trim().is_empty() || params.api_key.trim().is_empty() {
+    return Err("Missing baseUrl or apiKey — configure them in Settings".into());
+  }
+  validate_tts_params(&params)?;
+  let voice_audio_data_uri = load_voice_clone_audio(&params, &app)?;
+  let bytes = request_speech(&params, text.trim(), voice_audio_data_uri.as_deref()).await?;
+  let timestamp = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_millis();
+  let file_path = voice_previews_dir(&app)?.join(format!("clone_preview_{timestamp}.wav"));
+  std::fs::write(&file_path, &bytes)
+    .map_err(|e| format!("Failed to write voice clone preview: {e}"))?;
+  Ok(TtsResult {
+    audio_path: file_path.to_string_lossy().to_string(),
+  })
 }
 
 /// 获取可用模型列表。
@@ -524,28 +664,35 @@ fn voice_samples_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
 /// 将外部音频文件复制到音色样本库。
 ///
-/// 前端调用: `invoke("save_voice_sample", { sourcePath, sampleId })` → `string`（存储后的绝对路径）
+/// 前端调用: `invoke("save_voice_sample", { sourcePath, sampleId })` → 路径、格式与大小元数据
 #[tauri::command]
 pub fn save_voice_sample(
     source_path: String,
     sample_id: String,
     app: AppHandle,
-) -> Result<String, String> {
+) -> Result<VoiceSampleResult, String> {
     let src = std::path::Path::new(&source_path);
     if !src.exists() {
         return Err(format!("Source file not found: {source_path}"));
     }
+    let (format, mime_type) = audio_format(src)?;
+    let bytes = std::fs::read(src).map_err(|e| format!("Failed to read audio file: {e}"))?;
+    validate_audio_signature(format, &bytes)?;
+    let encoded_size = format!("data:{mime_type};base64,{}", STANDARD.encode(&bytes)).len();
+    validate_voice_clone_data_uri_size(encoded_size)?;
     let dir = voice_samples_dir(&app)?;
-    let ext = src
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("wav");
-    let file_name = format!("{}.{}", sanitize_filename(&sample_id), ext);
+    let file_name = format!("{}.{}", sanitize_filename(&sample_id), format);
     let dest = dir.join(&file_name);
-    std::fs::copy(src, &dest).map_err(|e| format!("Failed to copy audio file: {e}"))?;
+    std::fs::write(&dest, &bytes).map_err(|e| format!("Failed to save audio file: {e}"))?;
 
     log::info!("✓ 已保存音色样本: {}", dest.display());
-    Ok(dest.to_string_lossy().to_string())
+    Ok(VoiceSampleResult {
+      file_path: dest.to_string_lossy().to_string(),
+      format: format.to_string(),
+      mime_type: mime_type.to_string(),
+      byte_size: bytes.len() as u64,
+      encoded_size,
+    })
 }
 
 /// 删除音色样本文件。
@@ -870,7 +1017,24 @@ struct NSRect {
 
 #[cfg(test)]
 mod tests {
-  use super::{build_chat_endpoint, build_models_endpoint, sanitize_filename, validate_project_name};
+  use super::{
+    audio_format, build_chat_endpoint, build_models_endpoint, build_speech_body,
+    sanitize_filename, validate_audio_signature, validate_project_name,
+    validate_voice_clone_data_uri_size, TtsMode, TtsParams, MAX_VOICE_CLONE_DATA_URI_SIZE,
+  };
+
+  fn params(mode: TtsMode, model: &str) -> TtsParams {
+    TtsParams {
+      base_url: "https://example.com/v1".into(),
+      api_key: "test-key".into(),
+      model: model.into(),
+      mode,
+      voice: "冰糖".into(),
+      voice_design_prompt: "温柔的年轻女声".into(),
+      voice_clone_path: Some("/audio/sample.wav".into()),
+      performance_prompt: "语速稍慢，像在讲故事".into(),
+    }
+  }
 
   #[test]
   fn normalizes_mimo_endpoints() {
@@ -900,5 +1064,55 @@ mod tests {
   fn sanitizes_generated_file_names() {
     assert_eq!(sanitize_filename("001_你好/A"), "001____A");
     assert_eq!(sanitize_filename("safe-Name_42"), "safe-Name_42");
+  }
+
+  #[test]
+  fn builds_voice_clone_request_with_data_uri_and_performance_prompt() {
+    let params = params(TtsMode::VoiceClone, "mimo-v2.5-tts-voiceclone");
+    let body = build_speech_body(
+      &params,
+      "你好",
+      Some("data:audio/wav;base64,UklGRg=="),
+    )
+    .unwrap();
+
+    assert_eq!(body["model"], "mimo-v2.5-tts-voiceclone");
+    assert_eq!(body["messages"][0]["role"], "user");
+    assert_eq!(body["messages"][0]["content"], "语速稍慢，像在讲故事");
+    assert_eq!(body["messages"][1]["role"], "assistant");
+    assert_eq!(body["audio"]["voice"], "data:audio/wav;base64,UklGRg==");
+  }
+
+  #[test]
+  fn builds_voice_design_request_from_the_user_description() {
+    let params = params(TtsMode::VoiceDesign, "mimo-v2.5-tts-voicedesign");
+    let body = build_speech_body(&params, "你好", None).unwrap();
+
+    assert_eq!(body["messages"][0]["role"], "user");
+    assert_eq!(body["messages"][0]["content"], "温柔的年轻女声");
+    assert_eq!(body["messages"][1]["role"], "assistant");
+    assert!(body["audio"].get("voice").is_none());
+  }
+
+  #[test]
+  fn rejects_model_mode_mismatch() {
+    let params = params(TtsMode::VoiceClone, "mimo-v2.5-tts");
+    assert!(build_speech_body(&params, "你好", Some("data:audio/wav;base64,AA==")).is_err());
+  }
+
+  #[test]
+  fn validates_supported_audio_formats_and_signatures() {
+    assert_eq!(audio_format(std::path::Path::new("sample.wav")).unwrap().0, "wav");
+    assert_eq!(audio_format(std::path::Path::new("sample.mp3")).unwrap().1, "audio/mpeg");
+    assert!(audio_format(std::path::Path::new("sample.m4a")).is_err());
+    assert!(validate_audio_signature("wav", b"RIFF\0\0\0\0WAVE").is_ok());
+    assert!(validate_audio_signature("mp3", b"ID3\0").is_ok());
+    assert!(validate_audio_signature("wav", b"not-a-wave").is_err());
+  }
+
+  #[test]
+  fn enforces_ten_megabyte_encoded_sample_limit() {
+    assert!(validate_voice_clone_data_uri_size(MAX_VOICE_CLONE_DATA_URI_SIZE).is_ok());
+    assert!(validate_voice_clone_data_uri_size(MAX_VOICE_CLONE_DATA_URI_SIZE + 1).is_err());
   }
 }

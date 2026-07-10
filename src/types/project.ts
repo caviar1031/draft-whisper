@@ -15,6 +15,7 @@ export interface Project {
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
+  performancePrompt: string
   sentences: Sentence[]
 }
 

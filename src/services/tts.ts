@@ -10,11 +10,20 @@ export interface TtsParams {
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
+  performancePrompt: string
 }
 
 /** `tts_generate` 的返回值。 */
 export interface TtsResult {
   audioPath: string
+}
+
+export interface SavedVoiceSample {
+  filePath: string
+  format: "wav" | "mp3"
+  mimeType: "audio/wav" | "audio/mpeg"
+  byteSize: number
+  encodedSize: number
 }
 
 // ---- Blob URL 缓存 ----------------------------------------------------
@@ -55,6 +64,11 @@ export async function generateSentenceAudio(
   const result = await invoke<TtsResult>("tts_generate", { sentenceId, text, params, project })
   invalidateAudioUrl(result.audioPath)
   return result
+}
+
+/** 生成独立的声音克隆试听文件，不写入项目句子历史。 */
+export async function previewVoiceClone(text: string, params: TtsParams): Promise<TtsResult> {
+  return invoke<TtsResult>("tts_preview_voice_clone", { text, params })
 }
 
 /**
@@ -162,12 +176,15 @@ export async function nativeDragFile(path: string): Promise<void> {
 }
 
 /**
- * 将外部音频文件复制到音色样本库目录，返回存储后的绝对路径。
+ * 校验外部 WAV/MP3 并复制到音色样本库，返回路径、格式和大小元数据。
  *
- * 后端: invoke("save_voice_sample", { sourcePath, sampleId }) → string
+ * 后端: invoke("save_voice_sample", { sourcePath, sampleId }) → SavedVoiceSample
  */
-export async function saveVoiceSample(sourcePath: string, sampleId: string): Promise<string> {
-  return invoke<string>("save_voice_sample", { sourcePath, sampleId })
+export async function saveVoiceSample(
+  sourcePath: string,
+  sampleId: string,
+): Promise<SavedVoiceSample> {
+  return invoke<SavedVoiceSample>("save_voice_sample", { sourcePath, sampleId })
 }
 
 /**
@@ -177,6 +194,7 @@ export async function saveVoiceSample(sourcePath: string, sampleId: string): Pro
  */
 export async function deleteVoiceSample(path: string): Promise<void> {
   await invoke<void>("delete_voice_sample", { path })
+  invalidateAudioUrl(path)
 }
 
 /**
