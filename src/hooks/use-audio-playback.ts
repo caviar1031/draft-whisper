@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 export function useAudioPlayback() {
   const updateSentence = useProjectStore((s) => s.updateSentence)
   const [playingId, setPlayingId] = useState<string | null>(null)
+  const [playbackError, setPlaybackError] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const disposedRef = useRef(false)
 
@@ -23,6 +24,7 @@ export function useAudioPlayback() {
     async (id: string) => {
       const sentence = useProjectStore.getState().sentences.find((s) => s.id === id)
       if (!sentence?.audioPath) return
+      setPlaybackError(null)
 
       if (audioRef.current) {
         audioRef.current.pause()
@@ -45,6 +47,7 @@ export function useAudioPlayback() {
         }
         audio.onerror = (e) => {
           console.error("Audio playback error:", e, audio.error)
+          setPlaybackError(audio.error?.message ?? "Audio playback failed")
           setPlayingId(null)
           audioRef.current = null
         }
@@ -52,6 +55,7 @@ export function useAudioPlayback() {
         await audio.play()
       } catch (e) {
         console.error("handlePlay failed:", e)
+        setPlaybackError(e instanceof Error ? e.message : String(e))
         if (!disposedRef.current) setPlayingId(null)
       }
     },
@@ -66,5 +70,5 @@ export function useAudioPlayback() {
     setPlayingId(null)
   }, [])
 
-  return { playingId, handlePlay, handlePause }
+  return { playingId, playbackError, handlePlay, handlePause }
 }

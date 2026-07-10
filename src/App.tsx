@@ -1,22 +1,37 @@
 import { EmptyState } from "@/components/dw/empty-state"
-import { ProjectConfigCard } from "@/components/dw/project-config-card"
-import { ScriptEditor } from "@/components/dw/script-editor"
 import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
-import { SettingsPage } from "@/components/dw/settings-page"
 import { TitleBar } from "@/components/dw/title-bar"
 import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useTtsGeneration } from "@/hooks/use-tts-generation"
-import { createProject, listProjects, readAudioAsUrl } from "@/services/tts"
-import { flushCurrentProject, useProjectStore } from "@/stores/project-store"
+import {
+  cleanupAudioFiles,
+  createProject,
+  deleteProject,
+  listProjects,
+  readAudioAsUrl,
+} from "@/services/tts"
+import { deleteStoredProject, flushCurrentProject, useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
 import { generateSentenceId } from "@/utils/id"
 import { splitTextToSentences } from "@/utils/sentence"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { RefreshCw, TriangleAlert } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
+
+const SettingsPage = lazy(() =>
+  import("@/components/dw/settings-page").then((module) => ({ default: module.SettingsPage })),
+)
+const ScriptEditor = lazy(() =>
+  import("@/components/dw/script-editor").then((module) => ({ default: module.ScriptEditor })),
+)
+const ProjectConfigCard = lazy(() =>
+  import("@/components/dw/project-config-card").then((module) => ({
+    default: module.ProjectConfigCard,
+  })),
+)
 
 type Phase = "empty" | "imported" | "generating" | "complete"
 
@@ -41,8 +56,8 @@ function App() {
   const project = useSettingsStore((s) => s.project)
   const setProject = useSettingsStore((s) => s.setProject)
 
-  const { playingId, handlePlay, handlePause } = useAudioPlayback()
-  const { runGeneration, generateAll, retryFailed } = useTtsGeneration()
+  const { playingId, playbackError, handlePlay, handlePause } = useAudioPlayback()
+  const { runGeneration, generateAll, retryFailed, cancelGeneration } = useTtsGeneration()
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
@@ -50,6 +65,7 @@ function App() {
   const [projectConfigOpen, setProjectConfigOpen] = useState(false)
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [projects, setProjects] = useState<string[]>([])
+  const [projectError, setProjectError] = useState<string | null>(null)
 
   // 启动时加载上次选中的项目的句子
   useEffect(() => {
@@ -71,22 +87,29 @@ function App() {
   // 预缓存已有音频的 Blob URL（启动/切换项目时），确保点击播放时瞬间返回，
   // 避免 async IPC 打断用户手势链导致 WKWebView autoplay 策略阻止播放。
   const preloadedPathsRef = useRef(new Set<string>())
+  const preloadedProjectRef = useRef<string | null>(project)
   useEffect(() => {
+    if (preloadedProjectRef.current !== project) {
+      preloadedPathsRef.current.clear()
+      preloadedProjectRef.current = project
+    }
     for (const s of sentences) {
       if (s.audioPath && !preloadedPathsRef.current.has(s.audioPath)) {
         preloadedPathsRef.current.add(s.audioPath)
         readAudioAsUrl(s.audioPath).catch(() => {})
       }
     }
-  }, [sentences])
+  }, [project, sentences])
 
   // 获取项目列表
   const fetchProjects = useCallback(async () => {
     try {
       const projectList = await listProjects()
       setProjects(projectList)
+      setProjectError(null)
     } catch (error) {
       console.error("Failed to fetch projects:", error)
+      setProjectError(error instanceof Error ? error.message : String(error))
     }
   }, [])
 
@@ -104,10 +127,12 @@ function App() {
   // 选择项目：保存当前 → 加载目标 → 更新 settings
   const handleSelectProject = useCallback(
     (selectedProject: string | null) => {
+      cancelGeneration()
+      handlePause()
       loadProject(selectedProject)
       setProject(selectedProject)
     },
-    [loadProject, setProject],
+    [cancelGeneration, handlePause, loadProject, setProject],
   )
 
   // 创建项目
@@ -116,13 +141,42 @@ function App() {
       try {
         const updatedProjects = await createProject(name)
         setProjects(updatedProjects)
+        cancelGeneration()
+        handlePause()
         loadProject(name)
         setProject(name)
+        setProjectError(null)
       } catch (error) {
         console.error("Failed to create project:", error)
+        setProjectError(error instanceof Error ? error.message : String(error))
+        throw error
       }
     },
-    [loadProject, setProject],
+    [cancelGeneration, handlePause, loadProject, setProject],
+  )
+
+  const handleDeleteProject = useCallback(
+    async (name: string) => {
+      try {
+        if (project === name) {
+          cancelGeneration()
+          handlePause()
+        }
+        const updatedProjects = await deleteProject(name)
+        setProjects(updatedProjects)
+        if (project === name) {
+          loadProject(null)
+          setProject(null)
+        }
+        deleteStoredProject(name)
+        setProjectError(null)
+      } catch (error) {
+        console.error("Failed to delete project:", error)
+        setProjectError(error instanceof Error ? error.message : String(error))
+        throw error
+      }
+    },
+    [cancelGeneration, handlePause, loadProject, project, setProject],
   )
 
   // 由句子状态派生的高层阶段
@@ -145,6 +199,7 @@ function App() {
   const handleSaveScript = useCallback(
     (text: string, splitMode: "auto" | "manual") => {
       setScriptEditorOpen(false)
+      cancelGeneration()
       handlePause()
       setEditingId(null)
 
@@ -187,7 +242,7 @@ function App() {
         }
       }
     },
-    [sentences, setSentences, runGeneration, handlePause],
+    [cancelGeneration, sentences, setSentences, runGeneration, handlePause],
   )
 
   const handleGenerateAll = useCallback(() => {
@@ -225,9 +280,16 @@ function App() {
 
   const handleCommitEdit = useCallback(
     (id: string, text: string) => {
+      const sentence = useProjectStore.getState().sentences.find((item) => item.id === id)
+      if (sentence) {
+        const oldPaths = new Set(sentence.audioHistory.map((version) => version.audioPath))
+        if (sentence.audioPath) oldPaths.add(sentence.audioPath)
+        cleanupAudioFiles([...oldPaths])
+      }
       updateSentence(id, {
         text,
         status: "pending",
+        errorMessage: undefined,
         audioPath: null,
         audioHistory: [],
         duration: null,
@@ -311,7 +373,9 @@ function App() {
       />
 
       {settingsOpen ? (
-        <SettingsPage />
+        <Suspense fallback={<div className="dw-page-loading">Loading settings…</div>}>
+          <SettingsPage />
+        </Suspense>
       ) : (
         <>
           <Toolbar
@@ -320,6 +384,15 @@ function App() {
             onOpenScriptEditor={handleOpenScriptEditor}
             onAction={handleToolbarAction}
           />
+
+          {playbackError && (
+            <div className="dw-retry-all-bar" role="alert">
+              <span className="dw-retry-all-label">
+                <TriangleAlert size={14} strokeWidth={2} style={{ color: "var(--state-error)" }} />
+                Playback failed: {playbackError}
+              </span>
+            </div>
+          )}
 
           {failedCount > 0 && (
             <div className="dw-retry-all-bar">
@@ -347,7 +420,7 @@ function App() {
                   queuedLabel={phase === "imported" ? "Idle" : "Queued"}
                   errorMessage={
                     sentence.status === "failed"
-                      ? "Generation failed — check API settings"
+                      ? (sentence.errorMessage ?? "Generation failed — check API settings")
                       : undefined
                   }
                   onPlay={() => void handlePlay(sentence.id)}
@@ -373,32 +446,38 @@ function App() {
       )}
 
       {scriptEditorOpen && (
-        <ScriptEditor
-          mode={sentences.length > 0 ? "edit" : "import"}
-          initialText={sentences.length > 0 ? sentences.map((s) => s.text).join("\n") : ""}
-          ttsMode={projectMode}
-          model={projectModel}
-          voice={projectVoice}
-          voiceDesignPrompt={projectVoiceDesignPrompt}
-          voiceClonePath={projectVoiceClonePath}
-          onSave={handleSaveScript}
-          onClose={() => setScriptEditorOpen(false)}
-          onModeChange={setProjectMode}
-          onModelChange={setProjectModel}
-          onVoiceChange={setProjectVoice}
-          onVoiceDesignPromptChange={setProjectVoiceDesignPrompt}
-          onVoiceClonePathChange={setProjectVoiceClonePath}
-        />
+        <Suspense fallback={null}>
+          <ScriptEditor
+            mode={sentences.length > 0 ? "edit" : "import"}
+            initialText={sentences.length > 0 ? sentences.map((s) => s.text).join("\n") : ""}
+            ttsMode={projectMode}
+            model={projectModel}
+            voice={projectVoice}
+            voiceDesignPrompt={projectVoiceDesignPrompt}
+            voiceClonePath={projectVoiceClonePath}
+            onSave={handleSaveScript}
+            onClose={() => setScriptEditorOpen(false)}
+            onModeChange={setProjectMode}
+            onModelChange={setProjectModel}
+            onVoiceChange={setProjectVoice}
+            onVoiceDesignPromptChange={setProjectVoiceDesignPrompt}
+            onVoiceClonePathChange={setProjectVoiceClonePath}
+          />
+        </Suspense>
       )}
 
       {projectConfigOpen && (
-        <ProjectConfigCard
-          currentProject={project}
-          projects={projects}
-          onSelect={handleSelectProject}
-          onCreate={handleCreateProject}
-          onClose={handleCloseProjectConfig}
-        />
+        <Suspense fallback={null}>
+          <ProjectConfigCard
+            currentProject={project}
+            projects={projects}
+            onSelect={handleSelectProject}
+            onCreate={handleCreateProject}
+            onDelete={handleDeleteProject}
+            onClose={handleCloseProjectConfig}
+            errorMessage={projectError}
+          />
+        </Suspense>
       )}
     </WindowShell>
   )

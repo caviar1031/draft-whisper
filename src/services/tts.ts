@@ -93,6 +93,11 @@ export async function createProject(name: string): Promise<string[]> {
   return invoke<string[]>("tts_create_project", { name })
 }
 
+/** 删除项目目录及其缓存音频，并返回剩余项目列表。 */
+export async function deleteProject(name: string): Promise<string[]> {
+  return invoke<string[]>("tts_delete_project", { name })
+}
+
 /**
  * 读取本地音频文件并转为可播放的 Blob URL（带缓存）。
  * 直接给 <audio src={url}> 使用即可。
@@ -113,6 +118,19 @@ export async function readAudioAsUrl(path: string): Promise<string> {
   const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }))
   audioUrlCache.set(path, url)
   return url
+}
+
+/** 删除不再使用的缓存音频，并释放对应 Blob URL。 */
+export async function deleteAudioFiles(paths: string[]): Promise<void> {
+  const uniquePaths = [...new Set(paths.filter(Boolean))]
+  if (uniquePaths.length === 0) return
+  for (const path of uniquePaths) invalidateAudioUrl(path)
+  await invoke<void>("tts_delete_audio_files", { paths: uniquePaths })
+}
+
+/** 后台执行缓存清理；失败只记录，不影响用户的主要编辑/生成流程。 */
+export function cleanupAudioFiles(paths: string[]): void {
+  void deleteAudioFiles(paths).catch((error) => console.error("Audio cache cleanup failed:", error))
 }
 
 /**

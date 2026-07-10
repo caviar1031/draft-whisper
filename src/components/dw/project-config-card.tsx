@@ -1,12 +1,14 @@
-import { Folder, FolderPlus, X } from "lucide-react"
+import { Folder, FolderPlus, Trash2, TriangleAlert, X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 
 interface ProjectConfigCardProps {
   currentProject: string | null
   projects: string[]
   onSelect: (project: string | null) => void
-  onCreate: (name: string) => void
+  onCreate: (name: string) => Promise<void>
+  onDelete: (name: string) => Promise<void>
   onClose: () => void
+  errorMessage?: string | null
 }
 
 export function ProjectConfigCard({
@@ -14,10 +16,13 @@ export function ProjectConfigCard({
   projects,
   onSelect,
   onCreate,
+  onDelete,
   onClose,
+  errorMessage,
 }: ProjectConfigCardProps) {
   const [newProjectName, setNewProjectName] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  const [busyProject, setBusyProject] = useState<string | null>(null)
 
   useEffect(() => {
     // 聚焦到输入框
@@ -38,20 +43,42 @@ export function ProjectConfigCard({
     onSelect(null)
   }, [onSelect])
 
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     const trimmed = newProjectName.trim()
     if (trimmed && !projects.includes(trimmed)) {
-      onCreate(trimmed)
-      setNewProjectName("")
-      setIsCreating(false)
+      setBusyProject(trimmed)
+      try {
+        await onCreate(trimmed)
+        setNewProjectName("")
+        setIsCreating(false)
+      } catch {
+        // 父组件通过 errorMessage 展示可读错误。
+      } finally {
+        setBusyProject(null)
+      }
     }
   }, [newProjectName, projects, onCreate])
+
+  const handleDelete = useCallback(
+    async (project: string) => {
+      if (!window.confirm(`Delete “${project}” and all of its cached audio?`)) return
+      setBusyProject(project)
+      try {
+        await onDelete(project)
+      } catch {
+        // 父组件通过 errorMessage 展示可读错误。
+      } finally {
+        setBusyProject(null)
+      }
+    },
+    [onDelete],
+  )
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault()
-        handleCreate()
+        void handleCreate()
       }
       if (e.key === "Escape") {
         e.preventDefault()
@@ -84,6 +111,12 @@ export function ProjectConfigCard({
         </div>
 
         <div className="dw-project-config-content">
+          {errorMessage && (
+            <div className="dw-error-detail" role="alert">
+              <TriangleAlert className="dw-error-icon" size={14} strokeWidth={2} />
+              <span className="dw-error-msg">{errorMessage}</span>
+            </div>
+          )}
           <div className="dw-project-config-section">
             <div className="dw-project-config-label">
               Current Project
@@ -113,15 +146,27 @@ export function ProjectConfigCard({
             {projects.length > 0 ? (
               <div className="dw-project-list">
                 {projects.map((project) => (
-                  <button
-                    type="button"
-                    key={project}
-                    className={`dw-project-item ${project === currentProject ? "is-active" : ""}`}
-                    onClick={() => handleSelect(project)}
-                  >
-                    <Folder size={14} strokeWidth={2} />
-                    <span>{project}</span>
-                  </button>
+                  <div key={project} className="dw-project-item-row">
+                    <button
+                      type="button"
+                      className={`dw-project-item ${project === currentProject ? "is-active" : ""}`}
+                      onClick={() => handleSelect(project)}
+                      disabled={busyProject !== null}
+                    >
+                      <Folder size={14} strokeWidth={2} />
+                      <span>{project}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="dw-project-remove-btn"
+                      onClick={() => void handleDelete(project)}
+                      disabled={busyProject !== null}
+                      aria-label={`Delete ${project}`}
+                      title="Delete project and cached audio"
+                    >
+                      <Trash2 size={13} strokeWidth={2} />
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -144,8 +189,12 @@ export function ProjectConfigCard({
                 <button
                   type="button"
                   className="dw-primary-btn"
-                  disabled={!newProjectName.trim() || projects.includes(newProjectName.trim())}
-                  onClick={handleCreate}
+                  disabled={
+                    busyProject !== null ||
+                    !newProjectName.trim() ||
+                    projects.includes(newProjectName.trim())
+                  }
+                  onClick={() => void handleCreate()}
                 >
                   Create
                 </button>

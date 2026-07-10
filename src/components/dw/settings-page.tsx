@@ -10,6 +10,7 @@ type TestState = "idle" | "testing" | "success" | "error"
 export function SettingsPage() {
   const settings = useSettingsStore()
   const [testState, setTestState] = useState<TestState>("idle")
+  const [testError, setTestError] = useState<string | null>(null)
   const [fetchingModels, setFetchingModels] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [addingManual, setAddingManual] = useState(false)
@@ -18,7 +19,9 @@ export function SettingsPage() {
 
   const handleTest = useCallback(async () => {
     setTestState("testing")
+    setTestError(null)
     try {
+      await settings.flushApiKey()
       const firstModel = settings.models.find((m) => m.mode === "basic")
       await testTts({
         baseUrl: settings.baseUrl,
@@ -30,10 +33,11 @@ export function SettingsPage() {
         voiceClonePath: null,
       })
       setTestState("success")
-    } catch {
+    } catch (error) {
       setTestState("error")
+      setTestError(error instanceof Error ? error.message : String(error))
     }
-  }, [settings.baseUrl, settings.apiKey, settings.models])
+  }, [settings])
 
   const handleFetchModels = useCallback(async () => {
     if (!settings.baseUrl.trim() || !settings.apiKey.trim()) return
@@ -97,10 +101,24 @@ export function SettingsPage() {
         <input
           className="dw-settings-input"
           type="password"
-          placeholder="sk-..."
+          placeholder={settings.apiKeyLoaded ? "sk-..." : "Loading from Keychain…"}
           value={settings.apiKey}
           onChange={(e) => settings.setApiKey(e.target.value)}
+          onBlur={() => void settings.flushApiKey().catch(() => {})}
+          disabled={!settings.apiKeyLoaded}
         />
+        {settings.apiKeySaveState !== "idle" && (
+          <span
+            className={`dw-settings-save-state is-${settings.apiKeySaveState}`}
+            role={settings.apiKeySaveState === "error" ? "alert" : undefined}
+          >
+            {settings.apiKeySaveState === "pending" && "Waiting to save…"}
+            {settings.apiKeySaveState === "saving" && "Saving to Keychain…"}
+            {settings.apiKeySaveState === "saved" && "Saved to Keychain"}
+            {settings.apiKeySaveState === "error" &&
+              (settings.apiKeySaveError ?? "Could not save to Keychain")}
+          </span>
+        )}
       </Field>
 
       <Field label="Concurrency">
@@ -127,6 +145,11 @@ export function SettingsPage() {
         {testState === "success" && <span>✓ </span>}
         {testLabel}
       </button>
+      {testError && (
+        <div className="dw-settings-inline-error" role="alert" title={testError}>
+          {testError}
+        </div>
+      )}
 
       {/* 模型管理 */}
       <div className="dw-models-section">

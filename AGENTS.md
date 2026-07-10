@@ -12,7 +12,7 @@ DraftWhisper 是一款 macOS 优先的 AI 配音桌面工具（Tauri 2 + React�
 
 核心工作流：**改一句文案 → 重新生成 → 试听 → 拖进剪辑软件**。
 
-MVP 范围：导入文本、自动切句、调用 OpenAI 兼容 TTS API、播放试听、单句重新生成、本地缓存、设置页。不做多 Provider、项目管理、云同步、波形、字幕。
+当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 TTS API、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置页。不做多 Provider、云同步、波形、字幕。
 
 ---
 
@@ -129,10 +129,10 @@ draft-whisper/
 
 要点：
 
-- **状态在前端**：Zustand store 持有 settings 与 project（见 [src/stores](src/stores)）。后端无状态，每次调用由前端把 settings 作为参数传入。MVP 不做后端持久化（PRD 验收要求重启后配置保留 → 由前端持久化到本地，待实现）。
+- **状态在前端**：Zustand store 持有 settings 与 project（见 [src/stores](src/stores)）。项目元数据和非敏感设置已持久化到 `localStorage`，API Key 写入 macOS Keychain；后端不维护数据库状态。
 - **协议**：MVP 固定使用小米 MiMo v2.5 TTS（chat-completions 风格，非 OpenAI `/audio/speech`）。详见第 10 节。
-- **音频落盘**：后端把音频写到 `audio/{sentence_id}.wav`，重新生成同名覆盖。返回绝对路径字符串。目录选择有三级 fallback：`app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`（macOS sandbox 下前两个可能被 TCC 拒绝写入，最终用本地目录兜底）。前端拿到的是绝对路径，不关心具体落在哪。
-- **播放方式**：前端通过 `tts_read_audio` 命令取回字节，转 `Blob URL` 播放（无需配置 asset 协议/权限，跨平台稳定）。封装见 `src/services/tts.ts` 的 `readAudioAsUrl`。
+- **音频落盘**：后端把音频写到 `audio/{sentence_id}_{timestamp_ms}.wav`；命名项目写入 `audio/projects/{project}/`。每句最多保留最近 5 个版本，替换文本、删除句子或项目时会清理不再引用的文件。返回绝对路径字符串。目录选择有三级 fallback：`app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`。
+- **播放方式**：前端通过 `tts_read_audio` 命令取回 base64 字符串，解码为字节后转 `Blob URL` 播放（无需配置 asset 协议/权限，跨平台稳定）。封装见 `src/services/tts.ts` 的 `readAudioAsUrl`。
 
 ---
 
@@ -192,27 +192,29 @@ fn sanitize_filename(name: &str) -> String {
 ### 7.3 最终文件名格式
 
 ```
-{audioDir}/{sanitized_sentenceId}.wav
+{audioDir}/{sanitized_sentenceId}_{timestamp_ms}.wav
 ```
 
 - `audioDir`：音频目录（三级 fallback，见第 6 节）
 - `sanitized_sentenceId`：经过 `sanitize_filename()` 清理的 sentenceId
+- `timestamp_ms`：生成时的 Unix 毫秒时间戳，用于保留历史版本
 - 扩展名：`.wav`（固定，与 TTS 输出格式一致）
 
 ### 7.4 示例
 
 | 原文 | sentenceId | 清理后 | 最终文件名 |
 |------|------------|--------|------------|
-| `今天我们学习 Agent。` | `001_JinTianWMenXxAgent_k7x9` | `001_JinTianWMenXxAgent_k7x9` | `001_JinTianWMenXxAgent_k7x9.wav` |
-| `它是什么？` | `002_TaSSM_m2n4` | `002_TaSSM_m2n4` | `002_TaSSM_m2n4.wav` |
-| `Hello World!` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8.wav` |
+| `今天我们学习 Agent。` | `001_JinTianWMenXxAgent_k7x9` | `001_JinTianWMenXxAgent_k7x9` | `001_JinTianWMenXxAgent_k7x9_1783670400000.wav` |
+| `它是什么？` | `002_TaSSM_m2n4` | `002_TaSSM_m2n4` | `002_TaSSM_m2n4_1783670400001.wav` |
+| `Hello World!` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8_1783670400002.wav` |
 
 > 注：拼音首字母缩写（`pattern: "first"`），如「我们」→ `WM`，「什么」→ `SM`。实际输出取决于 `pinyin-pro` 的分词结果。
 
 ### 7.5 重新生成行为
 
-- 同一 sentenceId 重新生成时，**同名覆盖**原文件
-- 前端通过 `invalidateAudioUrl(result.audioPath)` 清除旧的 Blob URL 缓存
+- 同一 sentenceId 重新生成时创建新文件，并在前端保留最近 5 个版本
+- 超出 5 个版本的文件由 `tts_delete_audio_files` 清理
+- 被取消的请求、删除/重写的句子和已删除项目不会遗留可访问缓存
 
 ---
 
@@ -228,7 +230,7 @@ fn sanitize_filename(name: &str) -> String {
 | --- | --- |
 | Rust 命令 | `tts_generate` |
 | 前端调用名 | `ttsGenerate`（service 中为 `generateSentenceAudio`） |
-| 参数 | `{ sentenceId: string, text: string, params: TtsParams }` |
+| 参数 | `{ sentenceId: string, text: string, params: TtsParams, project?: string | null }` |
 | 返回 | `Promise<{ audioPath: string }>` |
 | 失败 | `reject(string)`，可读错误信息（HTTP 状态码 + 响应体） |
 
@@ -260,7 +262,7 @@ interface TtsParams {
   ```
   认证头：`api-key: <apiKey>`（**非** `Authorization: Bearer`）。
 - 响应：JSON，音频在 `choices[0].message.audio.data`，**base64 编码**，后端解码后写盘。
-- 成功后写入 `{appDataDir}/audio/{sentenceId}.wav`，**同名覆盖**。
+- 成功后写入 `{audioDir}/{sentenceId}_{timestamp_ms}.wav`；命名项目位于 `audio/projects/{project}/`。
 - `sentenceId` 仅含字母数字（来自 `generateId`），可直接作文件名。
 
 ### 7.2 `tts_test`
@@ -273,7 +275,7 @@ interface TtsParams {
 | 返回 | `Promise<void>` |
 | 失败 | `reject(string)` |
 
-行为：用一段极短测试文本 `"测试"` 发起一次真实 TTS 请求，成功即返回，失败返回错误。
+行为：用一段极短测试文本 `"test"` 发起一次真实 TTS 请求，成功即返回，失败返回错误。
 
 ### 8.3 `tts_read_audio`
 
@@ -282,7 +284,7 @@ interface TtsParams {
 | 项 | 值 |
 | --- | --- |
 | 参数 | `{ path: string }`（来自 `tts_generate` 返回的 `audioPath`） |
-| 返回 | `Promise<ArrayBuffer>` |
+| 返回 | `Promise<string>`（base64 编码） |
 | 失败 | `reject(string)` |
 
 前端用法（已封装为 `readAudioAsUrl(path)`，自动缓存对象 URL）：
@@ -293,6 +295,17 @@ const url = await readAudioAsUrl(sentence.audioPath) // blob:...
 // <audio src={url} />
 ```
 
+### 8.4 其他已注册命令
+
+| 命令 | 用途 |
+| --- | --- |
+| `tts_list_models` | 从 MiMo-compatible `/v1/models` 获取模型 ID |
+| `tts_list_projects` / `tts_create_project` / `tts_delete_project` | 列出、创建和删除本地项目目录 |
+| `tts_delete_audio_files` | 删除不再被项目元数据引用的缓存音频 |
+| `tts_copy_to_clipboard` / `tts_show_in_finder` / `tts_drag_file` | macOS 文件复制、Finder 定位与原生拖拽 |
+| `save_voice_sample` / `delete_voice_sample` | 管理声音克隆参考样本 |
+| `save_api_key` / `load_api_key` / `delete_api_key` | 管理 macOS Keychain 中的 API Key |
+
 ---
 
 ## 9. 数据模型
@@ -302,13 +315,15 @@ const url = await readAudioAsUrl(sentence.audioPath) // blob:...
 ### Sentence
 
 ```ts
-type SentenceStatus = "pending" | "generating" | "completed" | "failed"
+type SentenceStatus = "pending" | "queued" | "generating" | "completed" | "failed"
 interface Sentence {
   id: string
   text: string
   status: SentenceStatus
   audioPath: string | null   // tts_generate 成功后回填
+  audioHistory: AudioVersion[] // 最近 5 个音频版本
   duration: number | null     // 前端 <audio> 加载后由 onLoadedMetadata 回填
+  errorMessage?: string       // 最近一次生成失败的可读错误
 }
 ```
 
@@ -339,7 +354,7 @@ interface Project { mode: TtsMode; model: string; voice: string; voiceDesignProm
 - `audio.format` 固定 `wav`（非流式，浏览器 `<audio>` 通用支持）。
 - HTTP 由 Rust 侧 `reqwest` 发起，**不需要** `tauri-plugin-http` 或前端 `fetch` 权限。
 - 缓存目录：三级 fallback `app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`。macOS sandbox 下前两个可能被 TCC 拒绝写入，dev 模式通常落到 `.cache/audio`（已加入 `.gitignore`）。
-- 重新生成 → 同路径覆盖。
+- 重新生成 → 唯一时间戳路径；每句保留最近 5 个版本并清理淘汰文件。
 - 不在后端解析音频时长；duration 由前端 `<audio>` 元素的 `onLoadedMetadata` 提供。
 - 预置音色：`冰糖`(女,中) / `茉莉`(女,中) / `苏打`(男,中) / `白桦`(男,中) / `Mia`(女,英) / `Chloe`(女,英) / `Milo`(男,英) / `Dean`(男,英) / `mimo_default`。
 

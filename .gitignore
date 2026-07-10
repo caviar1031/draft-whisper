@@ -12,6 +12,19 @@ dist
 dist-ssr
 *.local
 
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+
+# Test output
+coverage
+
 # Rust
 src-tauri/target
 

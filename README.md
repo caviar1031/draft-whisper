@@ -2,6 +2,16 @@
 
 AI voice-over desktop tool — manage your voice-over one sentence at a time.
 
+## Current Features
+
+- Import or edit scripts with automatic/manual sentence splitting
+- MiMo v2.5 basic, voice-design, and voice-clone generation modes
+- Configurable concurrent generation with per-sentence retry and readable errors
+- Playback, native macOS file drag, clipboard copy, and Finder reveal
+- Local projects with automatic persistence and project deletion
+- Up to five cached audio versions per sentence with automatic cleanup
+- API keys stored in macOS Keychain with debounced, serialized writes
+
 ## Tech Stack
 
 - **Desktop**: Tauri 2
@@ -38,6 +48,9 @@ npm run lint:fix
 
 # Format
 npm run format
+
+# Frontend and Rust unit tests
+npm test
 ```
 
 ## Project Structure

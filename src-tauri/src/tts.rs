@@ -61,16 +61,6 @@ pub enum TtsMode {
     VoiceClone,
 }
 
-impl TtsMode {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::Basic => "basic",
-            Self::VoiceDesign => "voice-design",
-            Self::VoiceClone => "voice-clone",
-        }
-    }
-}
-
 /// 与前端 Settings 一一对应的 TTS 调用参数。
 ///
 /// `rename_all = "camelCase"`：前端传 camelCase（baseUrl/apiKey），
@@ -105,6 +95,27 @@ fn projects_root(app: &AppHandle) -> Result<PathBuf, String> {
   Ok(root)
 }
 
+fn validate_project_name(name: &str) -> Result<&str, String> {
+  let trimmed = name.trim();
+  if trimmed.is_empty() {
+    return Err("Project name cannot be empty".into());
+  }
+  if trimmed == "."
+    || trimmed == ".."
+    || trimmed.starts_with('.')
+    || trimmed.contains('/')
+    || trimmed.contains('\\')
+  {
+    return Err("Project name cannot contain /, \\ or start with .".into());
+  }
+  Ok(trimmed)
+}
+
+fn project_dir(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
+  let validated = validate_project_name(name)?;
+  Ok(projects_root(app)?.join(validated))
+}
+
 /// 列出所有已有项目名称。
 ///
 /// 前端调用: `invoke("tts_list_projects")` → `string[]`
@@ -135,21 +146,25 @@ pub fn tts_list_projects(app: AppHandle) -> Result<Vec<String>, String> {
 /// 前端调用: `invoke("tts_create_project", { name })` → `string[]`（创建后的完整列表）
 #[tauri::command]
 pub fn tts_create_project(name: String, app: AppHandle) -> Result<Vec<String>, String> {
-  let trimmed = name.trim().to_string();
-  if trimmed.is_empty() {
-    return Err("Project name cannot be empty".into());
-  }
-  if trimmed.contains('/') || trimmed.contains('\\') || trimmed.starts_with('.') {
-    return Err("Project name cannot contain /, \\ or start with .".into());
-  }
-  let root = projects_root(&app)?;
-  let dir = root.join(&trimmed);
+  let trimmed = validate_project_name(&name)?.to_string();
+  let dir = project_dir(&app, &trimmed)?;
   if dir.exists() {
     return Err(format!("Project \"{trimmed}\" already exists"));
   }
   std::fs::create_dir_all(&dir)
     .map_err(|e| format!("Failed to create project directory: {e}"))?;
   log::info!("✓ 已创建项目: {}", dir.display());
+  tts_list_projects(app)
+}
+
+/// 删除项目及其缓存音频。
+#[tauri::command]
+pub fn tts_delete_project(name: String, app: AppHandle) -> Result<Vec<String>, String> {
+  let dir = project_dir(&app, &name)?;
+  if dir.exists() {
+    std::fs::remove_dir_all(&dir)
+      .map_err(|e| format!("Failed to delete project directory: {e}"))?;
+  }
   tts_list_projects(app)
 }
 
@@ -377,8 +392,7 @@ pub async fn tts_generate(
     if trimmed.is_empty() {
       ensure_audio_dir(&app)?
     } else {
-      let root = projects_root(&app)?;
-      let dir = root.join(trimmed);
+      let dir = project_dir(&app, trimmed)?;
       std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Failed to create project directory: {e}"))?;
       dir
@@ -482,6 +496,19 @@ pub fn tts_read_audio(path: String, app: AppHandle) -> Result<String, String> {
   let safe_path = is_in_audio_dir(&app, &path)?;
   let bytes = std::fs::read(&safe_path).map_err(|e| format!("Failed to read audio file: {e}"))?;
   Ok(STANDARD.encode(&bytes))
+}
+
+/// 删除不再被项目元数据引用的缓存音频。
+#[tauri::command]
+pub fn tts_delete_audio_files(paths: Vec<String>, app: AppHandle) -> Result<(), String> {
+  for path in paths {
+    let safe_path = is_in_audio_dir(&app, &path)?;
+    if safe_path.is_file() {
+      std::fs::remove_file(&safe_path)
+        .map_err(|e| format!("Failed to delete cached audio file: {e}"))?;
+    }
+  }
+  Ok(())
 }
 
 /// 返回音色样本库目录，不存在则创建。
@@ -839,4 +866,39 @@ struct NSSize {
 struct NSRect {
   origin: NSPoint,
   size: NSSize,
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{build_chat_endpoint, build_models_endpoint, sanitize_filename, validate_project_name};
+
+  #[test]
+  fn normalizes_mimo_endpoints() {
+    assert_eq!(
+      build_chat_endpoint("https://example.com/v1/"),
+      "https://example.com/v1/chat/completions"
+    );
+    assert_eq!(
+      build_chat_endpoint("https://example.com/v1/chat/completions"),
+      "https://example.com/v1/chat/completions"
+    );
+    assert_eq!(
+      build_models_endpoint("https://example.com/v1/chat/completions"),
+      "https://example.com/v1/models"
+    );
+  }
+
+  #[test]
+  fn rejects_unsafe_project_names() {
+    for invalid in ["", " ", ".hidden", "..", "../escape", "nested/name", "nested\\name"] {
+      assert!(validate_project_name(invalid).is_err(), "accepted {invalid:?}");
+    }
+    assert_eq!(validate_project_name(" Demo Project ").unwrap(), "Demo Project");
+  }
+
+  #[test]
+  fn sanitizes_generated_file_names() {
+    assert_eq!(sanitize_filename("001_你好/A"), "001____A");
+    assert_eq!(sanitize_filename("safe-Name_42"), "safe-Name_42");
+  }
 }

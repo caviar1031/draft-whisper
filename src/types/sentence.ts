@@ -13,4 +13,5 @@ export interface Sentence {
   audioPath: string | null
   audioHistory: AudioVersion[]
   duration: number | null
+  errorMessage?: string
 }

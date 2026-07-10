@@ -1,4 +1,4 @@
-import { invalidateAudioUrl, revokeAllAudioUrls } from "@/services/tts"
+import { cleanupAudioFiles, invalidateAudioUrl, revokeAllAudioUrls } from "@/services/tts"
 import type { Project, Sentence, TtsMode } from "@/types"
 import { create } from "zustand"
 
@@ -8,6 +8,21 @@ const LEGACY_KEY = "dw-project"
 
 function storageKey(project: string | null): string {
   return `${STORAGE_PREFIX}${project ?? DEFAULT_KEY}`
+}
+
+function audioPaths(sentences: Sentence[]): Set<string> {
+  const paths = new Set<string>()
+  for (const sentence of sentences) {
+    if (sentence.audioPath) paths.add(sentence.audioPath)
+    for (const version of sentence.audioHistory) paths.add(version.audioPath)
+  }
+  return paths
+}
+
+function deleteUnreferencedAudio(previous: Sentence[], next: Sentence[]): void {
+  const retained = audioPaths(next)
+  const removed = [...audioPaths(previous)].filter((path) => !retained.has(path))
+  if (removed.length > 0) cleanupAudioFiles(removed)
 }
 
 /** 重置瞬态状态：generating/queued → 根据 audioPath 判断 */
@@ -119,6 +134,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     saveCurrentProject(get())
   },
   setSentences: (sentences) => {
+    deleteUnreferencedAudio(get().sentences, sentences)
     set({ sentences })
     saveCurrentProject(get())
   },
@@ -135,9 +151,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     saveCurrentProject(get())
   },
   removeSentence: (id) => {
-    // 在删除前清理该句子的 Blob URL 缓存
     const sentence = get().sentences.find((s) => s.id === id)
-    if (sentence?.audioPath) invalidateAudioUrl(sentence.audioPath)
+    if (sentence) {
+      const paths = [...audioPaths([sentence])]
+      for (const path of paths) invalidateAudioUrl(path)
+      cleanupAudioFiles(paths)
+    }
     set((state) => ({
       sentences: state.sentences.filter((s) => s.id !== id),
     }))
@@ -222,4 +241,9 @@ function flushAndSave(state: ProjectState): void {
  */
 export function flushCurrentProject(): void {
   flushAndSave(useProjectStore.getState())
+}
+
+/** 删除某个项目在 localStorage 中的元数据。 */
+export function deleteStoredProject(project: string): void {
+  localStorage.removeItem(storageKey(project))
 }

@@ -96,6 +96,10 @@ MVP 只验证一件事情：
 
 ✓ 设置页
 
+✓ 本地项目管理
+
+✓ 最近 5 个音频版本
+
 ---
 
 ## 不包含
@@ -104,11 +108,7 @@ MVP 只验证一件事情：
 
 ✕ 多 Provider
 
-✕ 项目管理
-
 ✕ 云同步
-
-✕ 历史版本
 
 ✕ 波形编辑
 
@@ -241,7 +241,7 @@ MVP 只验证一件事情：
 
 自动触发重新生成。
 
-覆盖旧音频。
+新版本成为当前音频，旧版本进入最近 5 个版本的历史记录。
 
 ---
 
@@ -278,9 +278,8 @@ audio/
 002.wav
 ```
 
-重新生成：
-
-覆盖对应文件。
+重新生成会创建带时间戳的新文件。每句保留最近 5 个版本，可在句子卡片中切换；
+超出上限、删除项目、删除或重写句子时自动清理不再引用的缓存文件。
 
 ---
 
@@ -297,7 +296,9 @@ Model
 
 Voice
 
-Speed
+Concurrency
+
+Model Management
 ```
 
 支持：
@@ -467,7 +468,9 @@ Rust
 
 ## Storage
 
-JSON
+localStorage（项目元数据与设置）
+
+macOS Keychain（API Key）
 
 Audio Files
 
@@ -475,7 +478,7 @@ Audio Files
 
 ## API
 
-OpenAI Compatible API
+小米 MiMo v2.5 TTS chat-completions 协议
 
 第一版：
 
@@ -496,19 +499,27 @@ status
 
 audioPath
 
+audioHistory[]
+
 duration
+
+errorMessage
 ```
 
 Project
 
 ```
-voice
+mode
 
 model
 
-speed
+voice
 
-sentences[]
+voiceDesignPrompt
+
+voiceClonePath
+
+sentences[]（包含最近 5 个 audioHistory 版本）
 ```
 
 ---
@@ -618,7 +629,6 @@ Conventional Commits
 ## v0.2
 
 * 多 Provider
-* 多音色
 * 快捷键
 * 深色模式
 * 菜单栏模式
@@ -627,8 +637,6 @@ Conventional Commits
 
 ## v0.5
 
-* Project
-* 批量生成
 * AI 智能断句
 * 波形
 
@@ -649,7 +657,6 @@ Conventional Commits
 * Agent Workflow
 * 时间轴同步
 * 云同步
-* 配音项目管理
 
 ---
 

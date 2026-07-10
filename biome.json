@@ -3,6 +3,15 @@
   "organizeImports": {
     "enabled": true
   },
+  "files": {
+    "ignore": [
+      "**/node_modules/**",
+      "dist/**",
+      "src-tauri/target/**",
+      "src-tauri/gen/**",
+      ".cache/**"
+    ]
+  },
   "linter": {
     "enabled": true,
     "rules": {
@@ -29,6 +38,12 @@
     "formatter": {
       "quoteStyle": "double",
       "semicolons": "asNeeded"
+    }
+  },
+  "json": {
+    "parser": {
+      "allowComments": true,
+      "allowTrailingCommas": true
     }
   }
 }

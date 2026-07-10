@@ -5,6 +5,21 @@ All notable changes to DraftWhisper will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- 生成任务按项目和句子隔离，避免新任务导致其他句子永久停留在等待/生成状态
+- 切换或删除项目时取消当前任务接管，并清理迟到请求生成的孤儿音频
+- API Key 改为防抖串行写入 Keychain，避免逐字符并发写入覆盖最终值
+- 统一项目名称校验，阻止 TTS 命令通过项目参数进行路径穿越
+- 修复 Biome 检查范围和 JSONC 解析，`npm run lint` 可作为稳定质量门禁
+- release 构建使用编译期调试条件，避免 `open_devtools` 阻断生产编译
+
+### Added
+- 每句最多保留最近 5 个音频版本，淘汰、重写和删除时自动清理缓存
+- 项目删除能力，同时删除项目元数据和缓存音频
+- 前端任务调度/Keychain 保存测试与 Rust 端点/路径测试
+- 用户可见的 TTS、项目操作和 Keychain 保存错误
+- 对设置页、脚本编辑器、项目面板和拼音库进行代码拆分，消除主包体积警告
+
+### Fixed
 - 原生文件拖拽使用 `NSWorkspace.iconForFileType` 获取音频图标，修复因未公开的 `NSImageName` 常量导致图标获取失败的问题
 - 前端 `nativeDragFile` 调用添加 `.catch()` 兜底，避免 unhandled promise rejection
 

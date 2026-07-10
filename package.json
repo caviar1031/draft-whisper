@@ -9,6 +9,9 @@
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "format": "biome format . --write",
+    "test": "npm run test:frontend && npm run test:rust",
+    "test:frontend": "node --test tests/*.test.ts",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "preview": "vite preview",
     "tauri": "tauri"
   },

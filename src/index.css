@@ -1293,6 +1293,14 @@
     -webkit-user-select: text;
   }
 
+  .dw-page-loading {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    color: var(--text-400);
+    font-size: 13px;
+  }
+
   .dw-settings-header {
     margin-bottom: 24px;
   }
@@ -1309,6 +1317,29 @@
 
   .dw-settings-field:last-of-type {
     margin-bottom: 20px;
+  }
+
+  .dw-settings-save-state {
+    display: block;
+    margin-top: 5px;
+    font-size: 11px;
+    color: var(--text-400);
+  }
+
+  .dw-settings-save-state.is-saved {
+    color: var(--state-success);
+  }
+
+  .dw-settings-save-state.is-error {
+    color: var(--state-error);
+  }
+
+  .dw-settings-inline-error {
+    margin: -8px 0 14px;
+    color: var(--state-error);
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
   }
 
   .dw-settings-label {
@@ -1830,6 +1861,27 @@
     font-family: inherit;
     cursor: pointer;
     transition: all 0.15s ease;
+  }
+
+  .dw-project-item-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .dw-project-item-row .dw-project-item {
+    flex: 1;
+  }
+
+  .dw-project-config-content > .dw-error-detail {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--state-error) 8%, transparent);
+  }
+
+  .dw-project-config-content > .dw-error-detail .dw-error-msg {
+    white-space: normal;
   }
 
   .dw-project-item:hover {

@@ -38,7 +38,8 @@ pub fn run() {
         }
       }
 
-      if cfg!(debug_assertions) {
+      #[cfg(debug_assertions)]
+      {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
             .level(log::LevelFilter::Info)
@@ -56,11 +57,13 @@ pub fn run() {
       tts::tts_test,
       tts::tts_list_models,
       tts::tts_read_audio,
+      tts::tts_delete_audio_files,
       tts::tts_copy_to_clipboard,
       tts::tts_show_in_finder,
       tts::tts_drag_file,
       tts::tts_list_projects,
       tts::tts_create_project,
+      tts::tts_delete_project,
       tts::save_voice_sample,
       tts::delete_voice_sample,
       tts::save_api_key,

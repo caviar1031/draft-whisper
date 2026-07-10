@@ -1,5 +1,5 @@
 import type { Sentence } from "@/types"
-import { generateSentenceId } from "./id"
+import { generateSentenceId } from "./id.ts"
 
 export function splitTextToSentences(text: string): Sentence[] {
   // 匹配一段非分隔符文本 + 可选的分隔符（中英文句末标点），保留原标点

@@ -52,6 +52,7 @@ export function SentenceCard({
 }: SentenceCardProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
+  const [actionError, setActionError] = useState<string | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
   const historyCount = sentence.audioHistory.length
@@ -67,7 +68,14 @@ export function SentenceCard({
     if (!sentence.audioPath || view !== "ready") return
     // 延迟一帧调用 Rust，避免与浏览器的 mousedown 处理冲突
     const path = sentence.audioPath
-    setTimeout(() => void nativeDragFile(path).catch(() => {}), 0)
+    setActionError(null)
+    setTimeout(
+      () =>
+        void nativeDragFile(path).catch((error) => {
+          setActionError(error instanceof Error ? error.message : String(error))
+        }),
+      0,
+    )
   }, [sentence.audioPath, view])
 
   const handleContextMenu = useCallback(
@@ -86,8 +94,10 @@ export function SentenceCard({
     try {
       await copyAudioToClipboard(sentence.audioPath)
       setCopyState("copied")
-    } catch {
+      setActionError(null)
+    } catch (error) {
       setCopyState("error")
+      setActionError(error instanceof Error ? error.message : String(error))
     }
     setTimeout(() => setContextMenu(null), 600)
   }, [sentence.audioPath])
@@ -96,8 +106,9 @@ export function SentenceCard({
     if (!sentence.audioPath) return
     try {
       await showInFinder(sentence.audioPath)
-    } catch {
-      // ignore
+      setActionError(null)
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error))
     }
     setContextMenu(null)
   }, [sentence.audioPath])
@@ -218,7 +229,17 @@ export function SentenceCard({
           {view === "failed" && errorMessage && (
             <div className="dw-error-detail">
               <TriangleAlert className="dw-error-icon" size={12} strokeWidth={2} />
-              <span className="dw-error-msg">{errorMessage}</span>
+              <span className="dw-error-msg" title={errorMessage}>
+                {errorMessage}
+              </span>
+            </div>
+          )}
+          {view === "ready" && actionError && (
+            <div className="dw-error-detail">
+              <TriangleAlert className="dw-error-icon" size={12} strokeWidth={2} />
+              <span className="dw-error-msg" title={actionError}>
+                {actionError}
+              </span>
             </div>
           )}
         </div>
