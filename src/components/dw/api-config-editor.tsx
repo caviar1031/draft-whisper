@@ -157,6 +157,7 @@ export function ApiConfigEditor({
         mimeType: stored.mimeType,
         byteSize: stored.byteSize,
         encodedSize: stored.encodedSize,
+        durationMs: stored.durationMs,
         source: "uploaded",
       })
       setCloneSamplePath(stored.filePath)

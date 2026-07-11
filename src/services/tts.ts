@@ -25,6 +25,7 @@ export interface SavedVoiceSample {
   mimeType: "audio/wav" | "audio/mpeg"
   byteSize: number
   encodedSize: number
+  durationMs: number
 }
 
 // ---- Blob URL 缓存 ----------------------------------------------------
@@ -70,6 +71,11 @@ export async function generateSentenceAudio(
 /** 生成独立的声音克隆试听文件，不写入项目句子历史。 */
 export async function previewVoiceClone(text: string, params: TtsParams): Promise<TtsResult> {
   return invoke<TtsResult>("tts_preview_voice_clone", { text, params })
+}
+
+/** 生成基础音色或声音设计试听文件。 */
+export async function previewVoice(text: string, params: TtsParams): Promise<TtsResult> {
+  return invoke<TtsResult>("tts_preview_voice", { text, params })
 }
 
 /**

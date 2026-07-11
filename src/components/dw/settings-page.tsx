@@ -8,6 +8,7 @@ import { Check, ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2, X } 
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiConfigEditor } from "./api-config-editor"
+import { VoiceLibrarySection } from "./voice-library-section"
 
 interface SettingsPageProps {
   onClose: () => void
@@ -119,6 +120,12 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
             </div>
           </div>
         </SettingsSection>
+
+        <div className="dw-settings-group-heading">
+          <h2>{t("settings.voiceCapabilities")}</h2>
+          <p>{t("settings.voiceCapabilitiesDesc")}</p>
+        </div>
+        <VoiceLibrarySection />
 
         <section className="dw-settings-section" aria-labelledby="models-api-title">
           <div className="dw-settings-section-heading dw-models-section-heading">

@@ -1,11 +1,14 @@
 import { cleanupAudioFiles, generateSentenceAudio, readAudioAsUrl } from "@/services/tts"
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
+import { useVoiceDesignStore } from "@/stores/voice-design-store"
+import { useVoiceSampleStore } from "@/stores/voice-sample-store"
 import type { SentenceStatus } from "@/types"
 import { retainRecentAudioVersions } from "@/utils/audio-history"
 import { GenerationTaskRegistry } from "@/utils/generation-tasks"
 import { resolveCapability } from "@/utils/provider-catalog"
 import { getTtsConfigurationError } from "@/utils/tts-config"
+import { resolveProjectVoiceResources } from "@/utils/voice-resources"
 import { useCallback, useRef } from "react"
 
 export function useTtsGeneration() {
@@ -37,8 +40,17 @@ export function useTtsGeneration() {
       const projState = useProjectStore.getState()
       const apiConfig = settings.apiConfigs.find((config) => config.id === projState.apiConfigId)
       const capability = apiConfig ? resolveCapability(apiConfig, projState.mode) : null
-      const configurationError = getTtsConfigurationError(
+      const voiceResources = resolveProjectVoiceResources(
         projState,
+        useVoiceDesignStore.getState().designs,
+        useVoiceSampleStore.getState().samples,
+      )
+      const resolvedProject = {
+        ...projState,
+        ...voiceResources,
+      }
+      const configurationError = getTtsConfigurationError(
+        resolvedProject,
         settings.apiConfigs,
         settings.apiKeys,
       )
@@ -50,8 +62,8 @@ export function useTtsGeneration() {
         model: capability.modelId,
         mode: projState.mode,
         voice: projState.voice,
-        voiceDesignPrompt: projState.voiceDesignPrompt,
-        voiceClonePath: projState.voiceClonePath,
+        voiceDesignPrompt: resolvedProject.voiceDesignPrompt,
+        voiceClonePath: resolvedProject.voiceClonePath,
         performancePrompt: projState.performancePrompt,
       }
       const concurrency = settings.concurrency

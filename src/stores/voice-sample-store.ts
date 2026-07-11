@@ -1,22 +1,10 @@
+import type { VoiceCloneSample } from "@/types"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-export interface VoiceSample {
-  id: string
-  name: string
-  filePath: string
-  createdAt: number
-  format?: "wav" | "mp3"
-  mimeType?: "audio/wav" | "audio/mpeg"
-  byteSize?: number
-  encodedSize?: number
-  source?: "uploaded" | "voice-design"
-  designPrompt?: string
-}
-
 interface VoiceSampleState {
-  samples: VoiceSample[]
-  addSample: (sample: VoiceSample) => void
+  samples: VoiceCloneSample[]
+  addSample: (sample: VoiceCloneSample) => void
   removeSample: (id: string) => void
   renameSample: (id: string, name: string) => void
 }
@@ -42,6 +30,20 @@ export const useVoiceSampleStore = create<VoiceSampleState>()(
         }))
       },
     }),
-    { name: "dw-voice-samples" },
+    {
+      name: "dw-voice-samples",
+      version: 2,
+      migrate: (persisted) => {
+        const state = persisted as { samples?: Array<Record<string, unknown>> }
+        return {
+          samples: (state.samples ?? [])
+            .filter((sample) => sample.format === "wav" || sample.format === "mp3")
+            .map((sample) => ({
+              ...sample,
+              durationMs: typeof sample.durationMs === "number" ? sample.durationMs : null,
+            })),
+        }
+      },
+    },
   ),
 )

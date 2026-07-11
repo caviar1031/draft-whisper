@@ -6,7 +6,7 @@ use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
+  let app = tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
       // ===== macOS 动态毛玻璃 (Vibrancy) =====
@@ -55,6 +55,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       tts::tts_generate,
       tts::tts_preview_voice_clone,
+      tts::tts_preview_voice,
       tts::tts_test,
       tts::tts_read_audio,
       tts::tts_delete_audio_files,
@@ -71,6 +72,20 @@ pub fn run() {
       tts::delete_api_key,
       tts::migrate_legacy_api_key,
     ])
-    .run(tauri::generate_context!())
+    .build(tauri::generate_context!())
     .expect("error while running tauri application");
+
+  app.run(|app_handle, event| {
+    #[cfg(target_os = "macos")]
+    if let tauri::RunEvent::Reopen {
+      has_visible_windows: false,
+      ..
+    } = event
+    {
+      if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+      }
+    }
+  });
 }

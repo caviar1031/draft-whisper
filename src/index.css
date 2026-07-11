@@ -3013,6 +3013,110 @@
     width: auto;
     padding: 0 14px;
   }
+
+  .dw-resource-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .dw-settings-group-heading h2 {
+    margin: 0;
+    color: var(--text-800);
+    font-size: 14px;
+  }
+
+  .dw-settings-group-heading p {
+    margin: 3px 0 0;
+    color: var(--text-400);
+    font-size: 9px;
+  }
+
+  .dw-resource-preview-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .dw-resource-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--glass-divider-strong);
+    border-radius: 13px;
+    background: var(--glass-bg-card);
+  }
+
+  .dw-resource-card-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    min-width: 0;
+    color: var(--brand-600);
+  }
+
+  .dw-resource-card-main > div {
+    min-width: 0;
+  }
+
+  .dw-resource-card-main strong {
+    display: block;
+    overflow: hidden;
+    color: var(--text-800);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dw-resource-card-main p {
+    display: -webkit-box;
+    margin: 3px 0 0;
+    overflow: hidden;
+    color: var(--text-400);
+    font-size: 9px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .dw-resource-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+
+  .dw-resource-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 64px;
+    padding: 12px;
+    border: 1px dashed var(--glass-divider-strong);
+    border-radius: 13px;
+    color: var(--text-400);
+    font-size: 9px;
+    text-align: center;
+  }
+
+  .dw-resource-editor {
+    inset: 28px 18px;
+    z-index: 120;
+  }
+
+  .dw-resource-file-path,
+  .dw-resource-rule {
+    margin: 0;
+    color: var(--text-400);
+    font-size: 9px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* Reduced motion */

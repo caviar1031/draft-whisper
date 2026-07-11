@@ -15,12 +15,15 @@ import {
 } from "@/services/tts"
 import { deleteStoredProject, flushCurrentProject, useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
+import { useVoiceDesignStore } from "@/stores/voice-design-store"
+import { useVoiceSampleStore } from "@/stores/voice-sample-store"
 import type { SentenceStatus } from "@/types"
 import { generateSentenceId } from "@/utils/id"
 import { resolveCapability } from "@/utils/provider-catalog"
 import { splitTextToSentences } from "@/utils/sentence"
 import { resolveLanguage } from "@/utils/settings-validation"
 import { getTtsConfigurationError } from "@/utils/tts-config"
+import { resolveProjectVoiceResources } from "@/utils/voice-resources"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { RefreshCw, TriangleAlert } from "lucide-react"
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
@@ -51,13 +54,17 @@ function App() {
   const projectMode = useProjectStore((s) => s.mode)
   const projectApiConfigId = useProjectStore((s) => s.apiConfigId)
   const projectVoice = useProjectStore((s) => s.voice)
+  const projectVoiceDesignId = useProjectStore((s) => s.voiceDesignId)
   const projectVoiceDesignPrompt = useProjectStore((s) => s.voiceDesignPrompt)
+  const projectVoiceCloneSampleId = useProjectStore((s) => s.voiceCloneSampleId)
   const projectVoiceClonePath = useProjectStore((s) => s.voiceClonePath)
   const projectPerformancePrompt = useProjectStore((s) => s.performancePrompt)
   const setProjectMode = useProjectStore((s) => s.setMode)
   const setProjectApiConfigId = useProjectStore((s) => s.setApiConfigId)
   const setProjectVoice = useProjectStore((s) => s.setVoice)
+  const setProjectVoiceDesignId = useProjectStore((s) => s.setVoiceDesignId)
   const setProjectVoiceDesignPrompt = useProjectStore((s) => s.setVoiceDesignPrompt)
+  const setProjectVoiceCloneSampleId = useProjectStore((s) => s.setVoiceCloneSampleId)
   const setProjectVoiceClonePath = useProjectStore((s) => s.setVoiceClonePath)
   const setProjectPerformancePrompt = useProjectStore((s) => s.setPerformancePrompt)
 
@@ -67,6 +74,20 @@ function App() {
   const apiKeys = useSettingsStore((s) => s.apiKeys)
   const language = useSettingsStore((s) => s.language)
   const defaultApiConfigId = useSettingsStore((s) => s.defaultApiConfigId)
+  const voiceDesigns = useVoiceDesignStore((s) => s.designs)
+  const voiceSamples = useVoiceSampleStore((s) => s.samples)
+  const effectiveVoiceResources = resolveProjectVoiceResources(
+    {
+      voiceDesignId: projectVoiceDesignId,
+      voiceDesignPrompt: projectVoiceDesignPrompt,
+      voiceCloneSampleId: projectVoiceCloneSampleId,
+      voiceClonePath: projectVoiceClonePath,
+    },
+    voiceDesigns,
+    voiceSamples,
+  )
+  const effectiveVoiceDesignPrompt = effectiveVoiceResources.voiceDesignPrompt
+  const effectiveVoiceClonePath = effectiveVoiceResources.voiceClonePath
   const selectedApiConfig = apiConfigs.find((config) => config.id === projectApiConfigId)
   const projectModel = resolveCapability(selectedApiConfig, projectMode)?.modelId ?? ""
 
@@ -88,6 +109,7 @@ function App() {
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [projects, setProjects] = useState<string[]>([])
   const [projectError, setProjectError] = useState<string | null>(null)
+  const closingRef = useRef(false)
 
   // 启动时加载上次选中的项目的句子
   useEffect(() => {
@@ -98,8 +120,19 @@ function App() {
   // 窗口关闭前立即保存项目数据（绕过 debounce）
   useEffect(() => {
     const win = getCurrentWindow()
-    const unlisten = win.onCloseRequested(() => {
-      flushCurrentProject()
+    const unlisten = win.onCloseRequested(async (event) => {
+      event.preventDefault()
+      if (closingRef.current) return
+      closingRef.current = true
+      try {
+        flushCurrentProject()
+      } finally {
+        try {
+          await win.hide()
+        } finally {
+          closingRef.current = false
+        }
+      }
     })
     return () => {
       void unlisten.then((fn) => fn())
@@ -216,8 +249,8 @@ function App() {
     {
       apiConfigId: projectApiConfigId,
       mode: projectMode,
-      voiceDesignPrompt: projectVoiceDesignPrompt,
-      voiceClonePath: projectVoiceClonePath,
+      voiceDesignPrompt: effectiveVoiceDesignPrompt,
+      voiceClonePath: effectiveVoiceClonePath,
     },
     apiConfigs,
     apiKeys,
@@ -512,16 +545,29 @@ function App() {
             apiConfigs={apiConfigs}
             model={projectModel}
             voice={projectVoice}
-            voiceDesignPrompt={projectVoiceDesignPrompt}
-            voiceClonePath={projectVoiceClonePath}
+            voiceDesignId={projectVoiceDesignId}
+            voiceDesigns={voiceDesigns}
+            voiceDesignPrompt={effectiveVoiceDesignPrompt}
+            voiceCloneSampleId={projectVoiceCloneSampleId}
+            voiceSamples={voiceSamples}
+            voiceClonePath={effectiveVoiceClonePath}
             performancePrompt={projectPerformancePrompt}
             onSave={handleSaveScript}
             onClose={() => setScriptEditorOpen(false)}
             onModeChange={setProjectMode}
             onApiConfigChange={setProjectApiConfigId}
             onVoiceChange={setProjectVoice}
+            onVoiceDesignIdChange={(id) => {
+              setProjectVoiceDesignId(id)
+              setProjectVoiceDesignPrompt(voiceDesigns.find((item) => item.id === id)?.prompt ?? "")
+            }}
             onVoiceDesignPromptChange={setProjectVoiceDesignPrompt}
-            onVoiceClonePathChange={setProjectVoiceClonePath}
+            onVoiceCloneSampleIdChange={(id) => {
+              setProjectVoiceCloneSampleId(id)
+              setProjectVoiceClonePath(
+                voiceSamples.find((item) => item.id === id)?.filePath ?? null,
+              )
+            }}
             onPerformancePromptChange={setProjectPerformancePrompt}
           />
         </Suspense>

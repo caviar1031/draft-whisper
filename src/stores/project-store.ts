@@ -40,7 +40,9 @@ interface ProjectData {
   apiConfigId: string | null
   mode: TtsMode
   voice: string
+  voiceDesignId: string | null
   voiceDesignPrompt: string
+  voiceCloneSampleId: string | null
   voiceClonePath: string | null
   performancePrompt: string
   sentences: Sentence[]
@@ -50,7 +52,9 @@ const DEFAULT_PROJECT_DATA: ProjectData = {
   apiConfigId: null,
   mode: "basic",
   voice: "冰糖",
+  voiceDesignId: null,
   voiceDesignPrompt: "",
+  voiceCloneSampleId: null,
   voiceClonePath: null,
   performancePrompt: "",
   sentences: [],
@@ -91,7 +95,9 @@ function loadProjectData(project: string | null): ProjectData {
           : useSettingsStore.getState().defaultApiConfigId,
       mode,
       voice: (state.voice as string) ?? "冰糖",
+      voiceDesignId: (state.voiceDesignId as string | null) ?? null,
       voiceDesignPrompt: (state.voiceDesignPrompt as string) ?? "",
+      voiceCloneSampleId: (state.voiceCloneSampleId as string | null) ?? null,
       voiceClonePath: (state.voiceClonePath as string | null) ?? null,
       performancePrompt: (state.performancePrompt as string) ?? "",
       sentences: normalizeSentences(sentences),
@@ -106,7 +112,9 @@ interface ProjectState extends Project {
   setApiConfigId: (apiConfigId: string | null) => void
   setMode: (mode: TtsMode) => void
   setVoice: (voice: string) => void
+  setVoiceDesignId: (id: string | null) => void
   setVoiceDesignPrompt: (prompt: string) => void
+  setVoiceCloneSampleId: (id: string | null) => void
   setVoiceClonePath: (path: string | null) => void
   setPerformancePrompt: (prompt: string) => void
   setSentences: (sentences: Sentence[]) => void
@@ -123,7 +131,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   apiConfigId: null,
   mode: "basic",
   voice: "冰糖",
+  voiceDesignId: null,
   voiceDesignPrompt: "",
+  voiceCloneSampleId: null,
   voiceClonePath: null,
   performancePrompt: "",
   sentences: [],
@@ -140,8 +150,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ voice })
     saveCurrentProject(get())
   },
+  setVoiceDesignId: (voiceDesignId) => {
+    set({ voiceDesignId })
+    saveCurrentProject(get())
+  },
   setVoiceDesignPrompt: (voiceDesignPrompt) => {
     set({ voiceDesignPrompt })
+    saveCurrentProject(get())
+  },
+  setVoiceCloneSampleId: (voiceCloneSampleId) => {
+    set({ voiceCloneSampleId })
     saveCurrentProject(get())
   },
   setVoiceClonePath: (voiceClonePath) => {
@@ -206,7 +224,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       apiConfigId: data.apiConfigId,
       mode: data.mode,
       voice: data.voice,
+      voiceDesignId: data.voiceDesignId,
       voiceDesignPrompt: data.voiceDesignPrompt,
+      voiceCloneSampleId: data.voiceCloneSampleId,
       voiceClonePath: data.voiceClonePath,
       performancePrompt: data.performancePrompt,
       sentences: data.sentences,
@@ -232,7 +252,9 @@ function saveCurrentProject(state: ProjectState): void {
       apiConfigId: state.apiConfigId,
       mode: state.mode,
       voice: state.voice,
+      voiceDesignId: state.voiceDesignId,
       voiceDesignPrompt: state.voiceDesignPrompt,
+      voiceCloneSampleId: state.voiceCloneSampleId,
       voiceClonePath: state.voiceClonePath,
       performancePrompt: state.performancePrompt,
       sentences: state.sentences,
@@ -250,7 +272,9 @@ function flushAndSave(state: ProjectState): void {
     apiConfigId: state.apiConfigId,
     mode: state.mode,
     voice: state.voice,
+    voiceDesignId: state.voiceDesignId,
     voiceDesignPrompt: state.voiceDesignPrompt,
+    voiceCloneSampleId: state.voiceCloneSampleId,
     voiceClonePath: state.voiceClonePath,
     performancePrompt: state.performancePrompt,
     sentences: state.sentences,
@@ -289,6 +313,50 @@ export function clearVoiceSampleReferences(filePath: string): void {
       localStorage.setItem(key, JSON.stringify(parsed))
     } catch {
       // 损坏的旧项目数据由正常加载迁移逻辑处理。
+    }
+  }
+}
+
+export function clearVoiceResourceReferences(
+  kind: "design" | "clone",
+  resourceId: string,
+  fallbackPath?: string,
+): void {
+  const current = useProjectStore.getState()
+  if (kind === "design" && current.voiceDesignId === resourceId) {
+    current.setVoiceDesignId(null)
+    current.setVoiceDesignPrompt("")
+  }
+  if (
+    kind === "clone" &&
+    (current.voiceCloneSampleId === resourceId || current.voiceClonePath === fallbackPath)
+  ) {
+    current.setVoiceCloneSampleId(null)
+    current.setVoiceClonePath(null)
+  }
+
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index)
+    if (!key?.startsWith(STORAGE_PREFIX)) continue
+    const raw = localStorage.getItem(key)
+    if (!raw) continue
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      const data = (parsed.state as Record<string, unknown>) ?? parsed
+      if (kind === "design" && data.voiceDesignId === resourceId) {
+        data.voiceDesignId = null
+        data.voiceDesignPrompt = ""
+      }
+      if (
+        kind === "clone" &&
+        (data.voiceCloneSampleId === resourceId || data.voiceClonePath === fallbackPath)
+      ) {
+        data.voiceCloneSampleId = null
+        data.voiceClonePath = null
+      }
+      localStorage.setItem(key, JSON.stringify(parsed))
+    } catch {
+      // Ignore damaged legacy entries.
     }
   }
 }

@@ -151,6 +151,7 @@ export function VoiceSampleSelector({
         mimeType: stored.mimeType,
         byteSize: stored.byteSize,
         encodedSize: stored.encodedSize,
+        durationMs: stored.durationMs,
         source: "uploaded",
       })
       onSelect(stored.filePath)

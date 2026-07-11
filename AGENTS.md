@@ -305,6 +305,7 @@ const url = await readAudioAsUrl(sentence.audioPath) // blob:...
 
 | 命令 | 用途 |
 | --- | --- |
+| `tts_preview_voice` | 为基础音色或声音设计生成独立试听文件，不写入句子历史 |
 | `tts_preview_voice_clone` | 使用当前克隆样本、自由文本演绎指令和试听文案生成独立试听文件，不写入句子历史 |
 | `tts_list_projects` / `tts_create_project` / `tts_delete_project` | 列出、创建和删除本地项目目录 |
 | `tts_delete_audio_files` | 删除不再被项目元数据引用的缓存音频 |
@@ -355,7 +356,9 @@ interface Project {
   apiConfigId: string | null
   mode: TtsMode
   voice: string
+  voiceDesignId: string | null
   voiceDesignPrompt: string
+  voiceCloneSampleId: string | null
   voiceClonePath: string | null
   performancePrompt: string
   sentences: Sentence[]
@@ -372,6 +375,8 @@ interface Project {
 - 请求体：`{ model, messages:[...], audio:{format:"wav", voice} }`。目标文本必须放 `role: assistant`。
 - 风格控制：基础/克隆模式的 `performancePrompt` 是用户自由输入的可选文本；声音设计模式的 `voiceDesignPrompt` 是用户输入的必填文本。二者都通过 `role: user` 发送，MiMo 不提供原生 speed 参数。
 - 声音克隆：参考音频只接受真实 WAV/MP3，以完整 Data URI 传入 `audio.voice`；Base64 Data URI 上限为 10 MB。独立试听文件存放在 `audio/voice-previews/`，不进入项目句子历史。
+- 声音资源库：声音设计和克隆样本分别持久化为可复用资源；项目保存资源 ID，生成时实时解析资源内容，编辑资源后所有引用项目同步生效。
+- 克隆样本保存入口和每次生成入口都会校验真实 WAV/MP3 签名、Base64 Data URI 小于 10 MB且时长小于 30 秒。
 - 响应：JSON，音频在 `choices[0].message.audio.data`，**base64 编码**，后端解码后落盘。
 - `audio.format` 固定 `wav`（非流式，浏览器 `<audio>` 通用支持）。
 - HTTP 由 Rust 侧 `reqwest` 发起，**不需要** `tauri-plugin-http` 或前端 `fetch` 权限。

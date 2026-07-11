@@ -13,6 +13,7 @@ import {
   validateApiConfig,
 } from "../src/utils/settings-validation.ts"
 import { getTtsConfigurationError } from "../src/utils/tts-config.ts"
+import { resolveProjectVoiceResources } from "../src/utils/voice-resources.ts"
 
 test("splits Chinese and English sentence punctuation while preserving it", () => {
   const sentences = splitTextToSentences("今天开始。\nAre you ready? 好！最后一句")
@@ -166,4 +167,52 @@ test("resolves system language to a supported locale", () => {
   assert.equal(resolveLanguage("system", "zh-Hans-CN"), "zh-CN")
   assert.equal(resolveLanguage("system", "fr-FR"), "en")
   assert.equal(resolveLanguage("en", "zh-CN"), "en")
+})
+
+test("resolves saved voice resources live while retaining legacy fallbacks", () => {
+  const selection = {
+    voiceDesignId: "design-1",
+    voiceDesignPrompt: "legacy design",
+    voiceCloneSampleId: "sample-1",
+    voiceClonePath: "/legacy.wav",
+  }
+  const resolved = resolveProjectVoiceResources(
+    selection,
+    [
+      {
+        id: "design-1",
+        name: "Narrator",
+        prompt: "consistent warm narrator",
+        previewAudioPath: null,
+        previewText: "test",
+        previewApiConfigId: null,
+        lastVerifiedAt: null,
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    ],
+    [
+      {
+        id: "sample-1",
+        name: "Clone",
+        filePath: "/validated.wav",
+        createdAt: 1,
+        format: "wav",
+        mimeType: "audio/wav",
+        byteSize: 100,
+        encodedSize: 150,
+        durationMs: 1_000,
+        source: "uploaded",
+      },
+    ],
+  )
+  assert.deepEqual(resolved, {
+    voiceDesignPrompt: "consistent warm narrator",
+    voiceClonePath: "/validated.wav",
+  })
+
+  assert.deepEqual(resolveProjectVoiceResources(selection, [], []), {
+    voiceDesignPrompt: "legacy design",
+    voiceClonePath: "/legacy.wav",
+  })
 })

@@ -1,10 +1,9 @@
 import { VOICE_OPTIONS } from "@/lib/options"
-import type { ApiConfig, TtsMode } from "@/types"
+import type { ApiConfig, TtsMode, VoiceCloneSample, VoiceDesignPreset } from "@/types"
 import { splitTextToSentences } from "@/utils/sentence"
 import { X } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { VoiceSampleSelector } from "./voice-sample-selector"
 
 type SplitMode = "auto" | "manual"
 type EditorTab = "script" | "voice"
@@ -17,7 +16,11 @@ interface ScriptEditorProps {
   apiConfigs: ApiConfig[]
   model: string
   voice: string
+  voiceDesignId: string | null
+  voiceDesigns: VoiceDesignPreset[]
   voiceDesignPrompt: string
+  voiceCloneSampleId: string | null
+  voiceSamples: VoiceCloneSample[]
   voiceClonePath: string | null
   performancePrompt: string
   onSave: (text: string, splitMode: SplitMode) => void
@@ -25,8 +28,9 @@ interface ScriptEditorProps {
   onModeChange: (mode: TtsMode) => void
   onApiConfigChange: (apiConfigId: string | null) => void
   onVoiceChange: (voice: string) => void
+  onVoiceDesignIdChange: (id: string | null) => void
   onVoiceDesignPromptChange: (prompt: string) => void
-  onVoiceClonePathChange: (path: string | null) => void
+  onVoiceCloneSampleIdChange: (id: string | null) => void
   onPerformancePromptChange: (prompt: string) => void
 }
 
@@ -78,7 +82,11 @@ export function ScriptEditor({
   apiConfigs,
   model,
   voice,
+  voiceDesignId,
+  voiceDesigns,
   voiceDesignPrompt,
+  voiceCloneSampleId,
+  voiceSamples,
   voiceClonePath,
   performancePrompt,
   onSave,
@@ -86,8 +94,9 @@ export function ScriptEditor({
   onModeChange,
   onApiConfigChange,
   onVoiceChange,
+  onVoiceDesignIdChange,
   onVoiceDesignPromptChange,
-  onVoiceClonePathChange,
+  onVoiceCloneSampleIdChange,
   onPerformancePromptChange,
 }: ScriptEditorProps) {
   const { t } = useTranslation()
@@ -385,6 +394,21 @@ export function ScriptEditor({
             {ttsMode === "voice-design" && (
               <div className="dw-settings-field">
                 <label className="dw-settings-label">
+                  {t("editor.voiceDesign")}
+                  <select
+                    className="dw-settings-select"
+                    value={voiceDesignId ?? ""}
+                    onChange={(event) => onVoiceDesignIdChange(event.target.value || null)}
+                  >
+                    <option value="">{t("editor.selectVoiceDesign")}</option>
+                    {voiceDesigns.map((design) => (
+                      <option key={design.id} value={design.id}>
+                        {design.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="dw-settings-label">
                   {t("editor.voiceDescription")}
                   <textarea
                     className="dw-editor-textarea"
@@ -392,6 +416,7 @@ export function ScriptEditor({
                     placeholder={t("editor.voiceDesignPlaceholder")}
                     value={voiceDesignPrompt}
                     onChange={(e) => onVoiceDesignPromptChange(e.target.value)}
+                    readOnly={Boolean(voiceDesignId)}
                     maxLength={500}
                   />
                 </label>
@@ -405,13 +430,26 @@ export function ScriptEditor({
             {/* Voice Clone: 音色样本库 */}
             {ttsMode === "voice-clone" && (
               <>
-                <VoiceSampleSelector
-                  selectedPath={voiceClonePath}
-                  onSelect={onVoiceClonePathChange}
-                  model={model}
-                  apiConfigId={apiConfigId}
-                  performancePrompt={performancePrompt}
-                />
+                <div className="dw-settings-field">
+                  <label className="dw-settings-label">
+                    {t("editor.voiceCloneSample")}
+                    <select
+                      className="dw-settings-select"
+                      value={voiceCloneSampleId ?? ""}
+                      onChange={(event) => onVoiceCloneSampleIdChange(event.target.value || null)}
+                    >
+                      <option value="">{t("editor.selectVoiceCloneSample")}</option>
+                      {voiceSamples
+                        .filter((sample) => sample.durationMs !== null)
+                        .map((sample) => (
+                          <option key={sample.id} value={sample.id}>
+                            {sample.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  {voiceClonePath && <div className="dw-editing-hint">{voiceClonePath}</div>}
+                </div>
                 <div className="dw-settings-field">
                   <label className="dw-settings-label">
                     {t("editor.performancePrompt")}
