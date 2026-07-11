@@ -1,8 +1,9 @@
-import type { TtsMode } from "@/types"
+import type { ProviderId, TtsMode } from "@/types"
 import { invoke } from "@tauri-apps/api/core"
 
 /** TTS 调用参数，与 Rust TtsParams struct 一一对应。 */
 export interface TtsParams {
+  provider: ProviderId
   baseUrl: string
   apiKey: string
   model: string
@@ -72,21 +73,12 @@ export async function previewVoiceClone(text: string, params: TtsParams): Promis
 }
 
 /**
- * 测试当前 settings 是否可用（设置页「Test API」按钮）。
+ * 测试当前 settings 是否可用（设置页「测试语音生成」按钮）。
  *
  * 后端: invoke("tts_test", { params })
  */
 export async function testTts(params: TtsParams): Promise<void> {
   await invoke<void>("tts_test", { params })
-}
-
-/**
- * 获取可用模型列表。
- *
- * 后端: invoke("tts_list_models", { baseUrl, apiKey }) → string[]
- */
-export async function listModels(baseUrl: string, apiKey: string): Promise<string[]> {
-  return invoke<string[]>("tts_list_models", { baseUrl, apiKey })
 }
 
 /**
@@ -202,8 +194,8 @@ export async function deleteVoiceSample(path: string): Promise<void> {
  *
  * 后端: invoke("save_api_key", { apiKey })
  */
-export async function saveApiKey(apiKey: string): Promise<void> {
-  await invoke<void>("save_api_key", { apiKey })
+export async function saveApiKey(configId: string, apiKey: string): Promise<void> {
+  await invoke<void>("save_api_key", { configId, apiKey })
 }
 
 /**
@@ -211,8 +203,8 @@ export async function saveApiKey(apiKey: string): Promise<void> {
  *
  * 后端: invoke("load_api_key") → string | null
  */
-export async function loadApiKey(): Promise<string | null> {
-  return invoke<string | null>("load_api_key")
+export async function loadApiKey(configId: string): Promise<string | null> {
+  return invoke<string | null>("load_api_key", { configId })
 }
 
 /**
@@ -220,6 +212,10 @@ export async function loadApiKey(): Promise<string | null> {
  *
  * 后端: invoke("delete_api_key")
  */
-export async function deleteApiKey(): Promise<void> {
-  await invoke<void>("delete_api_key")
+export async function deleteApiKey(configId: string): Promise<void> {
+  await invoke<void>("delete_api_key", { configId })
+}
+
+export async function migrateLegacyApiKey(configId: string): Promise<string | null> {
+  return invoke<string | null>("migrate_legacy_api_key", { configId })
 }

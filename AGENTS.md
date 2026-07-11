@@ -12,7 +12,7 @@ DraftWhisper 是一款 macOS 优先的 AI 配音桌面工具（Tauri 2 + React�
 
 核心工作流：**改一句文案 → 重新生成 → 试听 → 拖进剪辑软件**。
 
-当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置页。不做多 Provider、云同步、波形、字幕。
+当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置中心、多套 API 配置和中英文界面。Provider 架构可扩展，但当前只实现 MiMo；不做云同步、波形、字幕。
 
 ---
 
@@ -238,9 +238,10 @@ fn sanitize_filename(name: &str) -> String {
 
 ```ts
 interface TtsParams {
+  provider: ProviderId       // 当前适配器；本轮为 "mimo"
   baseUrl: string          // MiMo API 根地址
   apiKey: string           // api-key 头
-  model: string            // 用户选择的模型 ID
+  model: string            // 当前 API 配置对该能力映射的模型 ID
   mode: TtsMode            // "basic" | "voice-design" | "voice-clone"
   voice: string            // 基础模式的预置音色名
   voiceDesignPrompt: string // 声音设计的音色描述
@@ -250,7 +251,7 @@ interface TtsParams {
 ```
 
 行为：
-- 模式与模型固定对应：`basic` → `mimo-v2.5-tts`、`voice-design` → `mimo-v2.5-tts-voicedesign`、`voice-clone` → `mimo-v2.5-tts-voiceclone`；不匹配时拒绝请求。
+- 运行时根据项目的 `apiConfigId` 与当前模式解析能力映射；模型 ID 可编辑，但启用能力时不能为空。
 - 自动规范化 `baseUrl`：去掉尾部 `/`；若已以 `/chat/completions` 结尾则直接用；若以 `/v1` 结尾则补 `/chat/completions`；否则补 `/v1/chat/completions`。
 - 请求体（MiMo chat-completions 风格）：
   ```json
@@ -272,7 +273,7 @@ interface TtsParams {
 
 ### 8.2 `tts_test`
 
-测试当前 settings 是否可用（设置页「Test API」按钮）。
+测试编辑弹窗中的某项能力。三项能力分别发起一次真实合成；克隆测试需要声音样本。
 
 | 项 | 值 |
 | --- | --- |
@@ -280,7 +281,7 @@ interface TtsParams {
 | 返回 | `Promise<void>` |
 | 失败 | `reject(string)` |
 
-行为：用一段极短测试文本 `"test"` 发起一次真实 TTS 请求，成功即返回，失败返回错误。
+行为：用一段极短测试文本 `"test"` 发起一次真实 TTS 合成请求，成功即返回，失败返回错误。页面需提示这会合成示例语音并可能产生少量用量。
 
 ### 8.3 `tts_read_audio`
 
@@ -304,13 +305,13 @@ const url = await readAudioAsUrl(sentence.audioPath) // blob:...
 
 | 命令 | 用途 |
 | --- | --- |
-| `tts_list_models` | 从 MiMo-compatible `/v1/models` 获取模型 ID |
 | `tts_preview_voice_clone` | 使用当前克隆样本、自由文本演绎指令和试听文案生成独立试听文件，不写入句子历史 |
 | `tts_list_projects` / `tts_create_project` / `tts_delete_project` | 列出、创建和删除本地项目目录 |
 | `tts_delete_audio_files` | 删除不再被项目元数据引用的缓存音频 |
 | `tts_copy_to_clipboard` / `tts_show_in_finder` / `tts_drag_file` | macOS 文件复制、Finder 定位与原生拖拽 |
 | `save_voice_sample` / `delete_voice_sample` | 校验并管理 WAV/MP3 声音克隆样本；保存时返回路径、格式、MIME 和大小元数据 |
-| `save_api_key` / `load_api_key` / `delete_api_key` | 管理 macOS Keychain 中的 API Key |
+| `save_api_key` / `load_api_key` / `delete_api_key` | 按 `configId` 管理 macOS Keychain 中隔离的 API Key |
+| `migrate_legacy_api_key` | 将旧 `default` Keychain 条目迁移到第一张 API 配置 |
 
 ---
 
@@ -333,12 +334,17 @@ interface Sentence {
 }
 ```
 
-### Settings / TtsParams
+### Settings / API Config
 
 ```ts
-interface Settings { baseUrl: string; apiKey: string; concurrency: number; project: string | null }
-interface ModelConfig { id: string; name: string; mode: TtsMode }
-// settings-store.models: ModelConfig[] — 用户配置的模型列表
+interface Settings {
+  language: "system" | "zh-CN" | "en"
+  concurrency: number
+  project: string | null
+  apiConfigs: ApiConfig[]
+  defaultApiConfigId: string | null
+}
+// API 配置元数据进入 localStorage；API Key 只存在 Keychain 和运行时内存。
 ```
 
 ### Project
@@ -346,8 +352,8 @@ interface ModelConfig { id: string; name: string; mode: TtsMode }
 ```ts
 type TtsMode = "basic" | "voice-design" | "voice-clone"
 interface Project {
+  apiConfigId: string | null
   mode: TtsMode
-  model: string
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
@@ -362,7 +368,7 @@ interface Project {
 
 - 协议：小米 MiMo v2.5 TTS，`POST {baseUrl}/chat/completions`（chat-completions 风格，**非** OpenAI `/audio/speech`）。文档：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
 - 认证：`api-key: <apiKey>` 请求头（不是 `Authorization: Bearer`）。
-- 模型绑定：基础、声音设计、声音克隆分别固定使用 `mimo-v2.5-tts`、`mimo-v2.5-tts-voicedesign`、`mimo-v2.5-tts-voiceclone`。
+- Provider 目录提供新建配置的默认模型；项目运行时从能力映射解析用户可编辑的模型 ID。
 - 请求体：`{ model, messages:[...], audio:{format:"wav", voice} }`。目标文本必须放 `role: assistant`。
 - 风格控制：基础/克隆模式的 `performancePrompt` 是用户自由输入的可选文本；声音设计模式的 `voiceDesignPrompt` 是用户输入的必填文本。二者都通过 `role: user` 发送，MiMo 不提供原生 speed 参数。
 - 声音克隆：参考音频只接受真实 WAV/MP3，以完整 Data URI 传入 `audio.voice`；Base64 Data URI 上限为 10 MB。独立试听文件存放在 `audio/voice-previews/`，不进入项目句子历史。

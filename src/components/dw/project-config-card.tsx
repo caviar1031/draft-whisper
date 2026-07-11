@@ -1,5 +1,6 @@
 import { Folder, FolderPlus, Trash2, TriangleAlert, X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 interface ProjectConfigCardProps {
   currentProject: string | null
@@ -20,6 +21,7 @@ export function ProjectConfigCard({
   onClose,
   errorMessage,
 }: ProjectConfigCardProps) {
+  const { t } = useTranslation()
   const [newProjectName, setNewProjectName] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [busyProject, setBusyProject] = useState<string | null>(null)
@@ -100,12 +102,17 @@ export function ProjectConfigCard({
         className="dw-dim-overlay"
         style={{ top: 0 }}
         onClick={onClose}
-        aria-label="Close project config"
+        aria-label={t("common.close")}
       />
       <div className="dw-project-config-card" onKeyDown={handleKeyDown}>
         <div className="dw-project-config-header">
-          <span className="dw-settings-title">Project Configuration</span>
-          <button type="button" className="dw-settings-close" onClick={onClose} aria-label="Close">
+          <span className="dw-settings-title">{t("project.title")}</span>
+          <button
+            type="button"
+            className="dw-settings-close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             <X size={16} strokeWidth={2} />
           </button>
         </div>
@@ -119,13 +126,13 @@ export function ProjectConfigCard({
           )}
           <div className="dw-project-config-section">
             <div className="dw-project-config-label">
-              Current Project
+              {t("project.selected")}
               {currentProject && (
                 <button
                   type="button"
                   className="dw-project-remove-btn"
                   onClick={handleRemoveSelection}
-                  title="Remove selection"
+                  title={t("project.removeSelection")}
                 >
                   <X size={14} strokeWidth={2} />
                 </button>
@@ -137,12 +144,12 @@ export function ProjectConfigCard({
                 <span>{currentProject}</span>
               </div>
             ) : (
-              <div className="dw-project-none">No project selected</div>
+              <div className="dw-project-none">{t("project.none")}</div>
             )}
           </div>
 
           <div className="dw-project-config-section">
-            <div className="dw-project-config-label">Available Projects</div>
+            <div className="dw-project-config-label">{t("project.available")}</div>
             {projects.length > 0 ? (
               <div className="dw-project-list">
                 {projects.map((project) => (
@@ -162,7 +169,7 @@ export function ProjectConfigCard({
                       onClick={() => void handleDelete(project)}
                       disabled={busyProject !== null}
                       aria-label={`Delete ${project}`}
-                      title="Delete project and cached audio"
+                      title={t("project.deleteProject")}
                     >
                       <Trash2 size={13} strokeWidth={2} />
                     </button>
@@ -170,18 +177,18 @@ export function ProjectConfigCard({
                 ))}
               </div>
             ) : (
-              <div className="dw-project-empty">No projects available</div>
+              <div className="dw-project-empty">{t("project.empty")}</div>
             )}
           </div>
 
           <div className="dw-project-config-section">
-            <div className="dw-project-config-label">Create New Project</div>
+            <div className="dw-project-config-label">{t("project.create")}</div>
             {isCreating ? (
               <div className="dw-project-create-row">
                 <input
                   type="text"
                   className="dw-project-input"
-                  placeholder="Enter project name..."
+                  placeholder={t("project.namePlaceholder")}
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                   maxLength={50}
@@ -196,7 +203,7 @@ export function ProjectConfigCard({
                   }
                   onClick={() => void handleCreate()}
                 >
-                  Create
+                  {t("common.create")}
                 </button>
                 <button
                   type="button"
@@ -206,7 +213,7 @@ export function ProjectConfigCard({
                     setNewProjectName("")
                   }}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </div>
             ) : (
@@ -216,7 +223,7 @@ export function ProjectConfigCard({
                 onClick={() => setIsCreating(true)}
               >
                 <FolderPlus size={16} strokeWidth={2} />
-                <span>Create New Project</span>
+                <span>{t("project.create")}</span>
               </button>
             )}
           </div>

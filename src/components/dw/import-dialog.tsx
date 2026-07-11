@@ -1,6 +1,7 @@
 import { splitTextToSentences } from "@/utils/sentence"
 import { FileText, X } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 interface ImportDialogProps {
   onImport: (text: string) => void
@@ -8,6 +9,7 @@ interface ImportDialogProps {
 }
 
 export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
+  const { t } = useTranslation()
   const [text, setText] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -52,19 +54,24 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
         className="dw-dim-overlay"
         style={{ top: 0 }}
         onClick={onClose}
-        aria-label="Close import"
+        aria-label={t("common.close")}
       />
       <div className="dw-import-dialog" onKeyDown={handleKeyDown}>
         <div className="dw-import-header">
-          <span className="dw-settings-title">Import Script</span>
-          <button type="button" className="dw-settings-close" onClick={onClose} aria-label="Close">
+          <span className="dw-settings-title">{t("editor.importTitle")}</span>
+          <button
+            type="button"
+            className="dw-settings-close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             <X size={16} strokeWidth={2} />
           </button>
         </div>
         <textarea
           ref={textareaRef}
           className="dw-import-textarea"
-          placeholder="Paste your script here..."
+          placeholder={t("editor.scriptPlaceholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
@@ -76,7 +83,7 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
               onClick={() => fileInputRef.current?.click()}
             >
               <FileText size={14} strokeWidth={2} />
-              .txt File
+              {t("editor.textFile")}
             </button>
             <input
               ref={fileInputRef}
@@ -86,12 +93,14 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
               onChange={handleFileChange}
             />
             {sentenceCount > 0 && (
-              <span className="dw-import-count">{sentenceCount} sentences</span>
+              <span className="dw-import-count">
+                {t("editor.sentenceCount", { count: sentenceCount })}
+              </span>
             )}
           </div>
           <div className="dw-import-right">
             <button type="button" className="dw-pill-btn" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -99,7 +108,7 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
               disabled={!text.trim()}
               onClick={handleImport}
             >
-              Import
+              {t("editor.import")}
             </button>
           </div>
         </div>

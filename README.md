@@ -5,14 +5,15 @@ AI voice-over desktop tool — manage your voice-over one sentence at a time.
 ## Current Features
 
 - Import or edit scripts with automatic/manual sentence splitting
-- MiMo v2.5 basic, voice-design, and voice-clone generation modes with exact model binding
+- MiMo v2.5 basic, voice-design, and voice-clone generation with editable model mappings
 - Free-text performance direction, reusable WAV/MP3 clone samples, and independent clone previews
 - Voice-clone file signature validation and MiMo's 10 MB Base64 Data URI limit enforced locally
 - Configurable concurrent generation with per-sentence retry and readable errors
 - Playback, native macOS file drag, clipboard copy, and Finder reveal
 - Local projects with automatic persistence and project deletion
 - Up to five cached audio versions per sentence with automatic cleanup
-- API keys stored in macOS Keychain with debounced, serialized writes
+- Multiple project-selectable API configurations with keys isolated in macOS Keychain
+- Bilingual Settings center with per-capability real synthesis tests and editable model mappings
 
 ## Tech Stack
 

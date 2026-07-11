@@ -2,8 +2,17 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { MAX_AUDIO_VERSIONS, retainRecentAudioVersions } from "../src/utils/audio-history.ts"
 import { generateSentenceId } from "../src/utils/id.ts"
+import { PROVIDERS, createApiConfig } from "../src/utils/provider-catalog.ts"
 import { splitTextToSentences } from "../src/utils/sentence.ts"
-import { MODEL_BY_MODE, getTtsConfigurationError } from "../src/utils/tts-config.ts"
+import {
+  MAX_CONCURRENCY,
+  isValidHttpUrl,
+  migratePersistedSettings,
+  normalizeConcurrency,
+  resolveLanguage,
+  validateApiConfig,
+} from "../src/utils/settings-validation.ts"
+import { getTtsConfigurationError } from "../src/utils/tts-config.ts"
 
 test("splits Chinese and English sentence punctuation while preserving it", () => {
   const sentences = splitTextToSentences("今天开始。\nAre you ready? 好！最后一句")
@@ -37,41 +46,124 @@ test("retains only the five most recent audio versions", () => {
   assert.deepEqual(result.evictedPaths, ["/audio/0.wav", "/audio/1.wav"])
 })
 
-test("binds each TTS mode to the required MiMo v2.5 model", () => {
-  assert.equal(MODEL_BY_MODE.basic, "mimo-v2.5-tts")
-  assert.equal(MODEL_BY_MODE["voice-design"], "mimo-v2.5-tts-voicedesign")
-  assert.equal(MODEL_BY_MODE["voice-clone"], "mimo-v2.5-tts-voiceclone")
+test("uses MiMo models as editable provider defaults", () => {
+  assert.equal(PROVIDERS.mimo.defaultModels.basic, "mimo-v2.5-tts")
+  const config = createApiConfig("test")
+  config.capabilities.basic.modelId = "custom-model"
+  assert.equal(config.capabilities.basic.modelId, "custom-model")
+})
+
+test("validates enabled capability mappings without fixing model IDs", () => {
+  const config = createApiConfig("test")
+  config.capabilities.basic.modelId = "vendor-custom-basic"
+  assert.equal(validateApiConfig(config), null)
+
+  for (const capability of Object.values(config.capabilities)) capability.enabled = false
+  assert.equal(validateApiConfig(config), "settings.errors.capabilityRequired")
+
+  config.capabilities.basic.enabled = true
+  config.capabilities.basic.modelId = "  "
+  assert.equal(validateApiConfig(config), "settings.errors.modelRequired")
+})
+
+test("blocks missing configuration, disabled capability, and missing key", () => {
+  const config = createApiConfig("test")
+  const project = {
+    apiConfigId: config.id,
+    mode: "basic" as const,
+    voiceDesignPrompt: "",
+    voiceClonePath: null,
+  }
+
+  assert.equal(
+    getTtsConfigurationError({ ...project, apiConfigId: null }, [config]),
+    "errors.selectApiConfig",
+  )
+  assert.equal(getTtsConfigurationError(project, [], {}), "errors.apiConfigMissing")
+  config.capabilities.basic.enabled = false
+  assert.equal(getTtsConfigurationError(project, [config], {}), "errors.capabilityUnavailable")
+  config.capabilities.basic.enabled = true
+  assert.equal(getTtsConfigurationError(project, [config], {}), "errors.apiKeyMissing")
 })
 
 test("blocks voice clone generation until a supported sample is selected", () => {
+  const config = createApiConfig("test")
   assert.equal(
-    getTtsConfigurationError({
-      mode: "voice-clone",
-      model: MODEL_BY_MODE["voice-clone"],
-      voiceDesignPrompt: "",
-      voiceClonePath: null,
-    }),
-    "请先选择 WAV 或 MP3 声音样本",
+    getTtsConfigurationError(
+      {
+        apiConfigId: config.id,
+        mode: "voice-clone",
+        voiceDesignPrompt: "",
+        voiceClonePath: null,
+      },
+      [config],
+      { [config.id]: "test-key" },
+    ),
+    "errors.voiceSampleRequired",
   )
   assert.equal(
-    getTtsConfigurationError({
-      mode: "voice-clone",
-      model: MODEL_BY_MODE["voice-clone"],
-      voiceDesignPrompt: "",
-      voiceClonePath: "/audio/sample.wav",
-    }),
+    getTtsConfigurationError(
+      {
+        apiConfigId: config.id,
+        mode: "voice-clone",
+        voiceDesignPrompt: "",
+        voiceClonePath: "/audio/sample.wav",
+      },
+      [config],
+      { [config.id]: "test-key" },
+    ),
     null,
   )
 })
 
 test("requires a free-text description for voice design", () => {
+  const config = createApiConfig("test")
   assert.equal(
-    getTtsConfigurationError({
-      mode: "voice-design",
-      model: MODEL_BY_MODE["voice-design"],
-      voiceDesignPrompt: "   ",
-      voiceClonePath: null,
-    }),
-    "请先填写声音设计描述",
+    getTtsConfigurationError(
+      {
+        apiConfigId: config.id,
+        mode: "voice-design",
+        voiceDesignPrompt: "   ",
+        voiceClonePath: null,
+      },
+      [config],
+      { [config.id]: "test-key" },
+    ),
+    "errors.voiceDesignRequired",
   )
+})
+
+test("normalizes persisted concurrency to the supported settings range", () => {
+  assert.equal(normalizeConcurrency(undefined), 1)
+  assert.equal(normalizeConcurrency(0), 1)
+  assert.equal(normalizeConcurrency(2.8), 2)
+  assert.equal(normalizeConcurrency(20), MAX_CONCURRENCY)
+})
+
+test("accepts only HTTP or HTTPS API base URLs", () => {
+  assert.equal(isValidHttpUrl("https://api.xiaomimimo.com/v1"), true)
+  assert.equal(isValidHttpUrl("http://localhost:8080/v1"), true)
+  assert.equal(isValidHttpUrl("file:///tmp/api"), false)
+  assert.equal(isValidHttpUrl("not-a-url"), false)
+})
+
+test("migrates legacy global API settings into the first configuration", () => {
+  const migrated = migratePersistedSettings({
+    baseUrl: "https://api.example.com/v1",
+    concurrency: 12,
+    project: "Demo",
+    models: [{ id: "legacy-custom-model" }],
+  })
+  assert.equal(migrated.concurrency, MAX_CONCURRENCY)
+  assert.equal(migrated.project, "Demo")
+  assert.equal(migrated.apiConfigs.length, 1)
+  assert.equal(migrated.apiConfigs[0].baseUrl, "https://api.example.com/v1")
+  assert.equal(migrated.defaultApiConfigId, migrated.apiConfigs[0].id)
+  assert.equal("models" in migrated, false)
+})
+
+test("resolves system language to a supported locale", () => {
+  assert.equal(resolveLanguage("system", "zh-Hans-CN"), "zh-CN")
+  assert.equal(resolveLanguage("system", "fr-FR"), "en")
+  assert.equal(resolveLanguage("en", "zh-CN"), "en")
 })

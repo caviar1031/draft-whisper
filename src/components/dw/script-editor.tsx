@@ -1,9 +1,9 @@
 import { VOICE_OPTIONS } from "@/lib/options"
-import type { TtsMode } from "@/types"
+import type { ApiConfig, TtsMode } from "@/types"
 import { splitTextToSentences } from "@/utils/sentence"
-import { MODEL_BY_MODE } from "@/utils/tts-config"
 import { X } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { VoiceSampleSelector } from "./voice-sample-selector"
 
 type SplitMode = "auto" | "manual"
@@ -13,6 +13,8 @@ interface ScriptEditorProps {
   mode: "import" | "edit"
   initialText?: string
   ttsMode: TtsMode
+  apiConfigId: string | null
+  apiConfigs: ApiConfig[]
   model: string
   voice: string
   voiceDesignPrompt: string
@@ -21,18 +23,14 @@ interface ScriptEditorProps {
   onSave: (text: string, splitMode: SplitMode) => void
   onClose: () => void
   onModeChange: (mode: TtsMode) => void
-  onModelChange: (model: string) => void
+  onApiConfigChange: (apiConfigId: string | null) => void
   onVoiceChange: (voice: string) => void
   onVoiceDesignPromptChange: (prompt: string) => void
   onVoiceClonePathChange: (path: string | null) => void
   onPerformancePromptChange: (prompt: string) => void
 }
 
-const MODE_OPTIONS: { value: TtsMode; label: string; desc: string }[] = [
-  { value: "basic", label: "Basic TTS", desc: "预置音色" },
-  { value: "voice-design", label: "Voice Design", desc: "文本描述音色" },
-  { value: "voice-clone", label: "Voice Clone", desc: "音频样本克隆" },
-]
+const MODE_OPTIONS: TtsMode[] = ["basic", "voice-design", "voice-clone"]
 
 /** 测量纯文本在给定宽度下按 word-wrap 规则所需的视觉行数 */
 function measureVisualLines(
@@ -76,6 +74,8 @@ export function ScriptEditor({
   mode,
   initialText = "",
   ttsMode,
+  apiConfigId,
+  apiConfigs,
   model,
   voice,
   voiceDesignPrompt,
@@ -84,12 +84,13 @@ export function ScriptEditor({
   onSave,
   onClose,
   onModeChange,
-  onModelChange,
+  onApiConfigChange,
   onVoiceChange,
   onVoiceDesignPromptChange,
   onVoiceClonePathChange,
   onPerformancePromptChange,
 }: ScriptEditorProps) {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<EditorTab>("script")
   const [text, setText] = useState(initialText)
   const [splitMode, setSplitMode] = useState<SplitMode>(mode === "edit" ? "manual" : "auto")
@@ -197,15 +198,20 @@ export function ScriptEditor({
         className="dw-dim-overlay"
         style={{ top: 0 }}
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t("common.close")}
       />
       <div className="dw-script-editor" onKeyDown={handleKeyDown}>
         {/* Header */}
         <div className="dw-editor-header">
           <span className="dw-settings-title">
-            {mode === "import" ? "Import Script" : "Edit Project"}
+            {t(mode === "import" ? "editor.importTitle" : "editor.editTitle")}
           </span>
-          <button type="button" className="dw-settings-close" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="dw-settings-close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             <X size={16} strokeWidth={2} />
           </button>
         </div>
@@ -217,14 +223,14 @@ export function ScriptEditor({
             className={`dw-mode-btn${activeTab === "script" ? " is-active" : ""}`}
             onClick={() => setActiveTab("script")}
           >
-            Script
+            {t("editor.script")}
           </button>
           <button
             type="button"
             className={`dw-mode-btn${activeTab === "voice" ? " is-active" : ""}`}
             onClick={() => setActiveTab("voice")}
           >
-            Voice
+            {t("editor.voice")}
           </button>
         </div>
 
@@ -238,14 +244,14 @@ export function ScriptEditor({
                   className={`dw-mode-btn${splitMode === "auto" ? " is-active" : ""}`}
                   onClick={() => setSplitMode("auto")}
                 >
-                  Auto Split
+                  {t("editor.autoSplit")}
                 </button>
                 <button
                   type="button"
                   className={`dw-mode-btn${splitMode === "manual" ? " is-active" : ""}`}
                   onClick={() => setSplitMode("manual")}
                 >
-                  Manual
+                  {t("editor.manual")}
                 </button>
               </div>
             )}
@@ -254,7 +260,7 @@ export function ScriptEditor({
               <textarea
                 ref={textareaRef}
                 className="dw-editor-textarea"
-                placeholder="Paste your script here..."
+                placeholder={t("editor.scriptPlaceholder")}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
               />
@@ -281,7 +287,7 @@ export function ScriptEditor({
                 <textarea
                   ref={textareaRef}
                   className="dw-editor-textarea dw-editor-textarea--manual"
-                  placeholder="Each line is one sentence..."
+                  placeholder={t("editor.manualPlaceholder")}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onScroll={handleScroll}
@@ -293,7 +299,7 @@ export function ScriptEditor({
             {splitMode === "auto" && autoPreview.length > 0 && (
               <div className="dw-auto-preview">
                 <div className="dw-auto-preview-label">
-                  Preview ({autoPreview.length} sentences)
+                  {t("editor.preview", { count: autoPreview.length })}
                 </div>
                 <div className="dw-auto-preview-list">
                   {autoPreview.map((s, i) => (
@@ -311,32 +317,54 @@ export function ScriptEditor({
         {/* Voice Tab */}
         {activeTab === "voice" && (
           <div className="dw-voice-tab">
-            {/* 模式选择 */}
             <div className="dw-settings-field">
               <label className="dw-settings-label">
-                TTS Mode
+                {t("editor.apiConfig")}
                 <select
                   className="dw-settings-select"
-                  value={ttsMode}
-                  onChange={(e) => onModeChange(e.target.value as TtsMode)}
+                  value={apiConfigId ?? ""}
+                  onChange={(event) => onApiConfigChange(event.target.value || null)}
                 >
-                  {MODE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label} — {opt.desc}
+                  <option value="">{t("editor.selectApiConfig")}</option>
+                  {apiConfigs.map((config) => (
+                    <option key={config.id} value={config.id}>
+                      {config.name}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
 
-            {/* 模型选择（按当前 mode 过滤） */}
-            <ModelSelector mode={ttsMode} value={model} onChange={onModelChange} />
+            {/* 模式选择 */}
+            <div className="dw-settings-field">
+              <label className="dw-settings-label">
+                {t("editor.ttsMode")}
+                <select
+                  className="dw-settings-select"
+                  value={ttsMode}
+                  onChange={(e) => onModeChange(e.target.value as TtsMode)}
+                >
+                  {MODE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {t(`settings.modes.${option}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="dw-settings-field">
+              <label className="dw-settings-label">
+                {t("editor.model")}
+                <input className="dw-settings-input" value={model} readOnly />
+              </label>
+            </div>
 
             {/* Basic TTS: 音色 */}
             {ttsMode === "basic" && (
               <div className="dw-settings-field">
                 <label className="dw-settings-label">
-                  Voice
+                  {t("editor.voice")}
                   <select
                     className="dw-settings-select"
                     value={voice}
@@ -357,18 +385,18 @@ export function ScriptEditor({
             {ttsMode === "voice-design" && (
               <div className="dw-settings-field">
                 <label className="dw-settings-label">
-                  Voice Description
+                  {t("editor.voiceDescription")}
                   <textarea
                     className="dw-editor-textarea"
                     style={{ minHeight: 100 }}
-                    placeholder="描述你想要的音色，例如：年轻女性，温柔治愈系，语速适中..."
+                    placeholder={t("editor.voiceDesignPlaceholder")}
                     value={voiceDesignPrompt}
                     onChange={(e) => onVoiceDesignPromptChange(e.target.value)}
                     maxLength={500}
                   />
                 </label>
                 <div className="dw-editing-hint" style={{ marginTop: 4 }}>
-                  <span>1-4 句即可，描述越具体效果越好</span>
+                  <span>{t("editor.voiceDesignHint")}</span>
                   <span>{voiceDesignPrompt.length} / 500</span>
                 </div>
               </div>
@@ -381,22 +409,23 @@ export function ScriptEditor({
                   selectedPath={voiceClonePath}
                   onSelect={onVoiceClonePathChange}
                   model={model}
+                  apiConfigId={apiConfigId}
                   performancePrompt={performancePrompt}
                 />
                 <div className="dw-settings-field">
                   <label className="dw-settings-label">
-                    演绎指令（可选）
+                    {t("editor.performancePrompt")}
                     <textarea
                       className="dw-editor-textarea"
                       style={{ minHeight: 84 }}
-                      placeholder="自由描述语气、情绪、语速或场景，例如：温柔但略显疲惫，语速稍慢，像在深夜低声讲故事。"
+                      placeholder={t("editor.performancePlaceholder")}
                       value={performancePrompt}
                       onChange={(event) => onPerformancePromptChange(event.target.value)}
                       maxLength={500}
                     />
                   </label>
                   <div className="dw-editing-hint" style={{ marginTop: 4 }}>
-                    <span>内容会作为 user 消息发送，不会出现在合成语音中</span>
+                    <span>{t("editor.performanceHint")}</span>
                     <span>{performancePrompt.length} / 500</span>
                   </div>
                 </div>
@@ -410,18 +439,16 @@ export function ScriptEditor({
           <div className="dw-editor-left">
             {activeTab === "script" && sentenceCount > 0 && (
               <span className="dw-import-count">
-                {sentenceCount} {sentenceCount === 1 ? "sentence" : "sentences"}
+                {t("editor.sentenceCount", { count: sentenceCount })}
               </span>
             )}
             {activeTab === "voice" && (
-              <span className="dw-import-count">
-                {MODE_OPTIONS.find((o) => o.value === ttsMode)?.label}
-              </span>
+              <span className="dw-import-count">{t(`settings.modes.${ttsMode}`)}</span>
             )}
           </div>
           <div className="dw-editor-right">
             <button type="button" className="dw-pill-btn" onClick={onClose}>
-              Cancel
+              {t("editor.cancel")}
             </button>
             {activeTab === "script" ? (
               <button
@@ -430,44 +457,16 @@ export function ScriptEditor({
                 disabled={!text.trim() || sentenceCount === 0}
                 onClick={handleSave}
               >
-                {mode === "import" ? "Import" : "Save"}
+                {t(mode === "import" ? "editor.import" : "editor.save")}
               </button>
             ) : (
               <button type="button" className="dw-primary-btn" onClick={onClose}>
-                Done
+                {t("editor.done")}
               </button>
             )}
           </div>
         </div>
       </div>
     </>
-  )
-}
-
-/** 模型选择器：按当前 TTS 模式过滤已配置的模型 */
-function ModelSelector({
-  mode,
-  value,
-  onChange,
-}: {
-  mode: TtsMode
-  value: string
-  onChange: (model: string) => void
-}) {
-  const expectedModel = MODEL_BY_MODE[mode]
-
-  return (
-    <div className="dw-settings-field">
-      <label className="dw-settings-label">
-        Model
-        <select
-          className="dw-settings-select"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value={expectedModel}>{expectedModel}</option>
-        </select>
-      </label>
-    </div>
   )
 }

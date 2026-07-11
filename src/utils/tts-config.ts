@@ -1,28 +1,28 @@
-import type { TtsMode } from "@/types"
-
-export const MODEL_BY_MODE: Record<TtsMode, string> = {
-  basic: "mimo-v2.5-tts",
-  "voice-design": "mimo-v2.5-tts-voicedesign",
-  "voice-clone": "mimo-v2.5-tts-voiceclone",
-}
+import type { ApiConfig, TtsMode } from "@/types"
+import { resolveCapability } from "./provider-catalog.ts"
 
 interface TtsConfiguration {
+  apiConfigId: string | null
   mode: TtsMode
-  model: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
 }
 
-export function getTtsConfigurationError(config: TtsConfiguration): string | null {
-  const expectedModel = MODEL_BY_MODE[config.mode]
-  if (config.model !== expectedModel) {
-    return `当前模式需要模型 ${expectedModel}`
+export function getTtsConfigurationError(
+  project: TtsConfiguration,
+  apiConfigs: ApiConfig[],
+  apiKeys?: Record<string, string>,
+): string | null {
+  if (!project.apiConfigId) return "errors.selectApiConfig"
+  const config = apiConfigs.find((item) => item.id === project.apiConfigId)
+  if (!config) return "errors.apiConfigMissing"
+  if (!resolveCapability(config, project.mode)) return "errors.capabilityUnavailable"
+  if (apiKeys && !apiKeys[config.id]) return "errors.apiKeyMissing"
+  if (project.mode === "voice-design" && !project.voiceDesignPrompt.trim()) {
+    return "errors.voiceDesignRequired"
   }
-  if (config.mode === "voice-design" && !config.voiceDesignPrompt.trim()) {
-    return "请先填写声音设计描述"
-  }
-  if (config.mode === "voice-clone" && !config.voiceClonePath) {
-    return "请先选择 WAV 或 MP3 声音样本"
+  if (project.mode === "voice-clone" && !project.voiceClonePath) {
+    return "errors.voiceSampleRequired"
   }
   return null
 }

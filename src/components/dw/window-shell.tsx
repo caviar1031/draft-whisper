@@ -1,5 +1,6 @@
 import { Folder } from "lucide-react"
 import type { ReactNode } from "react"
+import { useTranslation } from "react-i18next"
 
 // 窗口外框 — 直接作为 Liquid Glass 卡片铺满视口
 // macOS vibrancy 在 Rust setup 中通过 window-vibrancy 应用，透出桌面壁纸
@@ -27,6 +28,7 @@ export function StatusBar({
   project,
   onProjectClick,
 }: StatusBarProps) {
+  const { t } = useTranslation()
   const toneColor =
     statusTone === "ready"
       ? "var(--state-success)"
@@ -42,9 +44,7 @@ export function StatusBar({
 
   return (
     <div className="dw-status-bar">
-      <span className="dw-status-bar-text">
-        {count} {count === 1 ? "sentence" : "sentences"}
-      </span>
+      <span className="dw-status-bar-text">{t("app.sentenceCount", { count })}</span>
       <div className="dw-status-bar-right">
         <span className="dw-status-bar-text" style={toneColor ? { color: toneColor } : undefined}>
           {statusText}
@@ -54,7 +54,7 @@ export function StatusBar({
             type="button"
             className="dw-status-bar-project"
             onClick={onProjectClick}
-            title="Configure project"
+            title={t("app.configureProject")}
           >
             <span className="dw-status-bar-project-name">{project}</span>
             <Folder size={14} strokeWidth={2} />
@@ -65,10 +65,10 @@ export function StatusBar({
             type="button"
             className="dw-status-bar-project"
             onClick={onProjectClick}
-            title="Configure project"
+            title={t("app.configureProject")}
           >
             <Folder size={14} strokeWidth={2} />
-            <span className="dw-status-bar-project-name">Select Project</span>
+            <span className="dw-status-bar-project-name">{t("app.selectProject")}</span>
           </button>
         )}
       </div>

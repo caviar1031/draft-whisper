@@ -1,6 +1,9 @@
+import type { ApiConfig, LanguagePreference } from "./api-config"
+
 export interface Settings {
-  baseUrl?: string
-  apiKey?: string
+  language?: LanguagePreference
   concurrency?: number
   project?: string | null
+  apiConfigs?: ApiConfig[]
+  defaultApiConfigId?: string | null
 }

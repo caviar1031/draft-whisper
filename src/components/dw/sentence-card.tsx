@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
+import { useTranslation } from "react-i18next"
 
 // 卡片可视状态 — 由 status 派生 + 播放/编辑等 UI 状态叠加
 export type CardView = "queued" | "generating" | "ready" | "playing" | "failed" | "editing"
@@ -54,6 +55,7 @@ export function SentenceCard({
   generationDisabled = false,
   generationDisabledReason,
 }: SentenceCardProps) {
+  const { t } = useTranslation()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
   const [actionError, setActionError] = useState<string | null>(null)
@@ -150,7 +152,7 @@ export function SentenceCard({
 
   const statusDotClass = `dw-status-dot is-${view}`
   const statusTextClass = `dw-status-text is-${view}`
-  const statusLabel = viewLabel(view, queuedLabel)
+  const statusLabel = viewLabel(view, queuedLabel, t)
 
   return (
     <div
@@ -178,7 +180,7 @@ export function SentenceCard({
               ) : (
                 <Copy size={14} strokeWidth={2} />
               )}
-              {copyState === "copied" ? "Copied" : "Copy Audio"}
+              {t(copyState === "copied" ? "sentence.copied" : "sentence.copyAudio")}
             </button>
             <button
               type="button"
@@ -186,7 +188,7 @@ export function SentenceCard({
               onClick={() => void handleShowInFinder()}
             >
               <FolderOpen size={14} strokeWidth={2} />
-              Show in Finder
+              {t("sentence.showFinder")}
             </button>
           </div>,
           document.body,
@@ -205,7 +207,7 @@ export function SentenceCard({
                 className="dw-version-btn"
                 disabled={currentIndex <= 0}
                 onClick={() => onSwitchVersion(currentIndex - 1)}
-                aria-label="Previous version"
+                aria-label={t("sentence.previous")}
               >
                 <ChevronLeft size={12} strokeWidth={2.5} />
               </button>
@@ -217,7 +219,7 @@ export function SentenceCard({
                 className="dw-version-btn"
                 disabled={currentIndex >= historyCount - 1}
                 onClick={() => onSwitchVersion(currentIndex + 1)}
-                aria-label="Next version"
+                aria-label={t("sentence.next")}
               >
                 <ChevronRight size={12} strokeWidth={2.5} />
               </button>
@@ -257,6 +259,7 @@ export function SentenceCard({
           onRetry,
           onEdit,
           generationDisabled,
+          t,
           generationDisabledReason,
         )}
       </div>
@@ -272,6 +275,7 @@ function renderActions(
   onRetry: () => void,
   onEdit: () => void,
   generationDisabled: boolean,
+  t: (key: string) => string,
   generationDisabledReason?: string,
 ) {
   if (view === "ready") {
@@ -280,16 +284,16 @@ function renderActions(
         <button
           type="button"
           className="dw-action-btn dw-regen-btn"
-          aria-label="Edit sentence"
+          aria-label={t("sentence.edit")}
           onClick={onEdit}
-          title="Edit"
+          title={t("common.edit")}
         >
           <Pencil size={14} strokeWidth={2} />
         </button>
         <button
           type="button"
           className="dw-action-btn dw-play-btn"
-          aria-label="Play"
+          aria-label={t("sentence.play")}
           onClick={onPlay}
         >
           <CirclePlay size={20} strokeWidth={2} />
@@ -297,7 +301,7 @@ function renderActions(
         <button
           type="button"
           className="dw-action-btn dw-regen-btn"
-          aria-label="Regenerate"
+          aria-label={t("sentence.regenerate")}
           onClick={onRegenerate}
           disabled={generationDisabled}
           title={generationDisabledReason}
@@ -313,7 +317,7 @@ function renderActions(
         <button
           type="button"
           className="dw-action-btn dw-pause-btn"
-          aria-label="Pause"
+          aria-label={t("sentence.pause")}
           onClick={onPause}
         >
           <CirclePause size={20} strokeWidth={2} />
@@ -321,7 +325,7 @@ function renderActions(
         <button
           type="button"
           className="dw-action-btn dw-regen-btn"
-          aria-label="Regenerate"
+          aria-label={t("sentence.regenerate")}
           disabled
           aria-hidden="true"
           tabIndex={-1}
@@ -337,13 +341,13 @@ function renderActions(
       <button
         type="button"
         className="dw-retry-btn"
-        aria-label="Retry"
+        aria-label={t("sentence.retry")}
         onClick={onRetry}
         disabled={generationDisabled}
         title={generationDisabledReason}
       >
         <RefreshCw size={11} strokeWidth={2} />
-        Retry
+        {t("sentence.retry")}
       </button>
     )
   }
@@ -361,6 +365,7 @@ interface EditingCardProps {
 }
 
 function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardProps) {
+  const { t } = useTranslation()
   const [value, setValue] = useState(sentence.text)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -394,10 +399,10 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
             marginBottom: "8px",
           }}
         >
-          <span className="dw-status-text is-pending">Pending</span>
+          <span className="dw-status-text is-pending">{t("sentence.pending")}</span>
           <span className="dw-changed-badge">
             <Pencil size={10} strokeWidth={2.5} style={{ color: "var(--glass-orange)" }} />
-            Changed
+            {t("sentence.changed")}
           </span>
         </div>
         <textarea
@@ -405,21 +410,26 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
           className="dw-editing-textarea"
           rows={3}
           value={value}
-          aria-label="Edit sentence"
+          aria-label={t("sentence.edit")}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           maxLength={500}
         />
         <div className="dw-editing-hint">
-          <span>Press Enter to confirm · Esc to cancel</span>
+          <span>{t("sentence.editHint")}</span>
           <span>{value.length} / 500</span>
         </div>
       </div>
       <div className="dw-card-actions" style={{ alignSelf: "center" }}>
-        <button type="button" className="dw-action-btn" aria-label="Play" disabled>
+        <button type="button" className="dw-action-btn" aria-label={t("sentence.play")} disabled>
           <CirclePlay size={20} strokeWidth={2} />
         </button>
-        <button type="button" className="dw-action-btn" aria-label="Regenerate" disabled>
+        <button
+          type="button"
+          className="dw-action-btn"
+          aria-label={t("sentence.regenerate")}
+          disabled
+        >
           <RefreshCw size={16} strokeWidth={2} />
         </button>
       </div>
@@ -427,20 +437,20 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
   )
 }
 
-function viewLabel(view: CardView, queuedLabel: string): string {
+function viewLabel(view: CardView, queuedLabel: string, t: (key: string) => string): string {
   switch (view) {
     case "queued":
       return queuedLabel
     case "generating":
-      return "Generating..."
+      return t("sentence.generating")
     case "ready":
-      return "Ready"
+      return t("sentence.ready")
     case "playing":
-      return "Playing"
+      return t("sentence.playing")
     case "failed":
-      return "Failed"
+      return t("sentence.failed")
     case "editing":
-      return "Pending"
+      return t("sentence.pending")
   }
 }
 

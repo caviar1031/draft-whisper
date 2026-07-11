@@ -5,6 +5,7 @@ import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useTtsGeneration } from "@/hooks/use-tts-generation"
+import i18n from "@/i18n"
 import {
   cleanupAudioFiles,
   createProject,
@@ -16,11 +17,14 @@ import { deleteStoredProject, flushCurrentProject, useProjectStore } from "@/sto
 import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
 import { generateSentenceId } from "@/utils/id"
+import { resolveCapability } from "@/utils/provider-catalog"
 import { splitTextToSentences } from "@/utils/sentence"
+import { resolveLanguage } from "@/utils/settings-validation"
 import { getTtsConfigurationError } from "@/utils/tts-config"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { RefreshCw, TriangleAlert } from "lucide-react"
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 const SettingsPage = lazy(() =>
   import("@/components/dw/settings-page").then((module) => ({ default: module.SettingsPage })),
@@ -37,6 +41,7 @@ const ProjectConfigCard = lazy(() =>
 type Phase = "empty" | "imported" | "generating" | "complete"
 
 function App() {
+  const { t } = useTranslation()
   const sentences = useProjectStore((s) => s.sentences)
   const setSentences = useProjectStore((s) => s.setSentences)
   const updateSentence = useProjectStore((s) => s.updateSentence)
@@ -44,13 +49,13 @@ function App() {
   const loadProject = useProjectStore((s) => s.loadProject)
 
   const projectMode = useProjectStore((s) => s.mode)
-  const projectModel = useProjectStore((s) => s.model)
+  const projectApiConfigId = useProjectStore((s) => s.apiConfigId)
   const projectVoice = useProjectStore((s) => s.voice)
   const projectVoiceDesignPrompt = useProjectStore((s) => s.voiceDesignPrompt)
   const projectVoiceClonePath = useProjectStore((s) => s.voiceClonePath)
   const projectPerformancePrompt = useProjectStore((s) => s.performancePrompt)
   const setProjectMode = useProjectStore((s) => s.setMode)
-  const setProjectModel = useProjectStore((s) => s.setModel)
+  const setProjectApiConfigId = useProjectStore((s) => s.setApiConfigId)
   const setProjectVoice = useProjectStore((s) => s.setVoice)
   const setProjectVoiceDesignPrompt = useProjectStore((s) => s.setVoiceDesignPrompt)
   const setProjectVoiceClonePath = useProjectStore((s) => s.setVoiceClonePath)
@@ -58,6 +63,20 @@ function App() {
 
   const project = useSettingsStore((s) => s.project)
   const setProject = useSettingsStore((s) => s.setProject)
+  const apiConfigs = useSettingsStore((s) => s.apiConfigs)
+  const apiKeys = useSettingsStore((s) => s.apiKeys)
+  const language = useSettingsStore((s) => s.language)
+  const defaultApiConfigId = useSettingsStore((s) => s.defaultApiConfigId)
+  const selectedApiConfig = apiConfigs.find((config) => config.id === projectApiConfigId)
+  const projectModel = resolveCapability(selectedApiConfig, projectMode)?.modelId ?? ""
+
+  useEffect(() => {
+    void i18n.changeLanguage(resolveLanguage(language))
+  }, [language])
+
+  useEffect(() => {
+    if (!projectApiConfigId && defaultApiConfigId) setProjectApiConfigId(defaultApiConfigId)
+  }, [defaultApiConfigId, projectApiConfigId, setProjectApiConfigId])
 
   const { playingId, playbackError, handlePlay, handlePause } = useAudioPlayback()
   const { runGeneration, generateAll, retryFailed, cancelGeneration } = useTtsGeneration()
@@ -193,12 +212,17 @@ function App() {
           : "imported"
 
   const failedCount = sentences.filter((s) => s.status === "failed").length
-  const ttsConfigurationError = getTtsConfigurationError({
-    mode: projectMode,
-    model: projectModel,
-    voiceDesignPrompt: projectVoiceDesignPrompt,
-    voiceClonePath: projectVoiceClonePath,
-  })
+  const ttsConfigurationError = getTtsConfigurationError(
+    {
+      apiConfigId: projectApiConfigId,
+      mode: projectMode,
+      voiceDesignPrompt: projectVoiceDesignPrompt,
+      voiceClonePath: projectVoiceClonePath,
+    },
+    apiConfigs,
+    apiKeys,
+  )
+  const localizedTtsConfigurationError = ttsConfigurationError ? t(ttsConfigurationError) : null
 
   // --- Script Editor ---
   const handleOpenScriptEditor = useCallback(() => {
@@ -331,13 +355,14 @@ function App() {
     phase === "complete"
       ? {
           kind: "regenerate-all",
-          disabled: Boolean(ttsConfigurationError),
-          disabledReason: ttsConfigurationError ?? undefined,
+          disabled: Boolean(localizedTtsConfigurationError),
+          disabledReason: localizedTtsConfigurationError ?? undefined,
         }
       : {
           kind: "generate",
-          disabled: phase === "empty" || phase === "generating" || Boolean(ttsConfigurationError),
-          disabledReason: ttsConfigurationError ?? undefined,
+          disabled:
+            phase === "empty" || phase === "generating" || Boolean(localizedTtsConfigurationError),
+          disabledReason: localizedTtsConfigurationError ?? undefined,
         }
 
   const handleToolbarAction = useCallback(() => {
@@ -361,23 +386,24 @@ function App() {
   // --- 状态栏 ---
   const statusBar = (() => {
     const count = sentences.length
-    if (phase === "empty") return { statusText: "Ready", statusTone: "default" as const }
-    if (phase === "imported") return { statusText: "Ready", statusTone: "default" as const }
+    if (phase === "empty") return { statusText: t("app.ready"), statusTone: "default" as const }
+    if (phase === "imported") return { statusText: t("app.ready"), statusTone: "default" as const }
     if (phase === "generating") {
       const done = sentences.filter((s) => s.status === "completed" || s.status === "failed").length
       const active = sentences.filter((s) => s.status === "generating").length
       return {
-        statusText: `Generating ${done} / ${count} (${active} active)...`,
+        statusText: t("app.generating", { done, total: count, active }),
         statusTone: "generating" as const,
       }
     }
-    if (editingId !== null) return { statusText: "1 pending edit", statusTone: "pending" as const }
+    if (editingId !== null)
+      return { statusText: t("app.pendingEdit"), statusTone: "pending" as const }
     if (failedCount > 0)
       return {
-        statusText: `${failedCount} failed`,
+        statusText: t("app.failedStatus", { count: failedCount, completed: count - failedCount }),
         statusTone: "error" as const,
       }
-    return { statusText: "All ready", statusTone: "ready" as const }
+    return { statusText: t("app.allReady"), statusTone: "ready" as const }
   })()
 
   return (
@@ -390,8 +416,8 @@ function App() {
       />
 
       {settingsOpen ? (
-        <Suspense fallback={<div className="dw-page-loading">Loading settings…</div>}>
-          <SettingsPage />
+        <Suspense fallback={<div className="dw-page-loading">{t("app.loadingSettings")}</div>}>
+          <SettingsPage onClose={() => setSettingsOpen(false)} />
         </Suspense>
       ) : (
         <>
@@ -411,14 +437,14 @@ function App() {
             </div>
           )}
 
-          {ttsConfigurationError && sentences.length > 0 && (
+          {localizedTtsConfigurationError && sentences.length > 0 && (
             <div className="dw-retry-all-bar" role="alert">
               <span className="dw-retry-all-label">
                 <TriangleAlert size={14} strokeWidth={2} style={{ color: "var(--state-error)" }} />
-                {ttsConfigurationError}
+                {localizedTtsConfigurationError}
               </span>
               <button type="button" className="dw-retry-all-btn" onClick={handleOpenScriptEditor}>
-                配置声音
+                {t("app.configureVoice")}
               </button>
             </div>
           )}
@@ -427,11 +453,11 @@ function App() {
             <div className="dw-retry-all-bar">
               <span className="dw-retry-all-label">
                 <TriangleAlert size={14} strokeWidth={2} style={{ color: "var(--state-error)" }} />
-                {failedCount} {failedCount === 1 ? "generation" : "generations"} failed
+                {t("app.failedCount", { count: failedCount })}
               </span>
               <button type="button" className="dw-retry-all-btn" onClick={handleRetryAll}>
                 <RefreshCw size={14} strokeWidth={2} />
-                Retry All
+                {t("app.retryAll")}
               </button>
             </div>
           )}
@@ -446,10 +472,10 @@ function App() {
                   sentence={sentence}
                   index={index}
                   view={cardView(sentence.id, sentence.status)}
-                  queuedLabel={phase === "imported" ? "Idle" : "Queued"}
+                  queuedLabel={phase === "imported" ? t("app.idle") : t("app.queued")}
                   errorMessage={
                     sentence.status === "failed"
-                      ? (sentence.errorMessage ?? "Generation failed — check API settings")
+                      ? (sentence.errorMessage ?? t("app.generationFailed"))
                       : undefined
                   }
                   onPlay={() => void handlePlay(sentence.id)}
@@ -460,8 +486,8 @@ function App() {
                   onCommitEdit={(text) => handleCommitEdit(sentence.id, text)}
                   onCancelEdit={handleCancelEdit}
                   onSwitchVersion={(historyIndex) => handleSwitchVersion(sentence.id, historyIndex)}
-                  generationDisabled={Boolean(ttsConfigurationError)}
-                  generationDisabledReason={ttsConfigurationError ?? undefined}
+                  generationDisabled={Boolean(localizedTtsConfigurationError)}
+                  generationDisabledReason={localizedTtsConfigurationError ?? undefined}
                 />
               ))}
             </div>
@@ -482,6 +508,8 @@ function App() {
             mode={sentences.length > 0 ? "edit" : "import"}
             initialText={sentences.length > 0 ? sentences.map((s) => s.text).join("\n") : ""}
             ttsMode={projectMode}
+            apiConfigId={projectApiConfigId}
+            apiConfigs={apiConfigs}
             model={projectModel}
             voice={projectVoice}
             voiceDesignPrompt={projectVoiceDesignPrompt}
@@ -490,7 +518,7 @@ function App() {
             onSave={handleSaveScript}
             onClose={() => setScriptEditorOpen(false)}
             onModeChange={setProjectMode}
-            onModelChange={setProjectModel}
+            onApiConfigChange={setProjectApiConfigId}
             onVoiceChange={setProjectVoice}
             onVoiceDesignPromptChange={setProjectVoiceDesignPrompt}
             onVoiceClonePathChange={setProjectVoiceClonePath}

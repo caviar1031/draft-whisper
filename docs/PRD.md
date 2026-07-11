@@ -108,7 +108,7 @@ MVP 只验证一件事情：
 
 ✕ AI 智能断句
 
-✕ 多 Provider
+△ 多 Provider 架构（当前仅注册 MiMo）
 
 ✕ 云同步
 
@@ -287,31 +287,27 @@ audio/
 
 ## 6.9 设置
 
-设置：
+Settings 是整个应用的设置中心。当前包含通用设置、生成设置和模型与 API 三个分区。
+Provider 使用可扩展注册结构，但当前只注册已完成真实适配的 MiMo。
 
-```
-Base URL
+页面结构：
 
-API Key
+* 通用设置：跟随系统、简体中文、English，可立即切换并持久化
+* 生成设置：1–4 的并发生成步进器
+* 模型与 API：顶部添加按钮和默认折叠的配置卡片
+* 编辑弹窗包含配置名称、Provider、Base URL、API Key、能力开关与可编辑模型 ID
+* 三项能力可分别发起真实合成测试；声音克隆测试支持选择或导入 WAV/MP3 样本
+* API Key 按配置 ID 隔离存储在 macOS Keychain，不进入 localStorage
+* 第一张配置自动成为默认配置；项目可以选择不同配置
 
-Model
-
-Voice
-
-Concurrency
-
-Model Management
-```
-
-支持：
-
-Test API。
+用户修改 Base URL、API Key 或模型 ID 后，对应测试结果立即失效。错误显示在对应能力或编辑弹窗内。
+项目级 Voice、声音设计描述、声音克隆样本和演绎指令继续在脚本编辑器中配置。
 
 ---
 
 ## 6.10 声音模式
 
-支持三个 MiMo v2.5 TTS 模式，切换模式时自动绑定对应模型：
+支持三个 MiMo v2.5 TTS 模式。下表模型是新建 MiMo 配置时的默认值，用户可在 Settings 中修改：
 
 | 模式 | 模型 |
 | --- | --- |
@@ -542,7 +538,7 @@ Project
 ```
 mode
 
-model
+apiConfigId
 
 voice
 
@@ -681,7 +677,7 @@ Conventional Commits
 
 ## v0.2
 
-* 多 Provider
+* 注册更多 Provider 适配器
 * 快捷键
 * 深色模式
 * 菜单栏模式

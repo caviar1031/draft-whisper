@@ -1,300 +1,264 @@
-import { listModels, testTts } from "@/services/tts"
+import i18n from "@/i18n"
+import { countApiConfigReferences, reassignApiConfigReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
-import type { ModelConfig, TtsMode } from "@/types"
-import { inferTtsMode } from "@/types"
-import { MODEL_BY_MODE } from "@/utils/tts-config"
-import { Download, Plus, RefreshCw, X } from "lucide-react"
-import { useCallback, useState } from "react"
+import type { ApiConfig, LanguagePreference } from "@/types"
+import { PROVIDERS, TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
+import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
+import { Check, ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2, X } from "lucide-react"
+import { useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
+import { ApiConfigEditor } from "./api-config-editor"
 
-type TestState = "idle" | "testing" | "success" | "error"
+interface SettingsPageProps {
+  onClose: () => void
+}
 
-export function SettingsPage() {
+interface EditorState {
+  config: ApiConfig
+  isNew: boolean
+}
+
+function generateApiConfigId(): string {
+  return `api_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+}
+
+export function SettingsPage({ onClose }: SettingsPageProps) {
+  const { t } = useTranslation()
   const settings = useSettingsStore()
-  const [testState, setTestState] = useState<TestState>("idle")
-  const [testError, setTestError] = useState<string | null>(null)
-  const [fetchingModels, setFetchingModels] = useState(false)
-  const [fetchError, setFetchError] = useState<string | null>(null)
-  const [addingManual, setAddingManual] = useState(false)
-  const [manualId, setManualId] = useState("")
-  const [manualMode, setManualMode] = useState<TtsMode>("basic")
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editor, setEditor] = useState<EditorState | null>(null)
+  const configs = useMemo(
+    () => [...settings.apiConfigs].sort((a, b) => a.createdAt - b.createdAt),
+    [settings.apiConfigs],
+  )
 
-  const handleTest = useCallback(async () => {
-    setTestState("testing")
-    setTestError(null)
+  const handleLanguageChange = (language: LanguagePreference) => {
+    settings.setLanguage(language)
+    void i18n.changeLanguage(resolveLanguage(language))
+  }
+
+  const handleAdd = () => {
+    setEditor({ config: createApiConfig(generateApiConfigId()), isNew: true })
+  }
+
+  const handleDelete = async (config: ApiConfig) => {
+    const references = countApiConfigReferences(config.id)
+    const remaining = settings.apiConfigs.filter((item) => item.id !== config.id)
+    const messageKey =
+      remaining.length > 0 ? "settings.deleteConfirm" : "settings.deleteLastConfirm"
+    if (!window.confirm(t(messageKey, { name: config.name, references }))) return
     try {
-      await settings.flushApiKey()
-      await testTts({
-        baseUrl: settings.baseUrl,
-        apiKey: settings.apiKey,
-        model: MODEL_BY_MODE.basic,
-        mode: "basic",
-        voice: "冰糖",
-        voiceDesignPrompt: "",
-        voiceClonePath: null,
-        performancePrompt: "",
-      })
-      setTestState("success")
+      const replacement = await settings.deleteApiConfig(config.id)
+      reassignApiConfigReferences(config.id, replacement)
+      if (expandedId === config.id) setExpandedId(null)
     } catch (error) {
-      setTestState("error")
-      setTestError(error instanceof Error ? error.message : String(error))
+      window.alert(error instanceof Error ? error.message : String(error))
     }
-  }, [settings])
-
-  const handleFetchModels = useCallback(async () => {
-    if (!settings.baseUrl.trim() || !settings.apiKey.trim()) return
-    setFetchingModels(true)
-    setFetchError(null)
-    try {
-      const ids = await listModels(settings.baseUrl, settings.apiKey)
-      const existingIds = new Set(settings.models.map((m) => m.id))
-      for (const id of ids) {
-        if (existingIds.has(id)) continue
-        settings.addModel({
-          id,
-          name: id,
-          mode: inferTtsMode(id),
-        })
-      }
-    } catch (e) {
-      setFetchError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setFetchingModels(false)
-    }
-  }, [settings])
-
-  const handleAddManual = useCallback(() => {
-    const id = manualId.trim()
-    if (!id) return
-    if (settings.models.some((m) => m.id === id)) return
-    settings.addModel({ id, name: id, mode: manualMode })
-    setManualId("")
-    setManualMode("basic")
-    setAddingManual(false)
-  }, [manualId, manualMode, settings])
-
-  const testLabel =
-    testState === "testing"
-      ? "Testing..."
-      : testState === "success"
-        ? "Connected"
-        : testState === "error"
-          ? "Failed — check settings"
-          : "Test API"
+  }
 
   return (
-    <div className="dw-settings-page" aria-label="Settings">
-      <div className="dw-settings-header">
-        <span className="dw-settings-title">Settings</span>
-      </div>
+    <div className="dw-settings-page" aria-label={t("settings.title")}>
+      <header className="dw-settings-page-header">
+        <div>
+          <h1 className="dw-settings-page-title">{t("settings.title")}</h1>
+          <p className="dw-settings-page-subtitle">{t("settings.subtitle")}</p>
+        </div>
+        <button
+          type="button"
+          className="dw-settings-close"
+          onClick={onClose}
+          aria-label={t("common.close")}
+        >
+          <X size={16} strokeWidth={2} />
+        </button>
+      </header>
 
-      {/* API 配置 */}
-      <Field label="Base URL">
-        <input
-          className="dw-settings-input"
-          type="url"
-          placeholder="https://api.xiaomimimo.com/v1"
-          value={settings.baseUrl}
-          onChange={(e) => settings.setBaseUrl(e.target.value)}
-        />
-      </Field>
+      <main className="dw-settings-content">
+        <SettingsSection title={t("settings.general")} description={t("settings.generalDesc")}>
+          <div className="dw-preference-row">
+            <div>
+              <strong>{t("settings.language")}</strong>
+            </div>
+            <select
+              className="dw-settings-select dw-language-select"
+              value={settings.language}
+              onChange={(event) => handleLanguageChange(event.target.value as LanguagePreference)}
+            >
+              <option value="system">{t("settings.languageSystem")}</option>
+              <option value="zh-CN">{t("settings.languageChinese")}</option>
+              <option value="en">{t("settings.languageEnglish")}</option>
+            </select>
+          </div>
+        </SettingsSection>
 
-      <Field label="API Key">
-        <input
-          className="dw-settings-input"
-          type="password"
-          placeholder={settings.apiKeyLoaded ? "sk-..." : "Loading from Keychain…"}
-          value={settings.apiKey}
-          onChange={(e) => settings.setApiKey(e.target.value)}
-          onBlur={() => void settings.flushApiKey().catch(() => {})}
-          disabled={!settings.apiKeyLoaded}
-        />
-        {settings.apiKeySaveState !== "idle" && (
-          <span
-            className={`dw-settings-save-state is-${settings.apiKeySaveState}`}
-            role={settings.apiKeySaveState === "error" ? "alert" : undefined}
-          >
-            {settings.apiKeySaveState === "pending" && "Waiting to save…"}
-            {settings.apiKeySaveState === "saving" && "Saving to Keychain…"}
-            {settings.apiKeySaveState === "saved" && "Saved to Keychain"}
-            {settings.apiKeySaveState === "error" &&
-              (settings.apiKeySaveError ?? "Could not save to Keychain")}
-          </span>
-        )}
-      </Field>
+        <SettingsSection
+          title={t("settings.generation")}
+          description={t("settings.generationDesc")}
+        >
+          <div className="dw-preference-row">
+            <div>
+              <strong>{t("settings.concurrency")}</strong>
+              <p>{t("settings.concurrencyHint")}</p>
+            </div>
+            <div className="dw-stepper" aria-label={t("settings.concurrency")}>
+              <button
+                type="button"
+                onClick={() => settings.setConcurrency(settings.concurrency - 1)}
+                disabled={settings.concurrency <= MIN_CONCURRENCY}
+              >
+                <Minus size={13} />
+              </button>
+              <output>{settings.concurrency}</output>
+              <button
+                type="button"
+                onClick={() => settings.setConcurrency(settings.concurrency + 1)}
+                disabled={settings.concurrency >= MAX_CONCURRENCY}
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+          </div>
+        </SettingsSection>
 
-      <Field label="Concurrency">
-        <input
-          className="dw-settings-input"
-          type="number"
-          min={1}
-          max={20}
-          value={settings.concurrency}
-          onChange={(e) => {
-            const n = Math.floor(Number(e.target.value))
-            if (n >= 1 && n <= 20) settings.setConcurrency(n)
+        <section className="dw-settings-section" aria-labelledby="models-api-title">
+          <div className="dw-settings-section-heading dw-models-section-heading">
+            <div>
+              <h2 id="models-api-title">{t("settings.models")}</h2>
+              <p>{t("settings.modelsDesc")}</p>
+            </div>
+            <button type="button" className="dw-primary-btn dw-add-model-btn" onClick={handleAdd}>
+              <Plus size={13} /> {t("settings.addModel")}
+            </button>
+          </div>
+
+          {configs.length === 0 ? (
+            <div className="dw-api-empty-state">
+              <CircleAlert size={20} />
+              <strong>{t("settings.emptyTitle")}</strong>
+              <p>{t("settings.emptyDesc")}</p>
+              <button type="button" className="dw-pill-btn" onClick={handleAdd}>
+                <Plus size={12} /> {t("settings.addModel")}
+              </button>
+            </div>
+          ) : (
+            <div className="dw-api-config-list">
+              {configs.map((config) => {
+                const expanded = expandedId === config.id
+                const enabled = TTS_MODES.filter((mode) => config.capabilities[mode].enabled)
+                const verified =
+                  enabled.length > 0 &&
+                  enabled.every((mode) => config.capabilities[mode].lastVerifiedAt)
+                return (
+                  <article className="dw-api-config-card" key={config.id}>
+                    <div className="dw-api-config-summary">
+                      <button
+                        type="button"
+                        className="dw-api-expand-btn"
+                        onClick={() => setExpandedId(expanded ? null : config.id)}
+                        aria-label={t(expanded ? "settings.collapse" : "settings.expand")}
+                        aria-expanded={expanded}
+                      >
+                        <ChevronDown className={expanded ? "is-open" : undefined} size={15} />
+                      </button>
+                      <div className="dw-provider-icon" aria-hidden="true">
+                        <span>Mi</span>
+                      </div>
+                      <div className="dw-api-config-name">
+                        <div>
+                          <strong>{config.name}</strong>
+                          {settings.defaultApiConfigId === config.id && (
+                            <span className="dw-default-badge">{t("common.default")}</span>
+                          )}
+                        </div>
+                        <span>
+                          {PROVIDERS[config.provider].name} ·{" "}
+                          {t("settings.capabilities", { count: enabled.length })}
+                        </span>
+                      </div>
+                      <span className={`dw-api-verify-badge${verified ? " is-verified" : ""}`}>
+                        {verified ? <Check size={11} /> : <CircleAlert size={11} />}
+                        {t(verified ? "common.verified" : "common.unverified")}
+                      </span>
+                      <button
+                        type="button"
+                        className="dw-icon-action"
+                        onClick={() => setEditor({ config, isNew: false })}
+                        aria-label={t("common.edit")}
+                      >
+                        <Edit3 size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="dw-icon-action is-danger"
+                        onClick={() => void handleDelete(config)}
+                        aria-label={t("common.delete")}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+
+                    {expanded && (
+                      <div className="dw-api-config-details">
+                        <div className="dw-api-config-url">{config.baseUrl}</div>
+                        {enabled.map((mode) => (
+                          <div className="dw-api-mapping-row" key={mode}>
+                            <span>{t(`settings.modes.${mode}`)}</span>
+                            <code>{config.capabilities[mode].modelId}</code>
+                          </div>
+                        ))}
+                        {settings.defaultApiConfigId !== config.id && (
+                          <button
+                            type="button"
+                            className="dw-pill-btn dw-set-default-btn"
+                            onClick={() => settings.setDefaultApiConfig(config.id)}
+                          >
+                            <Star size={11} /> {t("settings.setDefault")}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      </main>
+
+      {editor && (
+        <ApiConfigEditor
+          config={editor.config}
+          isNew={editor.isNew}
+          existingApiKey={settings.apiKeys[editor.config.id] ?? ""}
+          onCancel={() => setEditor(null)}
+          onSave={async (config, apiKey) => {
+            await settings.saveApiConfig(config, apiKey)
+            setEditor(null)
           }}
         />
-      </Field>
-
-      <button
-        type="button"
-        className={`dw-test-btn${testState !== "idle" ? ` is-${testState}` : ""}`}
-        onClick={handleTest}
-        disabled={testState === "testing"}
-      >
-        {testState === "testing" && <RefreshCw size={14} strokeWidth={2} className="dw-spinner" />}
-        {testState === "success" && <span>✓ </span>}
-        {testLabel}
-      </button>
-      {testError && (
-        <div className="dw-settings-inline-error" role="alert" title={testError}>
-          {testError}
-        </div>
       )}
+    </div>
+  )
+}
 
-      {/* 模型管理 */}
-      <div className="dw-models-section">
-        <div className="dw-models-header">
-          <span className="dw-settings-label" style={{ marginBottom: 0 }}>
-            Models
-          </span>
-          <div className="dw-models-actions">
-            <button
-              type="button"
-              className="dw-pill-btn"
-              onClick={handleFetchModels}
-              disabled={fetchingModels || !settings.baseUrl.trim() || !settings.apiKey.trim()}
-              title="Fetch models from API"
-            >
-              {fetchingModels ? (
-                <RefreshCw size={12} strokeWidth={2} className="dw-spinner" />
-              ) : (
-                <Download size={12} strokeWidth={2} />
-              )}
-              API
-            </button>
-            <button
-              type="button"
-              className="dw-pill-btn"
-              onClick={() => setAddingManual(true)}
-              title="Add model manually"
-            >
-              <Plus size={12} strokeWidth={2} />
-              Add
-            </button>
-          </div>
+function SettingsSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="dw-settings-section">
+      <div className="dw-settings-section-heading">
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
         </div>
-
-        {fetchError && (
-          <div className="dw-editing-hint" style={{ color: "var(--state-error)" }}>
-            <span>{fetchError}</span>
-          </div>
-        )}
-
-        {/* 模型列表 */}
-        {settings.models.length > 0 ? (
-          <div className="dw-model-list">
-            {settings.models.map((m) => (
-              <ModelItem key={m.id} model={m} />
-            ))}
-          </div>
-        ) : (
-          !addingManual && (
-            <div className="dw-editing-hint">
-              <span>No models configured. Fetch from API or add manually.</span>
-            </div>
-          )
-        )}
-
-        {/* 手动添加 */}
-        {addingManual && (
-          <div className="dw-manual-add">
-            <input
-              className="dw-settings-input"
-              type="text"
-              placeholder="Model ID (e.g. mimo-v2.5-tts)"
-              value={manualId}
-              onChange={(e) => setManualId(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddManual()
-                if (e.key === "Escape") setAddingManual(false)
-              }}
-            />
-            <select
-              className="dw-settings-select"
-              value={manualMode}
-              onChange={(e) => setManualMode(e.target.value as TtsMode)}
-            >
-              <option value="basic">Basic</option>
-              <option value="voice-design">Voice Design</option>
-              <option value="voice-clone">Voice Clone</option>
-            </select>
-            <div className="dw-models-actions">
-              <button
-                type="button"
-                className="dw-primary-btn"
-                onClick={handleAddManual}
-                disabled={!manualId.trim()}
-                style={{ height: 28, fontSize: 12 }}
-              >
-                Add
-              </button>
-              <button
-                type="button"
-                className="dw-pill-btn"
-                onClick={() => {
-                  setAddingManual(false)
-                  setManualId("")
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
       </div>
-    </div>
-  )
-}
-
-function ModelItem({ model }: { model: ModelConfig }) {
-  const removeModel = useSettingsStore((s) => s.removeModel)
-  const updateModel = useSettingsStore((s) => s.updateModel)
-
-  return (
-    <div className="dw-model-item">
-      <div className="dw-model-info">
-        <span className="dw-model-name">{model.name}</span>
-        <select
-          className="dw-model-mode-select"
-          value={model.mode}
-          onChange={(e) => updateModel(model.id, { mode: e.target.value as TtsMode })}
-        >
-          <option value="basic">Basic</option>
-          <option value="voice-design">Design</option>
-          <option value="voice-clone">Clone</option>
-        </select>
-      </div>
-      <button
-        type="button"
-        className="dw-model-remove"
-        onClick={() => removeModel(model.id)}
-        title="Remove model"
-      >
-        <X size={12} strokeWidth={2} />
-      </button>
-    </div>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="dw-settings-field">
-      {/* biome-ignore lint/a11y/noLabelWithoutControl: children renders an associated form control */}
-      <label className="dw-settings-label">
-        {label}
-        {children}
-      </label>
-    </div>
+      <div className="dw-preference-card">{children}</div>
+    </section>
   )
 }

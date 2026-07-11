@@ -1,4 +1,5 @@
 import { ArrowRight, CirclePlay, File, Pencil } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 // 工具栏主操作类型
 export type ToolbarAction = {
@@ -15,12 +16,13 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ action, hasContent, onOpenScriptEditor, onAction }: ToolbarProps) {
+  const { t } = useTranslation()
   return (
     <div className="dw-toolbar">
       <div className="dw-toolbar-left">
         <button type="button" className="dw-pill-btn" onClick={onOpenScriptEditor}>
           {hasContent ? <Pencil size={14} strokeWidth={2} /> : <File size={14} strokeWidth={2} />}
-          {hasContent ? "Edit Project" : "Import Script"}
+          {t(hasContent ? "app.editProject" : "app.importScript")}
         </button>
       </div>
       <div className="dw-toolbar-right">
@@ -37,6 +39,7 @@ function ActionButton({
   action: ToolbarAction
   onAction: () => void
 }) {
+  const { t } = useTranslation()
   if (action.kind === "generate") {
     return (
       <button
@@ -47,7 +50,7 @@ function ActionButton({
         title={action.disabledReason}
       >
         <CirclePlay size={14} strokeWidth={2} />
-        Generate All
+        {t("app.generateAll")}
       </button>
     )
   }
@@ -62,7 +65,7 @@ function ActionButton({
       style={{ color: "var(--text-500)" }}
     >
       <ArrowRight size={14} strokeWidth={2} />
-      Regenerate All
+      {t("app.regenerateAll")}
     </button>
   )
 }

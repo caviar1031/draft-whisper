@@ -1,98 +1,170 @@
-import { deleteApiKey, loadApiKey, saveApiKey } from "@/services/tts"
-import type { ModelConfig, Settings } from "@/types"
-import { SerialDebouncedSaver } from "@/utils/serial-debounced-saver"
+import { deleteApiKey, loadApiKey, migrateLegacyApiKey, saveApiKey } from "@/services/tts"
+import type { ApiConfig, LanguagePreference, Settings, TtsMode } from "@/types"
+import { createApiConfig } from "@/utils/provider-catalog"
+import {
+  LEGACY_API_CONFIG_ID,
+  migratePersistedSettings,
+  normalizeConcurrency,
+} from "@/utils/settings-validation"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-interface SettingsState extends Required<Settings> {
-  models: ModelConfig[]
-  apiKeyLoaded: boolean
-  apiKeySaveState: "idle" | "pending" | "saving" | "saved" | "error"
-  apiKeySaveError: string | null
-  setBaseUrl: (baseUrl: string) => void
-  setApiKey: (apiKey: string) => void
+type PersistedSettings = Required<Settings>
+
+interface SettingsState extends PersistedSettings {
+  apiKeys: Record<string, string>
+  apiKeysLoaded: boolean
+  apiKeyErrors: Record<string, string | null>
+  setLanguage: (language: LanguagePreference) => void
   setConcurrency: (concurrency: number) => void
   setProject: (project: string | null) => void
-  addModel: (config: ModelConfig) => void
-  removeModel: (id: string) => void
-  updateModel: (id: string, updates: Partial<Pick<ModelConfig, "name" | "mode">>) => void
-  updateSettings: (settings: Partial<Settings>) => void
-  flushApiKey: () => Promise<void>
+  saveApiConfig: (config: ApiConfig, apiKey?: string) => Promise<void>
+  deleteApiConfig: (configId: string) => Promise<string | null>
+  setDefaultApiConfig: (configId: string) => void
+  setCapabilityVerified: (configId: string, mode: TtsMode, verifiedAt: number | null) => void
+  loadAllApiKeys: () => Promise<void>
 }
 
-type PersistedSettings = Pick<SettingsState, "baseUrl" | "concurrency" | "project" | "models">
-
-const apiKeySaver = new SerialDebouncedSaver(
-  async (apiKey: string) => {
-    if (apiKey.length > 0) await saveApiKey(apiKey)
-    else await deleteApiKey()
-  },
-  500,
-  {
-    onPending: () => useSettingsStore.setState({ apiKeySaveState: "pending" }),
-    onSaving: () => useSettingsStore.setState({ apiKeySaveState: "saving" }),
-    onSuccess: () => useSettingsStore.setState({ apiKeySaveState: "saved", apiKeySaveError: null }),
-    onError: (error) =>
-      useSettingsStore.setState({
-        apiKeySaveState: "error",
-        apiKeySaveError: error instanceof Error ? error.message : String(error),
-      }),
-  },
-)
+function nextDefault(configs: ApiConfig[]): string | null {
+  return [...configs].sort((a, b) => a.createdAt - b.createdAt)[0]?.id ?? null
+}
 
 export const useSettingsStore = create<SettingsState>()(
   persist<SettingsState, [], [], PersistedSettings>(
-    (set) => ({
-      baseUrl: "",
-      apiKey: "",
+    (set, get) => ({
+      language: "system",
       concurrency: 1,
       project: null,
-      models: [],
-      apiKeyLoaded: false,
-      apiKeySaveState: "idle",
-      apiKeySaveError: null,
+      apiConfigs: [],
+      defaultApiConfigId: null,
+      apiKeys: {},
+      apiKeysLoaded: false,
+      apiKeyErrors: {},
 
-      setBaseUrl: (baseUrl) => set({ baseUrl }),
-      setApiKey: (apiKey) => {
-        set({ apiKey, apiKeySaveError: null })
-        apiKeySaver.schedule(apiKey)
-      },
-      setConcurrency: (concurrency) => set({ concurrency }),
+      setLanguage: (language) => set({ language }),
+      setConcurrency: (concurrency) => set({ concurrency: normalizeConcurrency(concurrency) }),
       setProject: (project) => set({ project }),
-      addModel: (config) => set((state) => ({ models: [...state.models, config] })),
-      removeModel: (id) => set((state) => ({ models: state.models.filter((m) => m.id !== id) })),
-      updateModel: (id, updates) =>
+
+      saveApiConfig: async (config, apiKey) => {
+        const existing = get().apiConfigs.find((item) => item.id === config.id)
+        if (apiKey?.trim()) {
+          try {
+            await saveApiKey(config.id, apiKey.trim())
+            set((state) => ({
+              apiKeys: { ...state.apiKeys, [config.id]: apiKey.trim() },
+              apiKeyErrors: { ...state.apiKeyErrors, [config.id]: null },
+            }))
+          } catch (error) {
+            set((state) => ({
+              apiKeyErrors: {
+                ...state.apiKeyErrors,
+                [config.id]: error instanceof Error ? error.message : String(error),
+              },
+            }))
+            throw error
+          }
+        } else if (!existing && !get().apiKeys[config.id]) {
+          throw new Error("settings.errors.apiKeyRequired")
+        }
+
+        set((state) => {
+          const apiConfigs = existing
+            ? state.apiConfigs.map((item) => (item.id === config.id ? config : item))
+            : [...state.apiConfigs, config]
+          return {
+            apiConfigs,
+            defaultApiConfigId: state.defaultApiConfigId ?? config.id,
+          }
+        })
+      },
+
+      deleteApiConfig: async (configId) => {
+        await deleteApiKey(configId)
+        let replacement: string | null = null
+        set((state) => {
+          const apiConfigs = state.apiConfigs.filter((config) => config.id !== configId)
+          replacement =
+            state.defaultApiConfigId === configId
+              ? nextDefault(apiConfigs)
+              : state.defaultApiConfigId
+          const { [configId]: _removedKey, ...apiKeys } = state.apiKeys
+          const { [configId]: _removedError, ...apiKeyErrors } = state.apiKeyErrors
+          return { apiConfigs, defaultApiConfigId: replacement, apiKeys, apiKeyErrors }
+        })
+        return replacement
+      },
+
+      setDefaultApiConfig: (configId) => {
+        if (get().apiConfigs.some((config) => config.id === configId)) {
+          set({ defaultApiConfigId: configId })
+        }
+      },
+
+      setCapabilityVerified: (configId, mode, verifiedAt) => {
         set((state) => ({
-          models: state.models.map((m) => (m.id === id ? { ...m, ...updates } : m)),
-        })),
-      updateSettings: (settings) => set((state) => ({ ...state, ...settings })),
-      flushApiKey: () => apiKeySaver.flush(),
+          apiConfigs: state.apiConfigs.map((config) =>
+            config.id === configId
+              ? {
+                  ...config,
+                  capabilities: {
+                    ...config.capabilities,
+                    [mode]: { ...config.capabilities[mode], lastVerifiedAt: verifiedAt },
+                  },
+                }
+              : config,
+          ),
+        }))
+      },
+
+      loadAllApiKeys: async () => {
+        let configs = get().apiConfigs
+        let migratedKey: string | null = null
+        if (configs.length === 0 || configs.some((config) => config.id === LEGACY_API_CONFIG_ID)) {
+          migratedKey = await migrateLegacyApiKey(LEGACY_API_CONFIG_ID)
+          if (migratedKey && configs.length === 0) {
+            const migrated = createApiConfig(LEGACY_API_CONFIG_ID, 0)
+            configs = [migrated]
+            set({ apiConfigs: configs, defaultApiConfigId: migrated.id })
+          }
+        }
+
+        const entries = await Promise.all(
+          configs.map(async (config) => {
+            if (config.id === LEGACY_API_CONFIG_ID && migratedKey) {
+              return [config.id, migratedKey] as const
+            }
+            try {
+              return [config.id, (await loadApiKey(config.id)) ?? ""] as const
+            } catch (error) {
+              set((state) => ({
+                apiKeyErrors: {
+                  ...state.apiKeyErrors,
+                  [config.id]: error instanceof Error ? error.message : String(error),
+                },
+              }))
+              return [config.id, ""] as const
+            }
+          }),
+        )
+        set({ apiKeys: Object.fromEntries(entries), apiKeysLoaded: true })
+      },
     }),
     {
       name: "dw-settings",
-      // apiKey 不写入 localStorage，由 Keychain 管理
-      partialize: (state) => {
-        const { baseUrl, concurrency, project, models } = state
-        return { baseUrl, concurrency, project, models }
-      },
+      version: 3,
+      migrate: migratePersistedSettings,
+      partialize: (state) => ({
+        language: state.language,
+        concurrency: state.concurrency,
+        project: state.project,
+        apiConfigs: state.apiConfigs,
+        defaultApiConfigId: state.defaultApiConfigId,
+      }),
       onRehydrateStorage: () => (state) => {
-        // store hydration 完成后，从 Keychain 加载 apiKey
-        if (state) {
-          loadApiKey()
-            .then((key) => {
-              // 直接 setState 而非调用 setApiKey，避免回写 Keychain
-              if (key) useSettingsStore.setState({ apiKey: key })
-              useSettingsStore.setState({ apiKeyLoaded: true })
-            })
-            .catch((e) => {
-              console.error("loadApiKey failed:", e)
-              useSettingsStore.setState({
-                apiKeyLoaded: true,
-                apiKeySaveState: "error",
-                apiKeySaveError: e instanceof Error ? e.message : String(e),
-              })
-            })
-        }
+        void state?.loadAllApiKeys().catch((error) => {
+          console.error("Failed to load API keys:", error)
+          useSettingsStore.setState({ apiKeysLoaded: true })
+        })
       },
     },
   ),

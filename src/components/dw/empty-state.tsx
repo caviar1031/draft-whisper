@@ -1,6 +1,9 @@
 // 空状态 — 无脚本时的占位提示，取自 Empty State 设计稿
 
+import { useTranslation } from "react-i18next"
+
 export function EmptyState() {
+  const { t } = useTranslation()
   return (
     <div
       style={{
@@ -38,7 +41,7 @@ export function EmptyState() {
           margin: "0 0 6px 0",
         }}
       >
-        No script imported yet
+        {t("app.emptyTitle")}
       </p>
       <p
         style={{
@@ -48,7 +51,7 @@ export function EmptyState() {
           margin: 0,
         }}
       >
-        Import a script to get started
+        {t("app.emptyDesc")}
       </p>
     </div>
   )

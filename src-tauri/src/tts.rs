@@ -61,6 +61,12 @@ pub enum TtsMode {
     VoiceClone,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ProviderId {
+    Mimo,
+}
+
 /// 与前端 Settings 一一对应的 TTS 调用参数。
 ///
 /// `rename_all = "camelCase"`：前端传 camelCase（baseUrl/apiKey），
@@ -68,6 +74,7 @@ pub enum TtsMode {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TtsParams {
+    pub provider: ProviderId,
     pub base_url: String,
     pub api_key: String,
     pub model: String,
@@ -107,21 +114,9 @@ fn validate_voice_clone_data_uri_size(size: usize) -> Result<(), String> {
   Ok(())
 }
 
-fn expected_model(mode: &TtsMode) -> &'static str {
-  match mode {
-    TtsMode::Basic => "mimo-v2.5-tts",
-    TtsMode::VoiceDesign => "mimo-v2.5-tts-voicedesign",
-    TtsMode::VoiceClone => "mimo-v2.5-tts-voiceclone",
-  }
-}
-
 fn validate_tts_params(params: &TtsParams) -> Result<(), String> {
-  let expected = expected_model(&params.mode);
-  if params.model != expected {
-    return Err(format!(
-      "Model {} does not match mode {:?}; expected {expected}",
-      params.model, params.mode
-    ));
+  if params.model.trim().is_empty() {
+    return Err("Model ID is required".into());
   }
   if params.mode == TtsMode::VoiceDesign && params.voice_design_prompt.trim().is_empty() {
     return Err("Voice design description is required".into());
@@ -280,22 +275,6 @@ fn build_chat_endpoint(base_url: &str) -> String {
   }
 }
 
-/// 构建 models 列表端点：`GET {base}/v1/models`
-///
-/// 输入 baseUrl 可能是各种格式，统一提取到 `/v1` 层级后补 `/models`。
-fn build_models_endpoint(base_url: &str) -> String {
-  let url = base_url.trim_end_matches('/');
-  // 去掉 /chat/completions 后缀
-  let base = if url.ends_with("/chat/completions") {
-    url.trim_end_matches("/chat/completions")
-  } else {
-    url
-  };
-  // 去掉 /v1 后缀（如果有），统一补 /v1/models
-  let base = base.trim_end_matches("/v1").trim_end_matches('/');
-  format!("{base}/v1/models")
-}
-
 /// 返回音频缓存目录，不存在则创建。
 ///
 /// 尝试顺序：`app_cache_dir` → `app_data_dir` → 项目本地 `.cache/audio`。
@@ -381,6 +360,16 @@ fn build_speech_body(
   voice_audio_data_uri: Option<&str>,
 ) -> Result<Value, String> {
   validate_tts_params(params)?;
+  match params.provider {
+    ProviderId::Mimo => build_mimo_speech_body(params, text, voice_audio_data_uri),
+  }
+}
+
+fn build_mimo_speech_body(
+  params: &TtsParams,
+  text: &str,
+  voice_audio_data_uri: Option<&str>,
+) -> Result<Value, String> {
   let mut messages = Vec::<Value>::with_capacity(2);
 
   let user_prompt = if params.mode == TtsMode::VoiceDesign {
@@ -577,56 +566,6 @@ pub async fn tts_preview_voice_clone(
   })
 }
 
-/// 获取可用模型列表。
-///
-/// 调用 `GET {baseUrl}/v1/models`，解析响应中的 `data[].id` 返回模型 ID 列表。
-/// 前端调用: `invoke("tts_list_models", { baseUrl, apiKey })` → `string[]`
-#[tauri::command]
-pub async fn tts_list_models(base_url: String, api_key: String) -> Result<Vec<String>, String> {
-  if base_url.trim().is_empty() || api_key.trim().is_empty() {
-    return Err("Missing baseUrl or apiKey".into());
-  }
-
-  let endpoint = build_models_endpoint(&base_url);
-  log::info!("Fetching models: {endpoint}");
-
-  let client = http_client();
-  let resp = client
-    .get(&endpoint)
-    .header("api-key", &api_key)
-    .send()
-    .await
-    .map_err(|e| format!("Request failed: {e}"))?;
-
-  let status = resp.status();
-  if !status.is_success() {
-    let text = resp.text().await.unwrap_or_default();
-    return Err(format!("HTTP {status}: {text}"));
-  }
-
-  let json: Value = resp
-    .json()
-    .await
-    .map_err(|e| format!("Failed to parse response JSON: {e}"))?;
-
-  let models = json
-    .get("data")
-    .and_then(|d| d.as_array())
-    .ok_or_else(|| format!("Response missing data array: {json}"))?;
-
-  let ids: Vec<String> = models
-    .iter()
-    .filter_map(|m| m.get("id").and_then(|id| id.as_str()).map(String::from))
-    .collect();
-
-  if ids.is_empty() {
-    return Err("Model list is empty".into());
-  }
-
-  log::info!("Fetched {} models", ids.len());
-  Ok(ids)
-}
-
 /// 读取本地音频文件，返回 base64 编码的字符串。
 ///
 /// 前端调用: `invoke("tts_read_audio", { path })` → string (base64)
@@ -711,78 +650,96 @@ pub fn delete_voice_sample(path: String, app: AppHandle) -> Result<(), String> {
 // ---- API Key 安全存储（macOS Keychain） ----
 
 const KEYCHAIN_SERVICE: &str = "com.draft-whisper.api-key";
-const KEYCHAIN_ACCOUNT: &str = "default";
+const LEGACY_KEYCHAIN_ACCOUNT: &str = "default";
 
-/// 将 API Key 存入 macOS Keychain。
-///
-/// 前端调用: `invoke("save_api_key", { apiKey })`
-#[tauri::command]
-pub fn save_api_key(api_key: String) -> Result<(), String> {
-    // 先尝试更新，失败则新增
-    let updated = std::process::Command::new("security")
+fn keychain_account(config_id: &str) -> Result<String, String> {
+    if config_id.is_empty()
+        || !config_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err("Invalid API configuration ID".into());
+    }
+    Ok(format!("api-config:{config_id}"))
+}
+
+fn load_keychain_account(account: &str) -> Result<Option<String>, String> {
+    let output = std::process::Command::new("security")
         .args([
-            "add-generic-password",
+            "find-generic-password",
             "-s", KEYCHAIN_SERVICE,
-            "-a", KEYCHAIN_ACCOUNT,
-            "-w", &api_key,
-            "-U", // update if exists
+            "-a", account,
+            "-w",
         ])
         .output()
         .map_err(|e| format!("Failed to run security command: {e}"))?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let key = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok((!key.is_empty()).then_some(key))
+}
 
-    if !updated.status.success() {
-        let stderr = String::from_utf8_lossy(&updated.stderr);
+fn save_keychain_account(account: &str, api_key: &str) -> Result<(), String> {
+    let output = std::process::Command::new("security")
+        .args([
+            "add-generic-password",
+            "-s", KEYCHAIN_SERVICE,
+            "-a", account,
+            "-w", api_key,
+            "-U",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to run security command: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Failed to save API key to Keychain: {stderr}"));
     }
     Ok(())
 }
 
-/// 从 macOS Keychain 读取 API Key。
-///
-/// 前端调用: `invoke("load_api_key")` → `string | null`
-#[tauri::command]
-pub fn load_api_key() -> Result<Option<String>, String> {
-    let output = std::process::Command::new("security")
-        .args([
-            "find-generic-password",
-            "-s", KEYCHAIN_SERVICE,
-            "-a", KEYCHAIN_ACCOUNT,
-            "-w", // output password only
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run security command: {e}"))?;
-
-    if !output.status.success() {
-        // errSecItemNotFound (-25300) — normal when no key stored yet
-        return Ok(None);
-    }
-
-    let key = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if key.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(key))
-}
-
-/// 从 macOS Keychain 删除 API Key。
-///
-/// 前端调用: `invoke("delete_api_key")`
-#[tauri::command]
-pub fn delete_api_key() -> Result<(), String> {
+fn delete_keychain_account(account: &str) -> Result<(), String> {
     let output = std::process::Command::new("security")
         .args([
             "delete-generic-password",
             "-s", KEYCHAIN_SERVICE,
-            "-a", KEYCHAIN_ACCOUNT,
+            "-a", account,
         ])
         .output()
         .map_err(|e| format!("Failed to run security command: {e}"))?;
-
-    // Even if the entry doesn't exist, treat as success
     if !output.status.success() {
-        log::warn!("delete_api_key: security returned non-zero, entry may not exist");
+        log::warn!("Keychain entry did not exist: {account}");
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn save_api_key(config_id: String, api_key: String) -> Result<(), String> {
+    save_keychain_account(&keychain_account(&config_id)?, &api_key)
+}
+
+#[tauri::command]
+pub fn load_api_key(config_id: String) -> Result<Option<String>, String> {
+    load_keychain_account(&keychain_account(&config_id)?)
+}
+
+#[tauri::command]
+pub fn delete_api_key(config_id: String) -> Result<(), String> {
+    delete_keychain_account(&keychain_account(&config_id)?)
+}
+
+#[tauri::command]
+pub fn migrate_legacy_api_key(config_id: String) -> Result<Option<String>, String> {
+    let account = keychain_account(&config_id)?;
+    if let Some(existing) = load_keychain_account(&account)? {
+        return Ok(Some(existing));
+    }
+    let Some(legacy) = load_keychain_account(LEGACY_KEYCHAIN_ACCOUNT)? else {
+        return Ok(None);
+    };
+    save_keychain_account(&account, &legacy)?;
+    delete_keychain_account(LEGACY_KEYCHAIN_ACCOUNT)?;
+    Ok(Some(legacy))
 }
 
 /// 将音频文件复制到 macOS 系统剪贴板（文件引用，非文本）。
@@ -1018,13 +975,15 @@ struct NSRect {
 #[cfg(test)]
 mod tests {
   use super::{
-    audio_format, build_chat_endpoint, build_models_endpoint, build_speech_body,
-    sanitize_filename, validate_audio_signature, validate_project_name,
-    validate_voice_clone_data_uri_size, TtsMode, TtsParams, MAX_VOICE_CLONE_DATA_URI_SIZE,
+    audio_format, build_chat_endpoint, build_speech_body, sanitize_filename,
+    validate_audio_signature, validate_project_name,
+    validate_voice_clone_data_uri_size, ProviderId, TtsMode, TtsParams,
+    MAX_VOICE_CLONE_DATA_URI_SIZE,
   };
 
   fn params(mode: TtsMode, model: &str) -> TtsParams {
     TtsParams {
+      provider: ProviderId::Mimo,
       base_url: "https://example.com/v1".into(),
       api_key: "test-key".into(),
       model: model.into(),
@@ -1045,10 +1004,6 @@ mod tests {
     assert_eq!(
       build_chat_endpoint("https://example.com/v1/chat/completions"),
       "https://example.com/v1/chat/completions"
-    );
-    assert_eq!(
-      build_models_endpoint("https://example.com/v1/chat/completions"),
-      "https://example.com/v1/models"
     );
   }
 
@@ -1095,9 +1050,16 @@ mod tests {
   }
 
   #[test]
-  fn rejects_model_mode_mismatch() {
-    let params = params(TtsMode::VoiceClone, "mimo-v2.5-tts");
-    assert!(build_speech_body(&params, "你好", Some("data:audio/wav;base64,AA==")).is_err());
+  fn accepts_user_configured_model_ids() {
+    let params = params(TtsMode::VoiceClone, "custom-clone-model");
+    let body = build_speech_body(&params, "你好", Some("data:audio/wav;base64,AA==")).unwrap();
+    assert_eq!(body["model"], "custom-clone-model");
+  }
+
+  #[test]
+  fn rejects_empty_model_ids() {
+    let params = params(TtsMode::Basic, " ");
+    assert!(build_speech_body(&params, "hello", None).is_err());
   }
 
   #[test]

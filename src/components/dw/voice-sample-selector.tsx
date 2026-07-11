@@ -22,11 +22,13 @@ import {
   X,
 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 interface VoiceSampleSelectorProps {
   selectedPath: string | null
   onSelect: (path: string | null) => void
   model: string
+  apiConfigId: string | null
   performancePrompt: string
 }
 
@@ -43,11 +45,16 @@ export function VoiceSampleSelector({
   selectedPath,
   onSelect,
   model,
+  apiConfigId,
   performancePrompt,
 }: VoiceSampleSelectorProps) {
+  const { t } = useTranslation()
   const { samples, addSample, removeSample, renameSample } = useVoiceSampleStore()
-  const baseUrl = useSettingsStore((state) => state.baseUrl)
-  const apiKey = useSettingsStore((state) => state.apiKey)
+  const apiConfig = useSettingsStore((state) =>
+    state.apiConfigs.find((config) => config.id === apiConfigId),
+  )
+  const apiKey = useSettingsStore((state) => (apiConfigId ? state.apiKeys[apiConfigId] : ""))
+  const baseUrl = apiConfig?.baseUrl ?? ""
   const [managing, setManaging] = useState(false)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState("")
@@ -57,7 +64,7 @@ export function VoiceSampleSelector({
   const [renameValue, setRenameValue] = useState("")
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [previewText, setPreviewText] = useState("你好，这是一段声音克隆试听。")
+  const [previewText, setPreviewText] = useState(() => t("samples.defaultPreview"))
   const [previewing, setPreviewing] = useState(false)
   const [previewPath, setPreviewPath] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -82,9 +89,9 @@ export function VoiceSampleSelector({
   useEffect(() => {
     if (selectedPath && !isSupportedSamplePath(selectedPath)) {
       onSelect(null)
-      setErrorMessage("旧声音样本格式不受支持，请重新导入 WAV 或 MP3 文件")
+      setErrorMessage(t("samples.unsupported"))
     }
-  }, [onSelect, selectedPath])
+  }, [onSelect, selectedPath, t])
 
   useEffect(() => {
     disposedRef.current = false
@@ -167,7 +174,7 @@ export function VoiceSampleSelector({
 
   const handleDelete = useCallback(
     async (sampleId: string, filePath: string) => {
-      if (!window.confirm("删除这个声音样本？引用它的项目将无法继续进行声音克隆。")) return
+      if (!window.confirm(t("samples.deleteConfirm"))) return
       try {
         await deleteVoiceSample(filePath)
       } catch {
@@ -180,7 +187,7 @@ export function VoiceSampleSelector({
       }
       setErrorMessage(null)
     },
-    [removeSample, selectedPath, onSelect],
+    [removeSample, selectedPath, onSelect, t],
   )
 
   const handleStartRename = useCallback((id: string, currentName: string) => {
@@ -231,6 +238,7 @@ export function VoiceSampleSelector({
     try {
       audioRef.current?.pause()
       const result = await previewVoiceClone(previewText.trim(), {
+        provider: apiConfig?.provider ?? "mimo",
         baseUrl,
         apiKey,
         model,
@@ -262,7 +270,7 @@ export function VoiceSampleSelector({
     } finally {
       if (!disposedRef.current && previewRequestRef.current === requestId) setPreviewing(false)
     }
-  }, [apiKey, baseUrl, model, performancePrompt, previewText, selectedPath])
+  }, [apiConfig?.provider, apiKey, baseUrl, model, performancePrompt, previewText, selectedPath])
 
   const handlePlayGeneratedPreview = useCallback(async () => {
     if (!previewPath) return
@@ -305,7 +313,7 @@ export function VoiceSampleSelector({
   return (
     <div className="dw-settings-field">
       <label className="dw-settings-label">
-        Voice Sample
+        {t("samples.title")}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <select
             className="dw-settings-select"
@@ -314,7 +322,7 @@ export function VoiceSampleSelector({
             onChange={(e) => onSelect(e.target.value || null)}
           >
             <option value="">
-              {samples.length === 0 ? "No samples — add one first" : "Select a sample..."}
+              {samples.length === 0 ? t("samples.empty") : t("samples.select")}
             </option>
             {samples
               .filter((sample) => isSupportedSamplePath(sample.filePath))
@@ -326,7 +334,7 @@ export function VoiceSampleSelector({
           </select>
           <button type="button" className="dw-pill-btn" onClick={handleAdd}>
             <Plus size={14} strokeWidth={2} />
-            Add
+            {t("samples.add")}
           </button>
           {samples.length > 0 && (
             <button
@@ -335,7 +343,7 @@ export function VoiceSampleSelector({
               onClick={() => setManaging(!managing)}
             >
               <Mic size={14} strokeWidth={2} />
-              Manage
+              {managing ? t("samples.done") : t("samples.manage")}
             </button>
           )}
         </div>
@@ -344,13 +352,13 @@ export function VoiceSampleSelector({
       {/* 新增样本：名称输入 */}
       {adding && (
         <div className="dw-sample-add-row" onKeyDown={handleAddKeyDown}>
-          <span className="dw-sample-add-label">Name</span>
+          <span className="dw-sample-add-label">{t("samples.name")}</span>
           <input
             ref={nameInputRef}
             className="dw-sample-name-input"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="My Voice"
+            placeholder={t("samples.namePlaceholder")}
             maxLength={40}
           />
           <button
@@ -360,7 +368,7 @@ export function VoiceSampleSelector({
             disabled={saving || !newName.trim()}
           >
             <Check size={14} strokeWidth={2} />
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("samples.saving") : t("samples.save")}
           </button>
           <button type="button" className="dw-pill-btn" onClick={handleCancelAdd}>
             <X size={14} strokeWidth={2} />
@@ -412,14 +420,14 @@ export function VoiceSampleSelector({
                     {s.name}
                   </span>
                   <span className="dw-sample-meta">
-                    {s.format?.toUpperCase() ?? "Legacy"}
+                    {s.format?.toUpperCase() ?? t("samples.legacy")}
                     {s.byteSize ? ` · ${(s.byteSize / 1024 / 1024).toFixed(1)} MB` : ""}
                   </span>
                   <button
                     type="button"
                     className="dw-pill-btn"
                     onClick={() => handlePreview(s.id, s.filePath)}
-                    title={playingId === s.id ? "Stop" : "Preview"}
+                    title={playingId === s.id ? t("samples.stop") : t("samples.preview")}
                   >
                     {playingId === s.id ? (
                       <Square size={12} strokeWidth={2} />
@@ -431,7 +439,7 @@ export function VoiceSampleSelector({
                     type="button"
                     className="dw-pill-btn"
                     onClick={() => handleStartRename(s.id, s.name)}
-                    title="Rename"
+                    title={t("samples.rename")}
                   >
                     <Pencil size={12} strokeWidth={2} />
                   </button>
@@ -439,7 +447,7 @@ export function VoiceSampleSelector({
                     type="button"
                     className="dw-pill-btn"
                     onClick={() => handleDelete(s.id, s.filePath)}
-                    title="Delete"
+                    title={t("samples.delete")}
                   >
                     <Trash2 size={12} strokeWidth={2} />
                   </button>
@@ -453,19 +461,19 @@ export function VoiceSampleSelector({
       <div className="dw-editing-hint" style={{ marginTop: 4 }}>
         <span>
           {selectedSample
-            ? `Using: ${selectedSample.name}${selectedSample.format ? ` · ${selectedSample.format.toUpperCase()}` : ""}${selectedSample.encodedSize ? ` · Base64 ${(selectedSample.encodedSize / 1024 / 1024).toFixed(1)} MB` : ""}`
-            : "仅支持 WAV / MP3，Base64 编码后不得超过 10 MB"}
+            ? `${t("samples.using", { name: selectedSample.name })}${selectedSample.format ? ` · ${selectedSample.format.toUpperCase()}` : ""}${selectedSample.encodedSize ? ` · Base64 ${(selectedSample.encodedSize / 1024 / 1024).toFixed(1)} MB` : ""}`
+            : t("samples.formatHint")}
         </span>
       </div>
 
       {selectedPath && (
         <div className="dw-clone-preview-panel">
-          <span className="dw-settings-label">克隆试听</span>
+          <span className="dw-settings-label">{t("samples.clonePreview")}</span>
           <textarea
             className="dw-editor-textarea"
             value={previewText}
             onChange={(event) => setPreviewText(event.target.value)}
-            placeholder="输入试听文本..."
+            placeholder={t("samples.previewPlaceholder")}
             maxLength={300}
           />
           <div className="dw-clone-preview-actions">
@@ -480,7 +488,7 @@ export function VoiceSampleSelector({
                 strokeWidth={2}
                 className={previewing ? "dw-spinner" : undefined}
               />
-              {previewing ? "生成中..." : "生成克隆试听"}
+              {previewing ? t("samples.generating") : t("samples.generate")}
             </button>
             {previewPath && (
               <button
@@ -493,7 +501,7 @@ export function VoiceSampleSelector({
                 ) : (
                   <Play size={12} strokeWidth={2} />
                 )}
-                {playingId === "__clone_preview__" ? "停止" : "再次播放"}
+                {playingId === "__clone_preview__" ? t("samples.stop") : t("samples.replay")}
               </button>
             )}
           </div>

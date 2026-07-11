@@ -4,6 +4,7 @@ import { useSettingsStore } from "@/stores/settings-store"
 import type { SentenceStatus } from "@/types"
 import { retainRecentAudioVersions } from "@/utils/audio-history"
 import { GenerationTaskRegistry } from "@/utils/generation-tasks"
+import { resolveCapability } from "@/utils/provider-catalog"
 import { getTtsConfigurationError } from "@/utils/tts-config"
 import { useCallback, useRef } from "react"
 
@@ -34,10 +35,19 @@ export function useTtsGeneration() {
     async (ids: string[]) => {
       const settings = useSettingsStore.getState()
       const projState = useProjectStore.getState()
+      const apiConfig = settings.apiConfigs.find((config) => config.id === projState.apiConfigId)
+      const capability = apiConfig ? resolveCapability(apiConfig, projState.mode) : null
+      const configurationError = getTtsConfigurationError(
+        projState,
+        settings.apiConfigs,
+        settings.apiKeys,
+      )
+      if (configurationError || !apiConfig || !capability) return
       const params = {
-        baseUrl: settings.baseUrl,
-        apiKey: settings.apiKey,
-        model: projState.model,
+        provider: apiConfig.provider,
+        baseUrl: apiConfig.baseUrl,
+        apiKey: settings.apiKeys[apiConfig.id],
+        model: capability.modelId,
         mode: projState.mode,
         voice: projState.voice,
         voiceDesignPrompt: projState.voiceDesignPrompt,
@@ -46,8 +56,6 @@ export function useTtsGeneration() {
       }
       const concurrency = settings.concurrency
       const currentProject = projState.currentProject
-      const configurationError = getTtsConfigurationError(projState)
-      if (configurationError) return
 
       // 每个句子独立拥有最新任务令牌：新任务只替换相同句子，不会误取消其他生成。
       const queuedTasks = tasks.current.start(ids, currentProject)

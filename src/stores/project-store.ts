@@ -1,6 +1,6 @@
 import { cleanupAudioFiles, invalidateAudioUrl, revokeAllAudioUrls } from "@/services/tts"
+import { useSettingsStore } from "@/stores/settings-store"
 import type { Project, Sentence, TtsMode } from "@/types"
-import { MODEL_BY_MODE } from "@/utils/tts-config"
 import { create } from "zustand"
 
 const STORAGE_PREFIX = "dw-project:"
@@ -37,8 +37,8 @@ function normalizeSentences(sentences: Sentence[]): Sentence[] {
 }
 
 interface ProjectData {
+  apiConfigId: string | null
   mode: TtsMode
-  model: string
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
@@ -47,8 +47,8 @@ interface ProjectData {
 }
 
 const DEFAULT_PROJECT_DATA: ProjectData = {
+  apiConfigId: null,
   mode: "basic",
-  model: "mimo-v2.5-tts",
   voice: "冰糖",
   voiceDesignPrompt: "",
   voiceClonePath: null,
@@ -71,7 +71,12 @@ function loadProjectData(project: string | null): ProjectData {
       }
     }
 
-    if (!raw) return { ...DEFAULT_PROJECT_DATA }
+    if (!raw) {
+      return {
+        ...DEFAULT_PROJECT_DATA,
+        apiConfigId: useSettingsStore.getState().defaultApiConfigId,
+      }
+    }
     const parsed = JSON.parse(raw) as Record<string, unknown>
 
     // 兼容旧版 Zustand persist 格式 { state: { sentences: [...] } }
@@ -80,8 +85,11 @@ function loadProjectData(project: string | null): ProjectData {
     const mode = (state.mode as TtsMode) ?? "basic"
 
     return {
+      apiConfigId:
+        typeof state.apiConfigId === "string"
+          ? state.apiConfigId
+          : useSettingsStore.getState().defaultApiConfigId,
       mode,
-      model: MODEL_BY_MODE[mode],
       voice: (state.voice as string) ?? "冰糖",
       voiceDesignPrompt: (state.voiceDesignPrompt as string) ?? "",
       voiceClonePath: (state.voiceClonePath as string | null) ?? null,
@@ -89,14 +97,14 @@ function loadProjectData(project: string | null): ProjectData {
       sentences: normalizeSentences(sentences),
     }
   } catch {
-    return { ...DEFAULT_PROJECT_DATA }
+    return { ...DEFAULT_PROJECT_DATA, apiConfigId: useSettingsStore.getState().defaultApiConfigId }
   }
 }
 
 interface ProjectState extends Project {
   currentProject: string | null
+  setApiConfigId: (apiConfigId: string | null) => void
   setMode: (mode: TtsMode) => void
-  setModel: (model: string) => void
   setVoice: (voice: string) => void
   setVoiceDesignPrompt: (prompt: string) => void
   setVoiceClonePath: (path: string | null) => void
@@ -112,20 +120,20 @@ interface ProjectState extends Project {
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   currentProject: null,
+  apiConfigId: null,
   mode: "basic",
-  model: "mimo-v2.5-tts",
   voice: "冰糖",
   voiceDesignPrompt: "",
   voiceClonePath: null,
   performancePrompt: "",
   sentences: [],
 
-  setMode: (mode) => {
-    set({ mode, model: MODEL_BY_MODE[mode] })
+  setApiConfigId: (apiConfigId) => {
+    set({ apiConfigId })
     saveCurrentProject(get())
   },
-  setModel: (model) => {
-    set({ model })
+  setMode: (mode) => {
+    set({ mode })
     saveCurrentProject(get())
   },
   setVoice: (voice) => {
@@ -195,8 +203,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const data = loadProjectData(project)
     set({
       currentProject: project,
+      apiConfigId: data.apiConfigId,
       mode: data.mode,
-      model: data.model,
       voice: data.voice,
       voiceDesignPrompt: data.voiceDesignPrompt,
       voiceClonePath: data.voiceClonePath,
@@ -221,8 +229,8 @@ function saveCurrentProject(state: ProjectState): void {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     saveProjectData(state.currentProject, {
+      apiConfigId: state.apiConfigId,
       mode: state.mode,
-      model: state.model,
       voice: state.voice,
       voiceDesignPrompt: state.voiceDesignPrompt,
       voiceClonePath: state.voiceClonePath,
@@ -239,8 +247,8 @@ function flushAndSave(state: ProjectState): void {
     saveTimer = null
   }
   saveProjectData(state.currentProject, {
+    apiConfigId: state.apiConfigId,
     mode: state.mode,
-    model: state.model,
     voice: state.voice,
     voiceDesignPrompt: state.voiceDesignPrompt,
     voiceClonePath: state.voiceClonePath,
@@ -281,6 +289,48 @@ export function clearVoiceSampleReferences(filePath: string): void {
       localStorage.setItem(key, JSON.stringify(parsed))
     } catch {
       // 损坏的旧项目数据由正常加载迁移逻辑处理。
+    }
+  }
+}
+
+export function countApiConfigReferences(configId: string): number {
+  let count = 0
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index)
+    if (!key?.startsWith(STORAGE_PREFIX)) continue
+    const raw = localStorage.getItem(key)
+    if (!raw) continue
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      const data = (parsed.state as Record<string, unknown>) ?? parsed
+      if (data.apiConfigId === configId) count += 1
+    } catch {
+      // Ignore damaged legacy entries.
+    }
+  }
+  return count
+}
+
+export function reassignApiConfigReferences(
+  deletedConfigId: string,
+  replacementConfigId: string | null,
+): void {
+  const current = useProjectStore.getState()
+  if (current.apiConfigId === deletedConfigId) current.setApiConfigId(replacementConfigId)
+
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index)
+    if (!key?.startsWith(STORAGE_PREFIX)) continue
+    const raw = localStorage.getItem(key)
+    if (!raw) continue
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      const data = (parsed.state as Record<string, unknown>) ?? parsed
+      if (data.apiConfigId !== deletedConfigId) continue
+      data.apiConfigId = replacementConfigId
+      localStorage.setItem(key, JSON.stringify(parsed))
+    } catch {
+      // Ignore damaged legacy entries.
     }
   }
 }

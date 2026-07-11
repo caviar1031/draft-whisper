@@ -1,4 +1,5 @@
 import { Settings } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { AppIcon } from "./app-icon"
 
 // 自定义顶栏 — 仅承载应用图标/名称 + 右侧设置/置顶
@@ -18,6 +19,7 @@ export function TitleBar({
   onToggleSettings,
   onToggleAlwaysOnTop,
 }: TitleBarProps) {
+  const { t } = useTranslation()
   return (
     <div className="dw-title-bar" data-tauri-drag-region>
       <div className="dw-title-left">
@@ -31,7 +33,7 @@ export function TitleBar({
         <button
           type="button"
           className={`dw-nav-btn${settingsOpen ? " is-active" : ""}`}
-          aria-label="Settings"
+          aria-label={t("app.settings")}
           aria-pressed={settingsOpen}
           onClick={onToggleSettings}
         >
@@ -40,7 +42,7 @@ export function TitleBar({
         <button
           type="button"
           className={`dw-toggle-pill${alwaysOnTop ? " is-active" : ""}`}
-          aria-label="Always on top"
+          aria-label={t("app.alwaysOnTop")}
           aria-pressed={alwaysOnTop}
           onClick={onToggleAlwaysOnTop}
         >
