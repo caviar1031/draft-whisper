@@ -1,0 +1,5 @@
+# 项目 Rust 代码实际使用 2 空格缩进（lib.rs / build.rs / 多数 tts.rs 函数）。
+# 此配置使 `cargo fmt --check` 与现有代码一致，避免在警告清理任务中引入
+# 大规模纯缩进改动。后续如需统一为 AGENTS.md 中记录的 4 空格，应单独处理。
+tab_spaces = 2
+edition = "2021"

@@ -8,14 +8,14 @@ use tauri::{AppHandle, Manager};
 
 /// 全局共享的 HTTP Client（复用连接池 + 超时配置）。
 fn http_client() -> &'static reqwest::Client {
-    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .expect("failed to build HTTP client")
-    })
+  static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+  CLIENT.get_or_init(|| {
+    reqwest::Client::builder()
+      .timeout(Duration::from_secs(30))
+      .connect_timeout(Duration::from_secs(10))
+      .build()
+      .expect("failed to build HTTP client")
+  })
 }
 
 /// 校验路径是否在音频缓存目录内（防止路径遍历攻击）。
@@ -23,48 +23,48 @@ fn http_client() -> &'static reqwest::Client {
 /// 会 canonicalize 路径以解析 `..` 等遍历符号。
 /// 文件不存在时（如 delete 场景），校验其父目录。
 fn is_in_audio_dir(app: &AppHandle, path: &str) -> Result<PathBuf, String> {
-    let audio_dir = ensure_audio_dir(app)?;
-    let canonical_dir = audio_dir
-        .canonicalize()
-        .map_err(|e| format!("Failed to canonicalize audio dir: {e}"))?;
+  let audio_dir = ensure_audio_dir(app)?;
+  let canonical_dir = audio_dir
+    .canonicalize()
+    .map_err(|e| format!("Failed to canonicalize audio dir: {e}"))?;
 
-    let target = std::path::Path::new(path);
-    let canonical_path = if target.exists() {
-        target
-            .canonicalize()
-            .map_err(|e| format!("Failed to resolve path: {e}"))?
-    } else {
-        // File doesn't exist — validate its parent directory instead
-        let parent = target.parent().unwrap_or(target);
-        let canonical_parent = parent
-            .canonicalize()
-            .map_err(|e| format!("Parent directory not found or unresolvable: {e}"))?;
-        canonical_parent.join(target.file_name().unwrap_or_default())
-    };
+  let target = std::path::Path::new(path);
+  let canonical_path = if target.exists() {
+    target
+      .canonicalize()
+      .map_err(|e| format!("Failed to resolve path: {e}"))?
+  } else {
+    // File doesn't exist — validate its parent directory instead
+    let parent = target.parent().unwrap_or(target);
+    let canonical_parent = parent
+      .canonicalize()
+      .map_err(|e| format!("Parent directory not found or unresolvable: {e}"))?;
+    canonical_parent.join(target.file_name().unwrap_or_default())
+  };
 
-    if !canonical_path.starts_with(&canonical_dir) {
-        return Err(format!(
-            "Path is outside audio directory: {} (allowed: {})",
-            path,
-            audio_dir.display()
-        ));
-    }
-    Ok(canonical_path)
+  if !canonical_path.starts_with(&canonical_dir) {
+    return Err(format!(
+      "Path is outside audio directory: {} (allowed: {})",
+      path,
+      audio_dir.display()
+    ));
+  }
+  Ok(canonical_path)
 }
 
 /// TTS 模式枚举。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum TtsMode {
-    Basic,
-    VoiceDesign,
-    VoiceClone,
+  Basic,
+  VoiceDesign,
+  VoiceClone,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderId {
-    Mimo,
+  Mimo,
 }
 
 /// 与前端 Settings 一一对应的 TTS 调用参数。
@@ -74,15 +74,15 @@ pub enum ProviderId {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TtsParams {
-    pub provider: ProviderId,
-    pub base_url: String,
-    pub api_key: String,
-    pub model: String,
-    pub mode: TtsMode,
-    pub voice: String,
-    pub voice_design_prompt: String,
-    pub voice_clone_path: Option<String>,
-    pub performance_prompt: String,
+  pub provider: ProviderId,
+  pub base_url: String,
+  pub api_key: String,
+  pub model: String,
+  pub mode: TtsMode,
+  pub voice: String,
+  pub voice_design_prompt: String,
+  pub voice_clone_path: Option<String>,
+  pub performance_prompt: String,
 }
 
 /// `tts_generate` 的返回值。
@@ -153,8 +153,7 @@ fn validate_audio_signature(format: &str, bytes: &[u8]) -> Result<(), String> {
   let valid = match format {
     "wav" => bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE",
     "mp3" => {
-      bytes.starts_with(b"ID3")
-        || (bytes.len() >= 2 && bytes[0] == 0xff && bytes[1] & 0xe0 == 0xe0)
+      bytes.starts_with(b"ID3") || (bytes.len() >= 2 && bytes[0] == 0xff && bytes[1] & 0xe0 == 0xe0)
     }
     _ => false,
   };
@@ -190,7 +189,9 @@ fn wav_duration_ms(bytes: &[u8]) -> Result<u64, String> {
     }
     offset = data_start + chunk_size + (chunk_size % 2);
   }
-  let byte_rate = byte_rate.filter(|rate| *rate > 0).ok_or("WAV byte rate is missing")?;
+  let byte_rate = byte_rate
+    .filter(|rate| *rate > 0)
+    .ok_or("WAV byte rate is missing")?;
   let data_size = data_size.ok_or("WAV audio data is missing")?;
   Ok(data_size.saturating_mul(1000) / u64::from(byte_rate))
 }
@@ -216,16 +217,34 @@ fn mp3_duration_ms(bytes: &[u8]) -> Result<u64, String> {
     let layer = (header >> 17) & 0b11;
     let bitrate_index = ((header >> 12) & 0b1111) as usize;
     let sample_index = ((header >> 10) & 0b11) as usize;
-    if version == 0b01 || layer != 0b01 || bitrate_index == 0 || bitrate_index == 15 || sample_index == 3 {
+    if version == 0b01
+      || layer != 0b01
+      || bitrate_index == 0
+      || bitrate_index == 15
+      || sample_index == 3
+    {
       offset += 1;
       continue;
     }
-    const MPEG1_BITRATES: [u32; 16] = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
-    const MPEG2_BITRATES: [u32; 16] = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
+    const MPEG1_BITRATES: [u32; 16] = [
+      0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0,
+    ];
+    const MPEG2_BITRATES: [u32; 16] = [
+      0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0,
+    ];
     const BASE_SAMPLE_RATES: [u32; 3] = [44_100, 48_000, 32_000];
     let is_mpeg1 = version == 0b11;
-    let bitrate = if is_mpeg1 { MPEG1_BITRATES[bitrate_index] } else { MPEG2_BITRATES[bitrate_index] };
-    let divisor = match version { 0b11 => 1, 0b10 => 2, 0b00 => 4, _ => unreachable!() };
+    let bitrate = if is_mpeg1 {
+      MPEG1_BITRATES[bitrate_index]
+    } else {
+      MPEG2_BITRATES[bitrate_index]
+    };
+    let divisor = match version {
+      0b11 => 1,
+      0b10 => 2,
+      0b00 => 4,
+      _ => unreachable!(),
+    };
     let sample_rate = BASE_SAMPLE_RATES[sample_index] / divisor;
     let padding = ((header >> 9) & 1) as usize;
     let coefficient = if is_mpeg1 { 144 } else { 72 };
@@ -264,8 +283,8 @@ fn validate_voice_clone_duration(duration_ms: u64) -> Result<(), String> {
 
 fn build_voice_clone_data_uri(path: &std::path::Path) -> Result<String, String> {
   let (format, mime_type) = audio_format(path)?;
-  let bytes = std::fs::read(path)
-    .map_err(|e| format!("Failed to read voice clone reference audio: {e}"))?;
+  let bytes =
+    std::fs::read(path).map_err(|e| format!("Failed to read voice clone reference audio: {e}"))?;
   validate_audio_signature(format, &bytes)?;
   let duration_ms = audio_duration_ms(format, &bytes)?;
   validate_voice_clone_duration(duration_ms)?;
@@ -280,8 +299,7 @@ fn build_voice_clone_data_uri(path: &std::path::Path) -> Result<String, String> 
 fn projects_root(app: &AppHandle) -> Result<PathBuf, String> {
   let base = ensure_audio_dir(app)?;
   let root = base.join("projects");
-  std::fs::create_dir_all(&root)
-    .map_err(|e| format!("Failed to create projects root: {e}"))?;
+  std::fs::create_dir_all(&root).map_err(|e| format!("Failed to create projects root: {e}"))?;
   Ok(root)
 }
 
@@ -313,8 +331,8 @@ fn project_dir(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
 pub fn tts_list_projects(app: AppHandle) -> Result<Vec<String>, String> {
   let root = projects_root(&app)?;
   let mut names: Vec<String> = Vec::new();
-  for entry in std::fs::read_dir(&root)
-    .map_err(|e| format!("Failed to read projects directory: {e}"))?
+  for entry in
+    std::fs::read_dir(&root).map_err(|e| format!("Failed to read projects directory: {e}"))?
   {
     let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
     if entry
@@ -341,8 +359,7 @@ pub fn tts_create_project(name: String, app: AppHandle) -> Result<Vec<String>, S
   if dir.exists() {
     return Err(format!("Project \"{trimmed}\" already exists"));
   }
-  std::fs::create_dir_all(&dir)
-    .map_err(|e| format!("Failed to create project directory: {e}"))?;
+  std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create project directory: {e}"))?;
   log::info!("✓ 已创建项目: {}", dir.display());
   tts_list_projects(app)
 }
@@ -417,8 +434,9 @@ fn ensure_audio_dir(app: &AppHandle) -> Result<PathBuf, String> {
     .join(".cache")
     .join("audio");
   log::info!("fallback local dir: {}", local.display());
-  std::fs::create_dir_all(&local)
-    .map_err(|e| format!("All directories unwritable, local fallback also failed: {local:?} -> {e}"))?;
+  std::fs::create_dir_all(&local).map_err(|e| {
+    format!("All directories unwritable, local fallback also failed: {local:?} -> {e}")
+  })?;
   Ok(local)
 }
 
@@ -440,17 +458,17 @@ fn sanitize_filename(name: &str) -> String {
 ///
 /// 非 voice-clone 模式或路径为空时返回 `None`。
 fn load_voice_clone_audio(params: &TtsParams, app: &AppHandle) -> Result<Option<String>, String> {
-    if params.mode != TtsMode::VoiceClone {
-        return Ok(None);
-    }
-    let Some(ref path) = params.voice_clone_path else {
-        return Ok(None);
-    };
-    if path.is_empty() {
-        return Ok(None);
-    }
-    let safe_path = is_in_audio_dir(app, path)?;
-    Ok(Some(build_voice_clone_data_uri(&safe_path)?))
+  if params.mode != TtsMode::VoiceClone {
+    return Ok(None);
+  }
+  let Some(ref path) = params.voice_clone_path else {
+    return Ok(None);
+  };
+  if path.is_empty() {
+    return Ok(None);
+  }
+  let safe_path = is_in_audio_dir(app, path)?;
+  Ok(Some(build_voice_clone_data_uri(&safe_path)?))
 }
 
 fn build_speech_body(
@@ -515,44 +533,42 @@ async fn request_speech(
   text: &str,
   voice_audio_data_uri: Option<&str>,
 ) -> Result<Vec<u8>, String> {
-    let endpoint = build_chat_endpoint(&params.base_url);
-    let body = build_speech_body(params, text, voice_audio_data_uri)?;
+  let endpoint = build_chat_endpoint(&params.base_url);
+  let body = build_speech_body(params, text, voice_audio_data_uri)?;
 
-    let client = http_client();
-    let resp = client
-        .post(&endpoint)
-        .header("api-key", &params.api_key)
-        .header("Content-Type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
+  let client = http_client();
+  let resp = client
+    .post(&endpoint)
+    .header("api-key", &params.api_key)
+    .header("Content-Type", "application/json")
+    .json(&body)
+    .send()
+    .await
+    .map_err(|e| format!("Request failed: {e}"))?;
 
-    let status = resp.status();
-    if !status.is_success() {
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("HTTP {status}: {text}"));
-    }
+  let status = resp.status();
+  if !status.is_success() {
+    let text = resp.text().await.unwrap_or_default();
+    return Err(format!("HTTP {status}: {text}"));
+  }
 
-    let json: Value = resp
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response JSON: {e}"))?;
+  let json: Value = resp
+    .json()
+    .await
+    .map_err(|e| format!("Failed to parse response JSON: {e}"))?;
 
-    let audio_data = json
-        .get("choices")
-        .and_then(|c| c.get(0))
-        .and_then(|c| c.get("message"))
-        .and_then(|m| m.get("audio"))
-        .and_then(|a| a.get("data"))
-        .and_then(|d| d.as_str())
-        .ok_or_else(|| {
-            format!("Response missing choices[0].message.audio.data: {}", json)
-        })?;
+  let audio_data = json
+    .get("choices")
+    .and_then(|c| c.get(0))
+    .and_then(|c| c.get("message"))
+    .and_then(|m| m.get("audio"))
+    .and_then(|a| a.get("data"))
+    .and_then(|d| d.as_str())
+    .ok_or_else(|| format!("Response missing choices[0].message.audio.data: {}", json))?;
 
-    STANDARD
-        .decode(audio_data)
-        .map_err(|e| format!("base64 decode failed: {e}"))
+  STANDARD
+    .decode(audio_data)
+    .map_err(|e| format!("base64 decode failed: {e}"))
 }
 
 /// 为某一句文本生成音频并写入本地缓存（每次生成使用唯一文件名，不覆盖历史版本）。
@@ -688,9 +704,10 @@ pub async fn tts_preview_voice(
     .unwrap_or_default()
     .as_millis();
   let file_path = voice_previews_dir(&app)?.join(format!("voice_preview_{timestamp}.wav"));
-  std::fs::write(&file_path, &bytes)
-    .map_err(|e| format!("Failed to write voice preview: {e}"))?;
-  Ok(TtsResult { audio_path: file_path.to_string_lossy().to_string() })
+  std::fs::write(&file_path, &bytes).map_err(|e| format!("Failed to write voice preview: {e}"))?;
+  Ok(TtsResult {
+    audio_path: file_path.to_string_lossy().to_string(),
+  })
 }
 
 /// 读取本地音频文件，返回 base64 编码的字符串。
@@ -721,11 +738,11 @@ pub fn tts_delete_audio_files(paths: Vec<String>, app: AppHandle) -> Result<(), 
 ///
 /// 路径：`{audio_base_dir}/voice-samples/`。
 fn voice_samples_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let base = ensure_audio_dir(app)?;
-    let dir = base.join("voice-samples");
-    std::fs::create_dir_all(&dir)
-        .map_err(|e| format!("Failed to create voice samples directory: {e}"))?;
-    Ok(dir)
+  let base = ensure_audio_dir(app)?;
+  let dir = base.join("voice-samples");
+  std::fs::create_dir_all(&dir)
+    .map_err(|e| format!("Failed to create voice samples directory: {e}"))?;
+  Ok(dir)
 }
 
 /// 将外部音频文件复制到音色样本库。
@@ -733,35 +750,35 @@ fn voice_samples_dir(app: &AppHandle) -> Result<PathBuf, String> {
 /// 前端调用: `invoke("save_voice_sample", { sourcePath, sampleId })` → 路径、格式与大小元数据
 #[tauri::command]
 pub fn save_voice_sample(
-    source_path: String,
-    sample_id: String,
-    app: AppHandle,
+  source_path: String,
+  sample_id: String,
+  app: AppHandle,
 ) -> Result<VoiceSampleResult, String> {
-    let src = std::path::Path::new(&source_path);
-    if !src.exists() {
-        return Err(format!("Source file not found: {source_path}"));
-    }
-    let (format, mime_type) = audio_format(src)?;
-    let bytes = std::fs::read(src).map_err(|e| format!("Failed to read audio file: {e}"))?;
-    validate_audio_signature(format, &bytes)?;
-    let duration_ms = audio_duration_ms(format, &bytes)?;
-    validate_voice_clone_duration(duration_ms)?;
-    let encoded_size = format!("data:{mime_type};base64,{}", STANDARD.encode(&bytes)).len();
-    validate_voice_clone_data_uri_size(encoded_size)?;
-    let dir = voice_samples_dir(&app)?;
-    let file_name = format!("{}.{}", sanitize_filename(&sample_id), format);
-    let dest = dir.join(&file_name);
-    std::fs::write(&dest, &bytes).map_err(|e| format!("Failed to save audio file: {e}"))?;
+  let src = std::path::Path::new(&source_path);
+  if !src.exists() {
+    return Err(format!("Source file not found: {source_path}"));
+  }
+  let (format, mime_type) = audio_format(src)?;
+  let bytes = std::fs::read(src).map_err(|e| format!("Failed to read audio file: {e}"))?;
+  validate_audio_signature(format, &bytes)?;
+  let duration_ms = audio_duration_ms(format, &bytes)?;
+  validate_voice_clone_duration(duration_ms)?;
+  let encoded_size = format!("data:{mime_type};base64,{}", STANDARD.encode(&bytes)).len();
+  validate_voice_clone_data_uri_size(encoded_size)?;
+  let dir = voice_samples_dir(&app)?;
+  let file_name = format!("{}.{}", sanitize_filename(&sample_id), format);
+  let dest = dir.join(&file_name);
+  std::fs::write(&dest, &bytes).map_err(|e| format!("Failed to save audio file: {e}"))?;
 
-    log::info!("✓ 已保存音色样本: {}", dest.display());
-    Ok(VoiceSampleResult {
-      file_path: dest.to_string_lossy().to_string(),
-      format: format.to_string(),
-      mime_type: mime_type.to_string(),
-      byte_size: bytes.len() as u64,
-      encoded_size,
-      duration_ms,
-    })
+  log::info!("✓ 已保存音色样本: {}", dest.display());
+  Ok(VoiceSampleResult {
+    file_path: dest.to_string_lossy().to_string(),
+    format: format.to_string(),
+    mime_type: mime_type.to_string(),
+    byte_size: bytes.len() as u64,
+    encoded_size,
+    duration_ms,
+  })
 }
 
 /// 删除音色样本文件。
@@ -769,12 +786,12 @@ pub fn save_voice_sample(
 /// 前端调用: `invoke("delete_voice_sample", { path })`
 #[tauri::command]
 pub fn delete_voice_sample(path: String, app: AppHandle) -> Result<(), String> {
-    let safe_path = is_in_audio_dir(&app, &path)?;
-    if safe_path.exists() {
-        std::fs::remove_file(&safe_path).map_err(|e| format!("Failed to delete sample file: {e}"))?;
-        log::info!("✓ 已删除音色样本: {}", safe_path.display());
-    }
-    Ok(())
+  let safe_path = is_in_audio_dir(&app, &path)?;
+  if safe_path.exists() {
+    std::fs::remove_file(&safe_path).map_err(|e| format!("Failed to delete sample file: {e}"))?;
+    log::info!("✓ 已删除音色样本: {}", safe_path.display());
+  }
+  Ok(())
 }
 
 // ---- API Key 安全存储（macOS Keychain） ----
@@ -783,93 +800,100 @@ const KEYCHAIN_SERVICE: &str = "com.draft-whisper.api-key";
 const LEGACY_KEYCHAIN_ACCOUNT: &str = "default";
 
 fn keychain_account(config_id: &str) -> Result<String, String> {
-    if config_id.is_empty()
-        || !config_id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err("Invalid API configuration ID".into());
-    }
-    Ok(format!("api-config:{config_id}"))
+  if config_id.is_empty()
+    || !config_id
+      .chars()
+      .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+  {
+    return Err("Invalid API configuration ID".into());
+  }
+  Ok(format!("api-config:{config_id}"))
 }
 
 fn load_keychain_account(account: &str) -> Result<Option<String>, String> {
-    let output = std::process::Command::new("security")
-        .args([
-            "find-generic-password",
-            "-s", KEYCHAIN_SERVICE,
-            "-a", account,
-            "-w",
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run security command: {e}"))?;
-    if !output.status.success() {
-        return Ok(None);
-    }
-    let key = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok((!key.is_empty()).then_some(key))
+  let output = std::process::Command::new("security")
+    .args([
+      "find-generic-password",
+      "-s",
+      KEYCHAIN_SERVICE,
+      "-a",
+      account,
+      "-w",
+    ])
+    .output()
+    .map_err(|e| format!("Failed to run security command: {e}"))?;
+  if !output.status.success() {
+    return Ok(None);
+  }
+  let key = String::from_utf8_lossy(&output.stdout).trim().to_string();
+  Ok((!key.is_empty()).then_some(key))
 }
 
 fn save_keychain_account(account: &str, api_key: &str) -> Result<(), String> {
-    let output = std::process::Command::new("security")
-        .args([
-            "add-generic-password",
-            "-s", KEYCHAIN_SERVICE,
-            "-a", account,
-            "-w", api_key,
-            "-U",
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run security command: {e}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Failed to save API key to Keychain: {stderr}"));
-    }
-    Ok(())
+  let output = std::process::Command::new("security")
+    .args([
+      "add-generic-password",
+      "-s",
+      KEYCHAIN_SERVICE,
+      "-a",
+      account,
+      "-w",
+      api_key,
+      "-U",
+    ])
+    .output()
+    .map_err(|e| format!("Failed to run security command: {e}"))?;
+  if !output.status.success() {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    return Err(format!("Failed to save API key to Keychain: {stderr}"));
+  }
+  Ok(())
 }
 
 fn delete_keychain_account(account: &str) -> Result<(), String> {
-    let output = std::process::Command::new("security")
-        .args([
-            "delete-generic-password",
-            "-s", KEYCHAIN_SERVICE,
-            "-a", account,
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run security command: {e}"))?;
-    if !output.status.success() {
-        log::warn!("Keychain entry did not exist: {account}");
-    }
-    Ok(())
+  let output = std::process::Command::new("security")
+    .args([
+      "delete-generic-password",
+      "-s",
+      KEYCHAIN_SERVICE,
+      "-a",
+      account,
+    ])
+    .output()
+    .map_err(|e| format!("Failed to run security command: {e}"))?;
+  if !output.status.success() {
+    log::warn!("Keychain entry did not exist: {account}");
+  }
+  Ok(())
 }
 
 #[tauri::command]
 pub fn save_api_key(config_id: String, api_key: String) -> Result<(), String> {
-    save_keychain_account(&keychain_account(&config_id)?, &api_key)
+  save_keychain_account(&keychain_account(&config_id)?, &api_key)
 }
 
 #[tauri::command]
 pub fn load_api_key(config_id: String) -> Result<Option<String>, String> {
-    load_keychain_account(&keychain_account(&config_id)?)
+  load_keychain_account(&keychain_account(&config_id)?)
 }
 
 #[tauri::command]
 pub fn delete_api_key(config_id: String) -> Result<(), String> {
-    delete_keychain_account(&keychain_account(&config_id)?)
+  delete_keychain_account(&keychain_account(&config_id)?)
 }
 
 #[tauri::command]
 pub fn migrate_legacy_api_key(config_id: String) -> Result<Option<String>, String> {
-    let account = keychain_account(&config_id)?;
-    if let Some(existing) = load_keychain_account(&account)? {
-        return Ok(Some(existing));
-    }
-    let Some(legacy) = load_keychain_account(LEGACY_KEYCHAIN_ACCOUNT)? else {
-        return Ok(None);
-    };
-    save_keychain_account(&account, &legacy)?;
-    delete_keychain_account(LEGACY_KEYCHAIN_ACCOUNT)?;
-    Ok(Some(legacy))
+  let account = keychain_account(&config_id)?;
+  if let Some(existing) = load_keychain_account(&account)? {
+    return Ok(Some(existing));
+  }
+  let Some(legacy) = load_keychain_account(LEGACY_KEYCHAIN_ACCOUNT)? else {
+    return Ok(None);
+  };
+  save_keychain_account(&account, &legacy)?;
+  delete_keychain_account(LEGACY_KEYCHAIN_ACCOUNT)?;
+  Ok(Some(legacy))
 }
 
 /// 将音频文件复制到 macOS 系统剪贴板（文件引用，非文本）。
@@ -952,91 +976,160 @@ pub fn tts_drag_file(path: String, window: tauri::Window, app: AppHandle) -> Res
   let safe_path = is_in_audio_dir(&app, &path)?;
   let safe_path_str = safe_path.to_string_lossy().to_string();
 
-  use objc::class;
-  use objc::declare::ClassDecl;
-  use objc::msg_send;
-  use objc::runtime::{Class, Object, Sel};
-  use objc::sel;
-  use objc::sel_impl;
-  use std::ffi::{c_double, CString};
+  // Tauri 同步 command 在主线程执行；AppKit 的 NSView / NSWindow / NSDraggingSession
+  // 都是 MainThreadOnly，缺少 MainThreadMarker 时直接报错而非触发未定义行为。
+  let mtm = objc2_foundation::MainThreadMarker::new()
+    .ok_or_else(|| "Native file drag must be initiated on the main thread".to_string())?;
 
-  let ns_view_ptr = window.ns_view().map_err(|e| format!("Failed to get ns_view: {e}"))?;
+  let ns_view_ptr = window
+    .ns_view()
+    .map_err(|e| format!("Failed to get ns_view: {e}"))?;
+  if ns_view_ptr.is_null() {
+    return Err("NSView pointer is null".into());
+  }
 
-  unsafe {
-    let content_view = ns_view_ptr as *mut Object;
+  // SAFETY:
+  // - `ns_view_ptr` 由 Tauri 返回，指向当前窗口 content view 的有效 NSView 实例。
+  // - 上面已通过 `MainThreadMarker::new()` 确认调用发生在主线程，满足
+  //   NSView / NSWindow / NSDraggingSession 的 MainThreadOnly 约束。
+  // - 调用期间 window / view 由 Tauri 持有，不会被释放。
+  // - 所有后续 AppKit 调用均在该 `view` 引用作用域内完成，不存在悬垂引用。
+  unsafe { drag::begin_drag(ns_view_ptr, mtm, &safe_path_str) };
 
-    // --- Dynamic class for NSDraggingSource ---
-    let drag_source_class = {
-      static mut CLS: *const Class = std::ptr::null();
-      static ONCE: std::sync::Once = std::sync::Once::new();
-      ONCE.call_once(|| {
-        let mut decl =
-          ClassDecl::new("DWFileDragSource", class!(NSObject)).unwrap();
-        decl.add_method(
-          sel!(draggingSession:sourceOperationMaskForDraggingContext:),
-          dragging_source_op_mask as extern "C" fn(&Object, Sel, *mut Object, isize) -> u64,
-        );
-        CLS = decl.register();
-      });
-      CLS
-    };
+  log::info!("原生文件拖拽已启动: {}", safe_path_str);
+  Ok(())
+}
 
-    extern "C" fn dragging_source_op_mask(
-      _this: &Object,
-      _sel: Sel,
-      _session: *mut Object,
-      _context: isize,
-    ) -> u64 {
-      1 // NSDragOperationCopy
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Result<(), String> {
+  let _ = (path, app);
+  Err("Native file drag is only supported on macOS".into())
+}
+
+/// macOS 原生文件拖拽实现细节。
+///
+/// 通过 `define_class!` 声明一个实现 `NSDraggingSource` 协议的 Objective-C 类
+/// `DWFileDragSource`，替代旧版 `objc` crate 的 `ClassDecl` 动态注册。
+/// 类注册由 `objc2` 在首次取用 `ClassType::class()` 时通过 `Once` 完成，
+/// 天然线程安全，无需手动维护 `static mut` 与 `Once`。
+#[cfg(target_os = "macos")]
+mod drag {
+  use objc2::rc::Retained;
+  use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
+  use objc2::{define_class, msg_send, AnyThread, MainThreadMarker, MainThreadOnly};
+  use objc2_app_kit::{
+    NSDragOperation, NSDraggingContext, NSDraggingItem, NSDraggingSession, NSDraggingSource,
+    NSEvent, NSEventModifierFlags, NSEventType, NSPasteboardWriting, NSView, NSWorkspace,
+  };
+  use objc2_foundation::{NSArray, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString, NSURL};
+  use std::ffi::c_void;
+
+  // `DWFileDragSource` 是一个实现 `NSDraggingSource` 协议的 NSObject 子类：
+  // 所有 context 下均返回 `NSDragOperationCopy`。标记为 `MainThreadOnly` 以匹配
+  // `NSDraggingSource` 协议约束。不持有任何 ivar，仅作协议载体。
+  define_class!(
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "DWFileDragSource"]
+    struct DWFileDragSource;
+
+    /// NSObject 协议合规（`define_class!` 不会自动实现）。
+    unsafe impl NSObjectProtocol for DWFileDragSource {}
+
+    /// 实现 `NSDraggingSource` 必填方法：始终允许 Copy 操作。
+    unsafe impl NSDraggingSource for DWFileDragSource {
+      // 方法名必须与 Objective-C selector `draggingSession:sourceOperationMaskForDraggingContext:`
+      // 对应（由 objc2-app-kit 的 NSDraggingSource trait 约定），无法改为 snake_case。
+      #[allow(non_snake_case)]
+      #[unsafe(method(draggingSession:sourceOperationMaskForDraggingContext:))]
+      fn draggingSession_sourceOperationMaskForDraggingContext(
+        &self,
+        _session: &NSDraggingSession,
+        _context: NSDraggingContext,
+      ) -> NSDragOperation {
+        NSDragOperation::Copy
+      }
     }
+  );
+
+  impl DWFileDragSource {
+    /// 在主线程上分配并初始化一个 `DWFileDragSource` 实例。
+    fn new(mtm: MainThreadMarker) -> Retained<Self> {
+      // `MainThreadOnly::alloc` 要求显式 `MainThreadMarker`，由调用方保证。
+      let allocated = <Self as MainThreadOnly>::alloc(mtm);
+      // `Allocated` → `PartialInit`：无 ivar 时传 `()`。`super` 调用 `init`
+      // 要求 receiver 为 `PartialInit<T>`（见 objc2 的 RetainSemantics 约束）。
+      let partial = allocated.set_ivars(());
+      // SAFETY: `partial` 是刚 alloc 且 ivar 已就绪的实例，调用 NSObject 的
+      // `init` 是其指定初始化器；返回的 `Retained` 拥有 +1 引用计数，符合
+      // init 家族语义。
+      unsafe { msg_send![super(partial), init] }
+    }
+  }
+
+  /// 从 NSView 启动一次携带文件 URL 的原生拖拽会话。
+  ///
+  /// # Safety
+  ///
+  /// - `ns_view_ptr` 必须指向有效的 `NSView` 实例。
+  /// - 调用必须发生在主线程（由 `mtm` 证明）。
+  /// - `path_str` 必须是已经过 `is_in_audio_dir` 校验的绝对路径。
+  pub(super) unsafe fn begin_drag(ns_view_ptr: *mut c_void, mtm: MainThreadMarker, path_str: &str) {
+    // SAFETY: 调用方承诺指针有效且当前在主线程（见函数级 SAFETY 注释）。
+    let view: &NSView = unsafe { &*(ns_view_ptr as *const NSView) };
 
     // --- Drag source instance ---
-    let source: *mut Object = msg_send![drag_source_class, new];
+    let source = DWFileDragSource::new(mtm);
+    let source: &ProtocolObject<dyn NSDraggingSource> = ProtocolObject::from_ref(&*source);
 
     // --- File URL ---
-    // CString 确保 \0 结尾；stringWithUTF8String: 要求 C 风格字符串（null-terminated）
-    let c_path = CString::new(safe_path_str).map_err(|e| format!("Path contains invalid characters: {e}"))?;
-    let path_str: *mut Object =
-      msg_send![class!(NSString), stringWithUTF8String: c_path.as_ptr()];
-    let file_url: *mut Object = msg_send![class!(NSURL), fileURLWithPath: path_str];
+    let path_nsstring = NSString::from_str(path_str);
+    let file_url = NSURL::fileURLWithPath(&path_nsstring);
 
     // --- Audio file icon via NSWorkspace (public API) ---
-    let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
-    let ext_str: *mut Object =
-      msg_send![class!(NSString), stringWithUTF8String: b"wav\0".as_ptr()];
-    let drag_image: *mut Object = msg_send![workspace, iconForFileType: ext_str];
+    let workspace = NSWorkspace::sharedWorkspace();
+    let ext_nsstring = NSString::from_str("wav");
+    // `iconForFileType:` 自 macOS 14 起被 Apple 标记为 deprecated，推荐改用
+    // `iconForContentType:`（需要 UTType + macOS 11+）。本任务范围禁止改变拖拽
+    // 图标行为，且新增 `objc2-uniform-type-identifiers` 依赖超出本次清理目标，
+    // 故在此最小范围内允许该 deprecated 调用。后续在提升部署目标到 macOS 11+
+    // 并引入 UTType 后可移除此 allow。
+    #[allow(deprecated)]
+    let drag_image = workspace.iconForFileType(&ext_nsstring);
 
     // --- Mouse location (global, in screen coordinates) ---
-    let mouse_loc: NSPoint = msg_send![class!(NSEvent), mouseLocation];
+    let mouse_loc = NSEvent::mouseLocation();
 
-    // --- Window number ---
-    let ns_window: *mut Object = msg_send![content_view, window];
-    let window_number: i64 = msg_send![ns_window, windowNumber];
+    // --- Window number (合成 NSLeftMouseDown 事件需要) ---
+    let ns_window = view
+      .window()
+      .expect("drag source view must be installed in a window");
+    let window_number = ns_window.windowNumber();
 
     // --- Synthesize mouse-down event ---
-    let event_type: u64 = 1; // NSLeftMouseDown
-    let mod_flags: u64 = 0;
-    let ts: c_double = 0.0;
-    let ctx: *mut Object = std::ptr::null_mut();
-    let ev_num: i64 = 0;
-    let click_count: i64 = 1;
-    let pressure: f32 = 1.0;
-    let event: *mut Object = msg_send![
-      class!(NSEvent),
-      mouseEventWithType: event_type
-      location: mouse_loc
-      modifierFlags: mod_flags
-      timestamp: ts
-      windowNumber: window_number
-      context: ctx
-      eventNumber: ev_num
-      clickCount: click_count
-      pressure: pressure
-    ];
+    // beginDraggingSessionWithItems:event:source: 需要一个鼠标事件作为拖拽起点。
+    // 返回 Option<Retained<NSEvent>>：在合法参数下不会为 None，因此 expect 安全。
+    let event = NSEvent::mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure(
+      NSEventType::LeftMouseDown,
+      mouse_loc,
+      NSEventModifierFlags::empty(),
+      0.0,
+      window_number,
+      None,
+      0,
+      1,
+      1.0,
+    )
+    .expect("failed to synthesize NSLeftMouseDown event for drag session");
 
     // --- NSDraggingItem with the file URL as pasteboard content ---
-    let item: *mut Object = msg_send![class!(NSDraggingItem), alloc];
-    let item: *mut Object = msg_send![item, initWithPasteboardWriter: file_url];
+    // NSURL 遵循 NSPasteboardWriting 协议，可安全转换为协议对象。
+    let writer: &ProtocolObject<dyn NSPasteboardWriting> = ProtocolObject::from_ref(&*file_url);
+    // `NSDraggingItem::alloc()` 需要 `AnyThread` trait 在作用域内（NSDraggingItem
+    // 是 AnyThread 类型，非 MainThreadOnly）。
+    let allocated_item = <NSDraggingItem as AnyThread>::alloc();
+    let item = NSDraggingItem::initWithPasteboardWriter(allocated_item, writer);
 
     // Set the drag image at mouse location (64×64 icon)
     let drag_frame = NSRect {
@@ -1049,57 +1142,23 @@ pub fn tts_drag_file(path: String, window: tauri::Window, app: AppHandle) -> Res
         height: 64.0,
       },
     };
-    let _: () = msg_send![item, setDraggingFrame: drag_frame contents: drag_image];
+    // 将 NSImage 上转为 AnyObject 引用：NSImage 是 NSObject 子类，
+    // `Retained<AnyObject>: From<Retained<NSImage>>` 提供安全的类型擦除。
+    let contents: Retained<AnyObject> = drag_image.into();
+    // SAFETY: `contents` 实际类型为 NSImage，与 setDraggingFrame:contents:
+    // 文档约定一致（contents 应为 NSImage 或 NSDraggingImageComponent）。
+    unsafe { item.setDraggingFrame_contents(drag_frame, Some(&contents)) };
 
     // --- NSArray with the dragging item ---
-    let items: *mut Object = msg_send![class!(NSArray), arrayWithObject: item];
+    // `&*item` 解引用 `Retained<NSDraggingItem>` 得到 `&NSDraggingItem`，
+    // 满足 `NSArray::from_slice` 的 `ObjectType: Message` 约束。
+    let items = NSArray::from_slice(&[&*item]);
 
     // --- Begin native dragging session from the content view ---
-    // Returns an NSDraggingSession (autoreleased); the session retains
-    // items and source internally, so they survive after this function returns.
-    let _session: *mut Object = msg_send![
-      content_view,
-      beginDraggingSessionWithItems: items
-      event: event
-      source: source
-    ];
-
-    log::info!("原生文件拖拽已启动: {}", c_path.to_string_lossy());
+    // 返回的 NSDraggingSession 由 session 内部 retain item 与 source，
+    // 因此本函数返回后 source / item / file_url 释放不影响进行中的拖拽。
+    let _session = view.beginDraggingSessionWithItems_event_source(&items, &event, source);
   }
-
-  Ok(())
-}
-
-#[cfg(not(target_os = "macos"))]
-#[tauri::command]
-pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Result<(), String> {
-  let _ = (path, app);
-  Err("Native file drag is only supported on macOS".into())
-}
-
-// NSPoint / NSSize / NSRect — 与 CoreGraphics / AppKit 布局一致
-#[cfg(target_os = "macos")]
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct NSPoint {
-  x: f64,
-  y: f64,
-}
-
-#[cfg(target_os = "macos")]
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct NSSize {
-  width: f64,
-  height: f64,
-}
-
-#[cfg(target_os = "macos")]
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct NSRect {
-  origin: NSPoint,
-  size: NSSize,
 }
 
 #[cfg(test)]
@@ -1107,8 +1166,7 @@ mod tests {
   use super::{
     audio_duration_ms, audio_format, build_chat_endpoint, build_speech_body, sanitize_filename,
     validate_audio_signature, validate_project_name, validate_voice_clone_data_uri_size,
-    validate_voice_clone_duration, ProviderId, TtsMode, TtsParams,
-    MAX_VOICE_CLONE_DATA_URI_SIZE,
+    validate_voice_clone_duration, ProviderId, TtsMode, TtsParams, MAX_VOICE_CLONE_DATA_URI_SIZE,
   };
 
   fn params(mode: TtsMode, model: &str) -> TtsParams {
@@ -1139,10 +1197,24 @@ mod tests {
 
   #[test]
   fn rejects_unsafe_project_names() {
-    for invalid in ["", " ", ".hidden", "..", "../escape", "nested/name", "nested\\name"] {
-      assert!(validate_project_name(invalid).is_err(), "accepted {invalid:?}");
+    for invalid in [
+      "",
+      " ",
+      ".hidden",
+      "..",
+      "../escape",
+      "nested/name",
+      "nested\\name",
+    ] {
+      assert!(
+        validate_project_name(invalid).is_err(),
+        "accepted {invalid:?}"
+      );
     }
-    assert_eq!(validate_project_name(" Demo Project ").unwrap(), "Demo Project");
+    assert_eq!(
+      validate_project_name(" Demo Project ").unwrap(),
+      "Demo Project"
+    );
   }
 
   #[test]
@@ -1154,12 +1226,7 @@ mod tests {
   #[test]
   fn builds_voice_clone_request_with_data_uri_and_performance_prompt() {
     let params = params(TtsMode::VoiceClone, "mimo-v2.5-tts-voiceclone");
-    let body = build_speech_body(
-      &params,
-      "你好",
-      Some("data:audio/wav;base64,UklGRg=="),
-    )
-    .unwrap();
+    let body = build_speech_body(&params, "你好", Some("data:audio/wav;base64,UklGRg==")).unwrap();
 
     assert_eq!(body["model"], "mimo-v2.5-tts-voiceclone");
     assert_eq!(body["messages"][0]["role"], "user");
@@ -1194,8 +1261,14 @@ mod tests {
 
   #[test]
   fn validates_supported_audio_formats_and_signatures() {
-    assert_eq!(audio_format(std::path::Path::new("sample.wav")).unwrap().0, "wav");
-    assert_eq!(audio_format(std::path::Path::new("sample.mp3")).unwrap().1, "audio/mpeg");
+    assert_eq!(
+      audio_format(std::path::Path::new("sample.wav")).unwrap().0,
+      "wav"
+    );
+    assert_eq!(
+      audio_format(std::path::Path::new("sample.mp3")).unwrap().1,
+      "audio/mpeg"
+    );
     assert!(audio_format(std::path::Path::new("sample.m4a")).is_err());
     assert!(validate_audio_signature("wav", b"RIFF\0\0\0\0WAVE").is_ok());
     assert!(validate_audio_signature("mp3", b"ID3\0").is_ok());
