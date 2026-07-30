@@ -2,6 +2,8 @@ mod tts;
 use tauri::Manager;
 
 #[cfg(target_os = "macos")]
+use objc2_app_kit::NSWindow;
+#[cfg(target_os = "macos")]
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,16 +28,20 @@ pub fn run() {
         // 设置 titlebarAppearsTransparent 让标题栏透明，
         // traffic light 按钮保持在标准标题栏容器中（不移动到 contentView），
         // 窗口缩放时由 NSWindow 自动管理按钮位置。
-        unsafe {
-          use objc::msg_send;
-          use objc::sel;
-          use objc::sel_impl;
-          use objc::runtime::Object;
-
-          let content_view = window.ns_view().unwrap() as *mut Object;
-          let ns_window: *mut Object = msg_send![content_view, window];
-          let _: () = msg_send![ns_window, setTitlebarAppearsTransparent: true];
-        }
+        //
+        // 直接复用 Tauri 暴露的 NSWindow 指针，避免旧版 `objc` 宏的 cfg 警告。
+        let ns_window_ptr = window
+          .ns_window()
+          .expect("Failed to get NSWindow pointer for setup");
+        // SAFETY:
+        // - `ns_window_ptr` 由 Tauri 返回，指向当前窗口的有效 NSWindow 实例，
+        //   且在 setup 阶段窗口已经创建并完成布局。
+        // - 调用发生在应用 `setup` 回调中（主线程），满足 NSWindow / AppKit 的
+        //   MainThreadOnly 约束。
+        // - `setTitlebarAppearsTransparent:` 是 NSWindow 的属性 setter，不会并发
+        //   修改窗口结构或触发重入，调用期间窗口对象不会被释放。
+        let ns_window: &NSWindow = unsafe { &*(ns_window_ptr as *const NSWindow) };
+        ns_window.setTitlebarAppearsTransparent(true);
       }
 
       #[cfg(debug_assertions)]

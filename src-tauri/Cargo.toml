@@ -30,6 +30,6 @@ base64 = "0.22"
 window-vibrancy = "0.5"
 # macOS 原生文件拖拽 — 用于将音频文件拖入剪映/Premiere 等剪辑软件
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
-objc = "0.2"

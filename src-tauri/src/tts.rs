@@ -952,91 +952,205 @@ pub fn tts_drag_file(path: String, window: tauri::Window, app: AppHandle) -> Res
   let safe_path = is_in_audio_dir(&app, &path)?;
   let safe_path_str = safe_path.to_string_lossy().to_string();
 
-  use objc::class;
-  use objc::declare::ClassDecl;
-  use objc::msg_send;
-  use objc::runtime::{Class, Object, Sel};
-  use objc::sel;
-  use objc::sel_impl;
-  use std::ffi::{c_double, CString};
+  // Tauri 同步 command 在主线程执行；AppKit 的 NSView / NSWindow /
+  // NSDraggingSession 都是 MainThreadOnly，缺少 MainThreadMarker 时直接
+  // 报错而非触发未定义行为。
+  let mtm = objc2_foundation::MainThreadMarker::new()
+    .ok_or_else(|| "Native file drag must be initiated on the main thread".to_string())?;
 
-  let ns_view_ptr = window.ns_view().map_err(|e| format!("Failed to get ns_view: {e}"))?;
+  let ns_view_ptr = window
+    .ns_view()
+    .map_err(|e| format!("Failed to get ns_view: {e}"))?;
+  if ns_view_ptr.is_null() {
+    return Err("NSView pointer is null".into());
+  }
 
-  unsafe {
-    let content_view = ns_view_ptr as *mut Object;
+  // SAFETY:
+  // - `ns_view_ptr` 由 Tauri 返回，指向当前窗口 content view 的有效 NSView 实例。
+  // - 上面已通过 `MainThreadMarker::new()` 确认调用发生在主线程，满足
+  //   NSView / NSWindow / NSDraggingSession 的 MainThreadOnly 约束。
+  // - 调用期间 window / view 由 Tauri 持有，不会被释放。
+  // - source 的生命周期由 `drag::begin_drag` 内部管理（见该函数注释）。
+  unsafe { drag::begin_drag(ns_view_ptr, mtm, &safe_path_str) };
 
-    // --- Dynamic class for NSDraggingSource ---
-    let drag_source_class = {
-      static mut CLS: *const Class = std::ptr::null();
-      static ONCE: std::sync::Once = std::sync::Once::new();
-      ONCE.call_once(|| {
-        let mut decl =
-          ClassDecl::new("DWFileDragSource", class!(NSObject)).unwrap();
-        decl.add_method(
-          sel!(draggingSession:sourceOperationMaskForDraggingContext:),
-          dragging_source_op_mask as extern "C" fn(&Object, Sel, *mut Object, isize) -> u64,
-        );
-        CLS = decl.register();
-      });
-      CLS
-    };
+  log::info!("原生文件拖拽已启动: {}", safe_path_str);
+  Ok(())
+}
 
-    extern "C" fn dragging_source_op_mask(
-      _this: &Object,
-      _sel: Sel,
-      _session: *mut Object,
-      _context: isize,
-    ) -> u64 {
-      1 // NSDragOperationCopy
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Result<(), String> {
+  let _ = (path, app);
+  Err("Native file drag is only supported on macOS".into())
+}
+
+/// macOS 原生文件拖拽实现细节。
+///
+/// 通过 `define_class!` 声明一个实现 `NSDraggingSource` 协议的 Objective-C 类
+/// `DWFileDragSource`，替代旧版 `objc` crate 的 `ClassDecl` 动态注册。类注册由
+/// `objc2` 在首次取用 `ClassType::class()` 时通过 `Once` 完成，天然线程安全，
+/// 无需手动维护 `static mut` 与 `Once`。
+///
+/// ## Source 生命周期
+///
+/// `begin_drag` 通过 `DWFileDragSource::new` 创建 source（+1 引用计数），然后
+/// 用 `Retained::into_raw` **故意泄漏**这个 +1，保证 source 在整个拖拽会话期间
+/// 存活。当拖拽结束时，AppKit 会回调
+/// `draggingSession:endedAtPoint:operation:`，我们在该回调中调用 `release` 来
+/// 释放泄漏的 +1，从而避免永久内存泄漏。
+///
+/// 依据 Apple 文档：
+/// - `beginDraggingSessionWithItems:event:source:` 的 session 会 retain source、
+///   items 和 event；session 本身被系统 retain 直到拖拽完成。
+///   <https://developer.apple.com/documentation/appkit/nsview/begindraggingsession(withitems:event:source:)>
+/// - `draggingSession:endedAtPoint:operation:` 在拖拽结束时由 session 发送给
+///   source，此时 session 尚未释放 source（释放发生在回调返回之后）。
+///   <https://developer.apple.com/documentation/appkit/nsdraggingsource/draggingsession(endedatpoint:operation:)>
+#[cfg(target_os = "macos")]
+mod drag {
+  use objc2::rc::Retained;
+  use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
+  use objc2::{
+    define_class, msg_send, AnyThread, MainThreadMarker, MainThreadOnly,
+  };
+  use objc2_app_kit::{
+    NSDragOperation, NSDraggingContext, NSDraggingItem, NSDraggingSession, NSDraggingSource,
+    NSEvent, NSEventModifierFlags, NSEventType, NSPasteboardWriting, NSView, NSWorkspace,
+  };
+  use objc2_foundation::{
+    NSArray, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString, NSURL,
+  };
+  use std::ffi::c_void;
+
+  // `DWFileDragSource` 是一个实现 `NSDraggingSource` 协议的 NSObject 子类：
+  // 所有 context 下均返回 `NSDragOperationCopy`。标记为 `MainThreadOnly` 以匹配
+  // `NSDraggingSource` 协议约束。不持有任何 ivar，仅作协议载体。
+  define_class!(
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "DWFileDragSource"]
+    struct DWFileDragSource;
+
+    /// NSObject 协议合规（`define_class!` 不会自动实现）。
+    unsafe impl NSObjectProtocol for DWFileDragSource {}
+
+    unsafe impl NSDraggingSource for DWFileDragSource {
+      // 方法名必须与 Objective-C selector
+      // `draggingSession:sourceOperationMaskForDraggingContext:` 对应
+      //（由 objc2-app-kit 的 NSDraggingSource trait 约定），无法改为 snake_case。
+      #[allow(non_snake_case)]
+      #[unsafe(method(draggingSession:sourceOperationMaskForDraggingContext:))]
+      fn draggingSession_sourceOperationMaskForDraggingContext(
+        &self,
+        _session: &NSDraggingSession,
+        _context: NSDraggingContext,
+      ) -> NSDragOperation {
+        NSDragOperation::Copy
+      }
+
+      // 拖拽结束回调：释放 `begin_drag` 中通过 `Retained::into_raw` 泄漏的 +1
+      // 引用计数。此时 session 尚未释放 source（释放发生在回调返回之后），因此
+      // `self` 仍然有效。
+      #[allow(non_snake_case)]
+      #[unsafe(method(draggingSession:endedAtPoint:operation:))]
+      fn draggingSession_endedAtPoint_operation(
+        &self,
+        _session: &NSDraggingSession,
+        _screen_point: NSPoint,
+        _operation: NSDragOperation,
+      ) {
+        // SAFETY: `begin_drag` 通过 `DWFileDragSource::new` 创建了 `self`（+1），
+        // 并用 `Retained::into_raw` 泄漏了这个 +1。session 也 retain 了 `self`
+        //（+1）。此处 `release` 释放泄漏的 +1；session 的 +1 在回调返回后由
+        // session dealloc 释放。回调返回后不再访问 `self`。
+        let _: () = unsafe { msg_send![self, release] };
+      }
     }
+  );
+
+  impl DWFileDragSource {
+    /// 在主线程上分配并初始化一个 `DWFileDragSource` 实例。
+    fn new(mtm: MainThreadMarker) -> Retained<Self> {
+      // `MainThreadOnly::alloc` 要求显式 `MainThreadMarker`，由调用方保证。
+      let allocated = <Self as MainThreadOnly>::alloc(mtm);
+      // `Allocated` → `PartialInit`：无 ivar 时传 `()`。`super` 调用 `init`
+      // 要求 receiver 为 `PartialInit<T>`（见 objc2 的 RetainSemantics 约束）。
+      let partial = allocated.set_ivars(());
+      // SAFETY: `partial` 是刚 alloc 且 ivar 已就绪的实例，调用 NSObject 的
+      // `init` 是其指定初始化器；返回的 `Retained` 拥有 +1 引用计数，符合
+      // init 家族语义。
+      unsafe { msg_send![super(partial), init] }
+    }
+  }
+
+  /// 从 NSView 启动一次携带文件 URL 的原生拖拽会话。
+  ///
+  /// # Safety
+  ///
+  /// - `ns_view_ptr` 必须指向有效的 `NSView` 实例。
+  /// - 调用必须发生在主线程（由 `mtm` 证明）。
+  /// - `path_str` 必须是已经过 `is_in_audio_dir` 校验的绝对路径。
+  pub(super) unsafe fn begin_drag(
+    ns_view_ptr: *mut c_void,
+    mtm: MainThreadMarker,
+    path_str: &str,
+  ) {
+    // SAFETY: 调用方承诺指针有效且当前在主线程（见函数级 SAFETY 注释）。
+    let view: &NSView = unsafe { &*(ns_view_ptr as *const NSView) };
 
     // --- Drag source instance ---
-    let source: *mut Object = msg_send![drag_source_class, new];
+    let source = DWFileDragSource::new(mtm);
+    let source_ref: &ProtocolObject<dyn NSDraggingSource> =
+      ProtocolObject::from_ref(&*source);
 
     // --- File URL ---
-    // CString 确保 \0 结尾；stringWithUTF8String: 要求 C 风格字符串（null-terminated）
-    let c_path = CString::new(safe_path_str).map_err(|e| format!("Path contains invalid characters: {e}"))?;
-    let path_str: *mut Object =
-      msg_send![class!(NSString), stringWithUTF8String: c_path.as_ptr()];
-    let file_url: *mut Object = msg_send![class!(NSURL), fileURLWithPath: path_str];
+    let path_nsstring = NSString::from_str(path_str);
+    let file_url = NSURL::fileURLWithPath(&path_nsstring);
 
     // --- Audio file icon via NSWorkspace (public API) ---
-    let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
-    let ext_str: *mut Object =
-      msg_send![class!(NSString), stringWithUTF8String: b"wav\0".as_ptr()];
-    let drag_image: *mut Object = msg_send![workspace, iconForFileType: ext_str];
+    let workspace = NSWorkspace::sharedWorkspace();
+    let ext_nsstring = NSString::from_str("wav");
+    // `iconForFileType:` 自 macOS 14 起被 Apple 标记为 deprecated，推荐改用
+    // `iconForContentType:`（需要 UTType + macOS 11+）。本任务范围禁止改变拖拽
+    // 图标行为，且新增 `objc2-uniform-type-identifiers` 依赖超出本次清理目标，
+    // 故在此最小范围内允许该 deprecated 调用。后续在提升部署目标到 macOS 11+
+    // 并引入 UTType 后可移除此 allow。
+    #[allow(deprecated)]
+    let drag_image = workspace.iconForFileType(&ext_nsstring);
 
     // --- Mouse location (global, in screen coordinates) ---
-    let mouse_loc: NSPoint = msg_send![class!(NSEvent), mouseLocation];
+    let mouse_loc = NSEvent::mouseLocation();
 
-    // --- Window number ---
-    let ns_window: *mut Object = msg_send![content_view, window];
-    let window_number: i64 = msg_send![ns_window, windowNumber];
+    // --- Window number (合成 NSLeftMouseDown 事件需要) ---
+    let ns_window = view
+      .window()
+      .expect("drag source view must be installed in a window");
+    let window_number = ns_window.windowNumber();
 
     // --- Synthesize mouse-down event ---
-    let event_type: u64 = 1; // NSLeftMouseDown
-    let mod_flags: u64 = 0;
-    let ts: c_double = 0.0;
-    let ctx: *mut Object = std::ptr::null_mut();
-    let ev_num: i64 = 0;
-    let click_count: i64 = 1;
-    let pressure: f32 = 1.0;
-    let event: *mut Object = msg_send![
-      class!(NSEvent),
-      mouseEventWithType: event_type
-      location: mouse_loc
-      modifierFlags: mod_flags
-      timestamp: ts
-      windowNumber: window_number
-      context: ctx
-      eventNumber: ev_num
-      clickCount: click_count
-      pressure: pressure
-    ];
+    // beginDraggingSessionWithItems:event:source: 需要一个鼠标事件作为拖拽起点。
+    // 返回 Option<Retained<NSEvent>>：在合法参数下不会为 None，因此 expect 安全。
+    let event = NSEvent::mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure(
+      NSEventType::LeftMouseDown,
+      mouse_loc,
+      NSEventModifierFlags::empty(),
+      0.0,
+      window_number,
+      None,
+      0,
+      1,
+      1.0,
+    )
+    .expect("failed to synthesize NSLeftMouseDown event for drag session");
 
     // --- NSDraggingItem with the file URL as pasteboard content ---
-    let item: *mut Object = msg_send![class!(NSDraggingItem), alloc];
-    let item: *mut Object = msg_send![item, initWithPasteboardWriter: file_url];
+    // NSURL 遵循 NSPasteboardWriting 协议，可安全转换为协议对象。
+    let writer: &ProtocolObject<dyn NSPasteboardWriting> =
+      ProtocolObject::from_ref(&*file_url);
+    // `NSDraggingItem::alloc()` 需要 `AnyThread` trait 在作用域内
+    //（NSDraggingItem 是 AnyThread 类型，非 MainThreadOnly）。
+    let allocated_item = <NSDraggingItem as AnyThread>::alloc();
+    let item = NSDraggingItem::initWithPasteboardWriter(allocated_item, writer);
 
     // Set the drag image at mouse location (64×64 icon)
     let drag_frame = NSRect {
@@ -1049,57 +1163,35 @@ pub fn tts_drag_file(path: String, window: tauri::Window, app: AppHandle) -> Res
         height: 64.0,
       },
     };
-    let _: () = msg_send![item, setDraggingFrame: drag_frame contents: drag_image];
+    // 将 NSImage 上转为 AnyObject 引用：NSImage 是 NSObject 子类，
+    // `Retained<AnyObject>: From<Retained<NSImage>>` 提供安全的类型擦除。
+    let contents: Retained<AnyObject> = drag_image.into();
+    // SAFETY: `contents` 实际类型为 NSImage，与 setDraggingFrame:contents:
+    // 文档约定一致（contents 应为 NSImage 或 NSDraggingImageComponent）。
+    unsafe { item.setDraggingFrame_contents(drag_frame, Some(&contents)) };
 
     // --- NSArray with the dragging item ---
-    let items: *mut Object = msg_send![class!(NSArray), arrayWithObject: item];
+    // `&*item` 解引用 `Retained<NSDraggingItem>` 得到 `&NSDraggingItem`，
+    // 满足 `NSArray::from_slice` 的 `ObjectType: Message` 约束。
+    let items = NSArray::from_slice(&[&*item]);
 
     // --- Begin native dragging session from the content view ---
-    // Returns an NSDraggingSession (autoreleased); the session retains
-    // items and source internally, so they survive after this function returns.
-    let _session: *mut Object = msg_send![
-      content_view,
-      beginDraggingSessionWithItems: items
-      event: event
-      source: source
-    ];
+    // 返回的 NSDraggingSession 由系统 retain 直到拖拽完成（见 Apple 文档）。
+    // 我们的 Retained<NSDraggingSession> 在函数返回时 drop，仅释放我们持有的
+    // +1；系统的 retain 仍然有效。
+    let _session =
+      view.beginDraggingSessionWithItems_event_source(&items, &event, source_ref);
 
-    log::info!("原生文件拖拽已启动: {}", c_path.to_string_lossy());
+    // --- Leak source to guarantee lifetime across the drag session ---
+    // `Retained::into_raw` 消费 `source` 并返回裸指针，不执行 release。这样
+    // source 的 +1 引用计数（来自 `new`）在整个拖拽期间不会被释放。当拖拽
+    // 结束时，`draggingSession:endedAtPoint:operation:` 回调会调用 `release`
+    // 来平衡这个 +1（见 DWFileDragSource 的 NSDraggingSource impl）。
+    //
+    // Apple 文档保证 session 会 retain source，因此即使我们的
+    // Retained<NSDraggingSession> 被 drop，source 仍然存活。
+    let _leaked_source_ptr = Retained::into_raw(source);
   }
-
-  Ok(())
-}
-
-#[cfg(not(target_os = "macos"))]
-#[tauri::command]
-pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Result<(), String> {
-  let _ = (path, app);
-  Err("Native file drag is only supported on macOS".into())
-}
-
-// NSPoint / NSSize / NSRect — 与 CoreGraphics / AppKit 布局一致
-#[cfg(target_os = "macos")]
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct NSPoint {
-  x: f64,
-  y: f64,
-}
-
-#[cfg(target_os = "macos")]
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct NSSize {
-  width: f64,
-  height: f64,
-}
-
-#[cfg(target_os = "macos")]
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct NSRect {
-  origin: NSPoint,
-  size: NSSize,
 }
 
 #[cfg(test)]
