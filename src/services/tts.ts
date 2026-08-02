@@ -32,6 +32,12 @@ export interface SavedVoiceSample {
 // 同一句重新生成会用相同路径覆盖文件，缓存中对应 URL 即失效。
 // generateSentenceAudio 成功后会自动 invalidate 该路径，确保下次读取拿到新字节。
 const audioUrlCache = new Map<string, string>()
+const audioUrlRequests = new Map<string, Promise<string>>()
+
+/** 同步读取已经准备好的 Blob URL，播放按钮可用它保持用户手势链。 */
+export function getCachedAudioUrl(path: string): string | null {
+  return audioUrlCache.get(path) ?? null
+}
 
 /** 释放某个路径对应的 Blob URL（若已缓存）。 */
 export function invalidateAudioUrl(path: string | null | undefined): void {
@@ -121,15 +127,25 @@ export async function readAudioAsUrl(path: string): Promise<string> {
   const cached = audioUrlCache.get(path)
   if (cached) return cached
 
-  const base64 = await invoke<string>("tts_read_audio", { path })
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-  const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }))
-  audioUrlCache.set(path, url)
-  return url
+  const existingRequest = audioUrlRequests.get(path)
+  if (existingRequest) return existingRequest
+
+  const request = invoke<string>("tts_read_audio", { path })
+    .then((base64) => {
+      const binaryString = atob(base64)
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+      const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }))
+      audioUrlCache.set(path, url)
+      return url
+    })
+    .finally(() => {
+      if (audioUrlRequests.get(path) === request) audioUrlRequests.delete(path)
+    })
+  audioUrlRequests.set(path, request)
+  return request
 }
 
 /** 删除不再使用的缓存音频，并释放对应 Blob URL。 */

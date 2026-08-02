@@ -95,6 +95,15 @@ export function useTtsGeneration() {
           updateSentence(id, { status: "generating" as SentenceStatus })
           try {
             const result = await generateSentenceAudio(id, sentence.text, params, currentProject)
+            let preloadError: unknown = null
+            try {
+              // Finish preparing the Blob URL before exposing the sentence as
+              // ready. This removes the first-click race between the ready UI
+              // and the asynchronous tts_read_audio IPC call.
+              await readAudioAsUrl(result.audioPath)
+            } catch (error) {
+              preloadError = error
+            }
             if (!tasks.current.isCurrent(task, useProjectStore.getState().currentProject)) {
               cleanupAudioFiles([result.audioPath])
               continue
@@ -111,9 +120,7 @@ export function useTtsGeneration() {
               audioHistory: retained,
             })
             if (evictedPaths.length > 0) cleanupAudioFiles(evictedPaths)
-            // 预缓存 Blob URL，确保点击播放时 readAudioAsUrl 能从缓存瞬间返回，
-            // 避免 async IPC 打断用户手势链导致 WKWebView autoplay 策略阻止播放。
-            readAudioAsUrl(result.audioPath).catch(() => {})
+            if (preloadError) console.error("Audio preload after generation failed:", preloadError)
           } catch (e) {
             console.error("TTS generate failed:", id, e)
             if (!tasks.current.isCurrent(task, useProjectStore.getState().currentProject)) continue
