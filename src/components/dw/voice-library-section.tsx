@@ -13,13 +13,13 @@ import type { VoiceDesignPreset } from "@/types"
 import { resolveCapability } from "@/utils/provider-catalog"
 import { open } from "@tauri-apps/plugin-dialog"
 import {
+  CheckCircle2,
   CircleAlert,
   Edit3,
   Mic2,
   Pause,
   Play,
   Plus,
-  RefreshCw,
   Sparkles,
   Trash2,
   X,
@@ -46,7 +46,6 @@ export function VoiceLibrarySection() {
   const [sampleError, setSampleError] = useState<string | null>(null)
   const [sampleSaving, setSampleSaving] = useState(false)
   const [playingPath, setPlayingPath] = useState<string | null>(null)
-  const [testingDesignId, setTestingDesignId] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const play = async (path: string) => {
@@ -88,44 +87,6 @@ export function VoiceLibrarySection() {
     if (design.previewAudioPath) cleanupAudioFiles([design.previewAudioPath])
     clearVoiceResourceReferences("design", design.id)
     removeDesign(design.id)
-  }
-
-  const testSavedDesign = async (design: VoiceDesignPreset) => {
-    const settings = useSettingsStore.getState()
-    const config = settings.apiConfigs.find((item) => item.id === design.previewApiConfigId)
-    const capability = config ? resolveCapability(config, "voice-design") : null
-    const apiKey = config ? settings.apiKeys[config.id] : ""
-    if (!config || !capability || !apiKey) {
-      setSampleError(t("voiceLibrary.design.missingApi"))
-      setDesignEditor(structuredClone(design))
-      return
-    }
-    setTestingDesignId(design.id)
-    setSampleError(null)
-    try {
-      const result = await previewVoice(design.previewText, {
-        provider: config.provider,
-        baseUrl: config.baseUrl,
-        apiKey,
-        model: capability.modelId,
-        mode: "voice-design",
-        voice: "",
-        voiceDesignPrompt: design.prompt,
-        voiceClonePath: null,
-        performancePrompt: "",
-      })
-      if (design.previewAudioPath) cleanupAudioFiles([design.previewAudioPath])
-      saveDesign({
-        ...design,
-        previewAudioPath: result.audioPath,
-        lastVerifiedAt: Date.now(),
-        updatedAt: Date.now(),
-      })
-    } catch (error) {
-      setSampleError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setTestingDesignId(null)
-    }
   }
 
   const chooseSample = async () => {
@@ -187,7 +148,6 @@ export function VoiceLibrarySection() {
         <div className="dw-settings-section-heading dw-models-section-heading">
           <div>
             <h2 id="voice-design-library-title">{t("voiceLibrary.design.title")}</h2>
-            <p>{t("voiceLibrary.design.description")}</p>
           </div>
           <button type="button" className="dw-primary-btn dw-add-model-btn" onClick={addDesign}>
             <Plus size={13} /> {t("voiceLibrary.design.add")}
@@ -203,22 +163,10 @@ export function VoiceLibrarySection() {
                   <Sparkles size={16} />
                   <div>
                     <strong>{design.name}</strong>
-                    <p>{design.prompt}</p>
+                    <p title={design.prompt}>{design.prompt}</p>
                   </div>
                 </div>
                 <div className="dw-resource-actions">
-                  <button
-                    type="button"
-                    className="dw-icon-action"
-                    aria-label={t("voiceLibrary.design.test")}
-                    disabled={testingDesignId === design.id}
-                    onClick={() => void testSavedDesign(design)}
-                  >
-                    <RefreshCw
-                      size={13}
-                      className={testingDesignId === design.id ? "dw-spinner" : undefined}
-                    />
-                  </button>
                   {design.previewAudioPath && (
                     <button
                       type="button"
@@ -257,7 +205,6 @@ export function VoiceLibrarySection() {
         <div className="dw-settings-section-heading dw-models-section-heading">
           <div>
             <h2 id="voice-clone-library-title">{t("voiceLibrary.clone.title")}</h2>
-            <p>{t("voiceLibrary.clone.description")}</p>
           </div>
           <button
             type="button"
@@ -589,25 +536,35 @@ function VoiceDesignEditor({
             onChange={(event) => update({ previewText: event.target.value }, true)}
           />
         </label>
-        <button
-          type="button"
-          className="dw-test-btn"
-          disabled={testing}
-          onClick={() => void test()}
-        >
-          {testing ? t("common.testing") : t("voiceLibrary.design.test")}
-        </button>
-        {draft.previewAudioPath && (
-          <div className="dw-resource-preview-result">
-            <span className="dw-test-result is-success">
-              {t("voiceLibrary.design.testSuccess")}
-            </span>
-            <button type="button" className="dw-pill-btn" onClick={() => void playPreview()}>
-              {playing ? <Pause size={12} /> : <Play size={12} />}
-              {t(playing ? "sentence.pause" : "sentence.play")}
+        <div className="dw-preview-panel">
+          <div className="dw-preview-panel-actions">
+            <button
+              type="button"
+              className="dw-preview-generate-btn"
+              disabled={testing}
+              onClick={() => void test()}
+            >
+              <Sparkles size={13} />
+              {testing ? t("common.testing") : t("voiceLibrary.design.test")}
             </button>
+            {draft.previewAudioPath && (
+              <button
+                type="button"
+                className="dw-preview-play-btn"
+                onClick={() => void playPreview()}
+              >
+                {playing ? <Pause size={13} /> : <Play size={13} />}
+                {t(playing ? "sentence.pause" : "sentence.play")}
+              </button>
+            )}
           </div>
-        )}
+          {draft.previewAudioPath && (
+            <output className="dw-preview-ready">
+              <CheckCircle2 size={13} />
+              <span>{t("voiceLibrary.design.testSuccess")}</span>
+            </output>
+          )}
+        </div>
         {error && <div className="dw-settings-inline-error">{error}</div>}
       </div>
       <footer className="dw-api-editor-footer">

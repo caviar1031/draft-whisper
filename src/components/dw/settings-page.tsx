@@ -5,7 +5,7 @@ import type { ApiConfig, LanguagePreference, ThemePreference } from "@/types"
 import { PROVIDERS, TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
 import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
 import { Check, ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2, X } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiConfigEditor } from "./api-config-editor"
 import { VoiceLibrarySection } from "./voice-library-section"
@@ -79,42 +79,40 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       </header>
 
       <main className="dw-settings-content">
-        <SettingsSection title={t("settings.general")} description={t("settings.generalDesc")}>
+        <SettingsSection title={t("settings.general")}>
           <div className="dw-preference-row">
             <div>
               <strong>{t("settings.language")}</strong>
             </div>
-            <select
-              className="dw-settings-select dw-language-select"
+            <SettingsSelect
               value={settings.language}
-              onChange={(event) => handleLanguageChange(event.target.value as LanguagePreference)}
-            >
-              <option value="system">{t("settings.languageSystem")}</option>
-              <option value="zh-CN">{t("settings.languageChinese")}</option>
-              <option value="en">{t("settings.languageEnglish")}</option>
-            </select>
+              ariaLabel={t("settings.language")}
+              options={[
+                { value: "system", label: t("settings.languageSystem") },
+                { value: "zh-CN", label: t("settings.languageChinese") },
+                { value: "en", label: t("settings.languageEnglish") },
+              ]}
+              onChange={handleLanguageChange}
+            />
           </div>
           <div className="dw-preference-row">
             <div>
               <strong>{t("settings.theme")}</strong>
-              <p>{t("settings.themeHint")}</p>
             </div>
-            <select
-              className="dw-settings-select dw-language-select"
+            <SettingsSelect
               value={settings.theme}
-              onChange={(event) => handleThemeChange(event.target.value as ThemePreference)}
-            >
-              <option value="system">{t("settings.themeSystem")}</option>
-              <option value="light">{t("settings.themeLight")}</option>
-              <option value="dark">{t("settings.themeDark")}</option>
-            </select>
+              ariaLabel={t("settings.theme")}
+              options={[
+                { value: "system", label: t("settings.themeSystem") },
+                { value: "light", label: t("settings.themeLight") },
+                { value: "dark", label: t("settings.themeDark") },
+              ]}
+              onChange={handleThemeChange}
+            />
           </div>
         </SettingsSection>
 
-        <SettingsSection
-          title={t("settings.generation")}
-          description={t("settings.generationDesc")}
-        >
+        <SettingsSection title={t("settings.generation")}>
           <div className="dw-preference-row">
             <div>
               <strong>{t("settings.concurrency")}</strong>
@@ -140,10 +138,6 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
           </div>
         </SettingsSection>
 
-        <div className="dw-settings-group-heading">
-          <h2>{t("settings.voiceCapabilities")}</h2>
-          <p>{t("settings.voiceCapabilitiesDesc")}</p>
-        </div>
         <VoiceLibrarySection />
 
         <section className="dw-settings-section" aria-labelledby="models-api-title">
@@ -273,7 +267,7 @@ function SettingsSection({
   children,
 }: {
   title: string
-  description: string
+  description?: string
   children: React.ReactNode
 }) {
   return (
@@ -281,10 +275,169 @@ function SettingsSection({
       <div className="dw-settings-section-heading">
         <div>
           <h2>{title}</h2>
-          <p>{description}</p>
+          {description && <p>{description}</p>}
         </div>
       </div>
       <div className="dw-preference-card">{children}</div>
     </section>
+  )
+}
+
+interface SettingsSelectOption<Value extends string> {
+  value: Value
+  label: string
+}
+
+function SettingsSelect<Value extends string>({
+  value,
+  options,
+  ariaLabel,
+  onChange,
+}: {
+  value: Value
+  options: SettingsSelectOption<Value>[]
+  ariaLabel: string
+  onChange: (value: Value) => void
+}) {
+  const listboxId = useId()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  )
+  const [open, setOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(selectedIndex)
+  const [placement, setPlacement] = useState<"down" | "up">("down")
+  const selectedOption = options[selectedIndex]
+
+  useEffect(() => {
+    if (!open) return
+
+    const updatePlacement = () => {
+      const trigger = triggerRef.current
+      if (!trigger) return
+      const triggerRect = trigger.getBoundingClientRect()
+      const boundary = trigger.closest(".dw-settings-content")?.getBoundingClientRect()
+      const boundaryTop = boundary?.top ?? 0
+      const boundaryBottom = boundary?.bottom ?? window.innerHeight
+      const menuHeight = options.length * 34 + 10
+      const spaceBelow = boundaryBottom - triggerRect.bottom
+      const spaceAbove = triggerRect.top - boundaryTop
+      setPlacement(spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow ? "up" : "down")
+    }
+
+    updatePlacement()
+    window.addEventListener("resize", updatePlacement)
+    return () => window.removeEventListener("resize", updatePlacement)
+  }, [open, options.length])
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [open])
+
+  const openMenu = () => {
+    setHighlightedIndex(selectedIndex)
+    setOpen((current) => !current)
+  }
+
+  const selectOption = (option: SettingsSelectOption<Value>) => {
+    onChange(option.value)
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault()
+      const direction = event.key === "ArrowDown" ? 1 : -1
+      if (!open) {
+        setHighlightedIndex(selectedIndex)
+        setOpen(true)
+        return
+      }
+      setHighlightedIndex((current) => (current + direction + options.length) % options.length)
+      return
+    }
+
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault()
+      setOpen(true)
+      setHighlightedIndex(event.key === "Home" ? 0 : options.length - 1)
+      return
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault()
+      if (!open) {
+        setHighlightedIndex(selectedIndex)
+        setOpen(true)
+      } else {
+        selectOption(options[highlightedIndex])
+      }
+    }
+  }
+
+  return (
+    <div className={`dw-settings-select-wrap${open ? " is-open" : ""}`} ref={rootRef}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="dw-settings-select-control"
+        aria-label={ariaLabel}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        onClick={openMenu}
+        onKeyDown={handleKeyDown}
+      >
+        <span>{selectedOption.label}</span>
+        <ChevronDown size={15} aria-hidden="true" />
+      </button>
+      {open && (
+        <div
+          id={listboxId}
+          className={`dw-settings-select-menu is-${placement}`}
+          role="menu"
+          tabIndex={-1}
+          aria-label={ariaLabel}
+        >
+          {options.map((option, index) => (
+            <button
+              key={option.value}
+              id={`${listboxId}-option-${index}`}
+              type="button"
+              className={`dw-settings-select-option${
+                index === highlightedIndex ? " is-highlighted" : ""
+              }`}
+              onClick={() => selectOption(option)}
+              onMouseEnter={() => setHighlightedIndex(index)}
+            >
+              <span>{option.label}</span>
+              {option.value === value && <Check size={14} aria-hidden="true" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
