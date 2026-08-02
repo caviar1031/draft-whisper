@@ -9,9 +9,11 @@ import {
   isValidHttpUrl,
   migratePersistedSettings,
   normalizeConcurrency,
+  normalizeTheme,
   resolveLanguage,
   validateApiConfig,
 } from "../src/utils/settings-validation.ts"
+import { resolveTheme } from "../src/utils/theme.ts"
 import { getTtsConfigurationError } from "../src/utils/tts-config.ts"
 import { resolveProjectVoiceResources } from "../src/utils/voice-resources.ts"
 
@@ -151,7 +153,7 @@ test("accepts only HTTP or HTTPS API base URLs", () => {
 test("migrates legacy global API settings into the first configuration", () => {
   const migrated = migratePersistedSettings({
     baseUrl: "https://api.example.com/v1",
-    concurrency: 12,
+    concurrency: 20,
     project: "Demo",
     models: [{ id: "legacy-custom-model" }],
   })
@@ -167,6 +169,17 @@ test("resolves system language to a supported locale", () => {
   assert.equal(resolveLanguage("system", "zh-Hans-CN"), "zh-CN")
   assert.equal(resolveLanguage("system", "fr-FR"), "en")
   assert.equal(resolveLanguage("en", "zh-CN"), "en")
+})
+
+test("migrates and normalizes the saved theme preference", () => {
+  assert.equal(normalizeTheme("dark"), "dark")
+  assert.equal(normalizeTheme("light"), "light")
+  assert.equal(normalizeTheme("unknown"), "system")
+  assert.equal(migratePersistedSettings({}).theme, "system")
+  assert.equal(migratePersistedSettings({ theme: "dark" }).theme, "dark")
+  assert.equal(resolveTheme("system", true), "dark")
+  assert.equal(resolveTheme("system", false), "light")
+  assert.equal(resolveTheme("light", true), "light")
 })
 
 test("resolves saved voice resources live while retaining legacy fallbacks", () => {

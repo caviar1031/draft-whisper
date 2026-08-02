@@ -1,12 +1,13 @@
-import type { ApiConfig, LanguagePreference, ProviderId, TtsMode } from "@/types"
+import type { ApiConfig, LanguagePreference, ProviderId, ThemePreference, TtsMode } from "@/types"
 import { PROVIDERS, TTS_MODES, createApiConfig } from "./provider-catalog.ts"
 
 export const MIN_CONCURRENCY = 1
-export const MAX_CONCURRENCY = 4
+export const MAX_CONCURRENCY = 16
 export const LEGACY_API_CONFIG_ID = "migrated-mimo"
 
 export interface PersistedSettingsData {
   language: LanguagePreference
+  theme: ThemePreference
   concurrency: number
   project: string | null
   apiConfigs: ApiConfig[]
@@ -30,6 +31,10 @@ export function isValidHttpUrl(value: string): boolean {
 
 function normalizeLanguage(value: unknown): LanguagePreference {
   return value === "zh-CN" || value === "en" || value === "system" ? value : "system"
+}
+
+export function normalizeTheme(value: unknown): ThemePreference {
+  return value === "light" || value === "dark" || value === "system" ? value : "system"
 }
 
 function normalizeApiConfig(value: unknown): ApiConfig | null {
@@ -88,6 +93,7 @@ export function migratePersistedSettings(value: unknown): PersistedSettingsData 
 
   return {
     language: normalizeLanguage(old.language),
+    theme: normalizeTheme(old.theme),
     concurrency: normalizeConcurrency(old.concurrency),
     project: typeof old.project === "string" || old.project === null ? old.project : null,
     apiConfigs,

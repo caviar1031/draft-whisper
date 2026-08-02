@@ -22,6 +22,7 @@ import { generateSentenceId } from "@/utils/id"
 import { resolveCapability } from "@/utils/provider-catalog"
 import { splitTextToSentences } from "@/utils/sentence"
 import { resolveLanguage } from "@/utils/settings-validation"
+import { applyTheme, getThemeMediaQuery } from "@/utils/theme"
 import { getTtsConfigurationError } from "@/utils/tts-config"
 import { resolveProjectVoiceResources } from "@/utils/voice-resources"
 import { getCurrentWindow } from "@tauri-apps/api/window"
@@ -73,6 +74,7 @@ function App() {
   const apiConfigs = useSettingsStore((s) => s.apiConfigs)
   const apiKeys = useSettingsStore((s) => s.apiKeys)
   const language = useSettingsStore((s) => s.language)
+  const theme = useSettingsStore((s) => s.theme)
   const defaultApiConfigId = useSettingsStore((s) => s.defaultApiConfigId)
   const voiceDesigns = useVoiceDesignStore((s) => s.designs)
   const voiceSamples = useVoiceSampleStore((s) => s.samples)
@@ -94,6 +96,23 @@ function App() {
   useEffect(() => {
     void i18n.changeLanguage(resolveLanguage(language))
   }, [language])
+
+  useEffect(() => {
+    applyTheme(theme)
+    if (theme !== "system") return
+
+    const mediaQuery = getThemeMediaQuery()
+    if (!mediaQuery) return
+
+    const handleSystemThemeChange = () => applyTheme("system")
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleSystemThemeChange)
+      return () => mediaQuery.removeEventListener("change", handleSystemThemeChange)
+    }
+
+    mediaQuery.addListener(handleSystemThemeChange)
+    return () => mediaQuery.removeListener(handleSystemThemeChange)
+  }, [theme])
 
   useEffect(() => {
     if (!projectApiConfigId && defaultApiConfigId) setProjectApiConfigId(defaultApiConfigId)

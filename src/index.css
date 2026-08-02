@@ -56,6 +56,8 @@
 }
 
 :root {
+  color-scheme: light;
+
   /* ===== Apple-inspired primitive palette (Pinguo design tokens) ===== */
 
   /* brand */
@@ -172,6 +174,9 @@
   --glass-bg-card-hover: rgba(255, 255, 255, 0.75);
   --glass-bg-card-subtle: rgba(255, 255, 255, 0.25);
   --glass-bg-input: rgba(255, 255, 255, 0.6);
+  --glass-header-bg: rgba(255, 255, 255, 0.28);
+  --glass-editor-bg: rgba(250, 250, 252, 0.96);
+  --glass-select-option-bg: #ffffff;
   --glass-overlay: rgba(0, 0, 0, 0.15);
   --glass-focus-ring: rgba(0, 122, 255, 0.3);
   --glass-text-on-primary: #ffffff;
@@ -202,23 +207,73 @@
 }
 
 .dark {
-  --background: var(--background-900);
+  color-scheme: dark;
+
+  /* Primitive aliases used by the original Liquid Glass component styles. */
+  --brand-400: #5eb5ff;
+  --brand-500: #0a84ff;
+  --brand-600: #66abff;
+  --brand-700: #9fcbff;
+  --background-400: #636366;
+  --text-100: #e5e5ea;
+  --text-200: #d1d1d6;
+  --text-300: #aeaeb2;
+  --text-400: #98989d;
+  --text-500: #8e8e93;
+  --text-600: #aeaeb2;
+  --text-700: #d1d1d6;
+  --text-800: #f5f5f7;
+  --text-900: #ffffff;
+  --icon-600: #aeaeb2;
+  --icon-700: #c7c7cc;
+  --icon-800: #e5e5ea;
+  --icon-900: #f5f5f7;
+  --state-success: #30d158;
+  --state-error: #ff453a;
+  --state-success-surface: rgba(48, 209, 88, 0.16);
+  --state-error-surface: rgba(255, 69, 58, 0.16);
+  --glass-green-tint: rgba(48, 209, 88, 0.14);
+  --glass-green-tint-strong: rgba(48, 209, 88, 0.2);
+  --glass-green-strong: #30d158;
+  --glass-red-tint-medium: rgba(255, 69, 58, 0.14);
+  --glass-card-bg: rgba(255, 255, 255, 0.04);
+  --glass-header-bg: rgba(28, 28, 30, 0.38);
+  --glass-editor-bg: rgba(28, 28, 30, 0.96);
+  --glass-select-option-bg: #2c2c2e;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  --macos-bg-1: #202b38;
+  --macos-bg-2: #263746;
+  --macos-bg-3: #26313d;
+  --macos-bg-4: #182431;
+  --macos-bg-5: #202d3a;
+  --macos-bg-6: #26303b;
+
+  --background: #1c1c1e;
   --foreground: var(--text-50);
-  --card: var(--background-800);
+  --card: #2c2c2e;
   --card-foreground: var(--text-50);
-  --popover: var(--background-700);
+  --popover: #3a3a3c;
   --popover-foreground: var(--text-50);
 
-  --primary: var(--brand-400);
-  --primary-foreground: var(--background-900);
-  --secondary: var(--background-800);
+  --primary: var(--brand-500);
+  --primary-foreground: #000000;
+  --secondary: #2c2c2e;
   --secondary-foreground: var(--text-50);
-  --muted: var(--background-800);
+  --muted: #2c2c2e;
   --muted-foreground: var(--text-400);
-  --accent: var(--background-700);
+  --accent: #3a3a3c;
   --accent-foreground: var(--text-50);
   --destructive: var(--state-error-dark);
   --success: var(--state-success-dark);
+  --border: #48484a;
+  --input: #636366;
+
+  --sidebar: #2c2c2e;
+  --sidebar-foreground: var(--text-50);
+  --sidebar-accent: #48484a;
+  --sidebar-accent-foreground: var(--text-50);
+  --sidebar-border: #48484a;
 
   --glass-bg: rgba(28, 28, 30, 0.78);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -1335,7 +1390,7 @@
     gap: 16px;
     padding: 18px 22px 16px;
     border-bottom: 1px solid var(--glass-divider);
-    background: rgba(255, 255, 255, 0.28);
+    background: var(--glass-header-bg);
     backdrop-filter: blur(18px) saturate(160%);
     -webkit-backdrop-filter: blur(18px) saturate(160%);
     flex-shrink: 0;
@@ -1880,7 +1935,7 @@
   }
 
   .dw-settings-select option {
-    background: #fff;
+    background: var(--glass-select-option-bg);
     color: var(--text-800);
   }
 
@@ -2820,7 +2875,7 @@
     overflow: hidden;
     border: 1px solid var(--glass-divider-strong);
     border-radius: 16px;
-    background: rgba(250, 250, 252, 0.96);
+    background: var(--glass-editor-bg);
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.24);
     backdrop-filter: blur(24px) saturate(170%);
     -webkit-backdrop-filter: blur(24px) saturate(170%);

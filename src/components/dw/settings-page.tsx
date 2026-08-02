@@ -1,7 +1,7 @@
 import i18n from "@/i18n"
 import { countApiConfigReferences, reassignApiConfigReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
-import type { ApiConfig, LanguagePreference } from "@/types"
+import type { ApiConfig, LanguagePreference, ThemePreference } from "@/types"
 import { PROVIDERS, TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
 import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
 import { Check, ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2, X } from "lucide-react"
@@ -36,6 +36,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const handleLanguageChange = (language: LanguagePreference) => {
     settings.setLanguage(language)
     void i18n.changeLanguage(resolveLanguage(language))
+  }
+
+  const handleThemeChange = (theme: ThemePreference) => {
+    settings.setTheme(theme)
   }
 
   const handleAdd = () => {
@@ -88,6 +92,21 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               <option value="system">{t("settings.languageSystem")}</option>
               <option value="zh-CN">{t("settings.languageChinese")}</option>
               <option value="en">{t("settings.languageEnglish")}</option>
+            </select>
+          </div>
+          <div className="dw-preference-row">
+            <div>
+              <strong>{t("settings.theme")}</strong>
+              <p>{t("settings.themeHint")}</p>
+            </div>
+            <select
+              className="dw-settings-select dw-language-select"
+              value={settings.theme}
+              onChange={(event) => handleThemeChange(event.target.value as ThemePreference)}
+            >
+              <option value="system">{t("settings.themeSystem")}</option>
+              <option value="light">{t("settings.themeLight")}</option>
+              <option value="dark">{t("settings.themeDark")}</option>
             </select>
           </div>
         </SettingsSection>

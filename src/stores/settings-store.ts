@@ -1,5 +1,5 @@
 import { deleteApiKey, loadApiKey, migrateLegacyApiKey, saveApiKey } from "@/services/tts"
-import type { ApiConfig, LanguagePreference, Settings, TtsMode } from "@/types"
+import type { ApiConfig, LanguagePreference, Settings, ThemePreference, TtsMode } from "@/types"
 import { createApiConfig } from "@/utils/provider-catalog"
 import {
   LEGACY_API_CONFIG_ID,
@@ -16,6 +16,7 @@ interface SettingsState extends PersistedSettings {
   apiKeysLoaded: boolean
   apiKeyErrors: Record<string, string | null>
   setLanguage: (language: LanguagePreference) => void
+  setTheme: (theme: ThemePreference) => void
   setConcurrency: (concurrency: number) => void
   setProject: (project: string | null) => void
   saveApiConfig: (config: ApiConfig, apiKey?: string) => Promise<void>
@@ -33,6 +34,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist<SettingsState, [], [], PersistedSettings>(
     (set, get) => ({
       language: "system",
+      theme: "system",
       concurrency: 1,
       project: null,
       apiConfigs: [],
@@ -42,6 +44,7 @@ export const useSettingsStore = create<SettingsState>()(
       apiKeyErrors: {},
 
       setLanguage: (language) => set({ language }),
+      setTheme: (theme) => set({ theme }),
       setConcurrency: (concurrency) => set({ concurrency: normalizeConcurrency(concurrency) }),
       setProject: (project) => set({ project }),
 
@@ -151,10 +154,11 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "dw-settings",
-      version: 3,
+      version: 4,
       migrate: migratePersistedSettings,
       partialize: (state) => ({
         language: state.language,
+        theme: state.theme,
         concurrency: state.concurrency,
         project: state.project,
         apiConfigs: state.apiConfigs,
