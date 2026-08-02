@@ -993,25 +993,16 @@ pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Re
 ///
 /// ## Source 生命周期
 ///
-/// `begin_drag` 通过 `DWFileDragSource::new` 创建 source（+1 引用计数），然后
-/// 用 `Retained::into_raw` **故意泄漏**这个 +1，保证 source 在整个拖拽会话期间
-/// 存活。当拖拽结束时，AppKit 会回调
-/// `draggingSession:endedAtPoint:operation:`，我们在该回调中调用 `release` 来
-/// 释放泄漏的 +1，从而避免永久内存泄漏。
-///
-/// 依据 Apple 文档：
-/// - `beginDraggingSessionWithItems:event:source:` 的 session 会 retain source、
-///   items 和 event；session 本身被系统 retain 直到拖拽完成。
-///   <https://developer.apple.com/documentation/appkit/nsview/begindraggingsession(withitems:event:source:)>
-/// - `draggingSession:endedAtPoint:operation:` 在拖拽结束时由 session 发送给
-///   source，此时 session 尚未释放 source（释放发生在回调返回之后）。
-///   <https://developer.apple.com/documentation/appkit/nsdraggingsource/draggingsession(endedatpoint:operation:)>
+/// `begin_drag` 通过 `Retained::into_raw` 显式保留 source 的 +1 引用计数，
+/// 因而不依赖 AppKit 是否强持有 source。拖拽结束回调把这份 +1 所有权恢复为
+/// `Retained`，再交给当前 Objective-C autorelease pool 延迟释放。这样对象在
+/// `&self` 回调返回前不会析构，同时不会永久泄漏。
 #[cfg(target_os = "macos")]
 mod drag {
   use objc2::rc::Retained;
   use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
   use objc2::{
-    define_class, msg_send, AnyThread, MainThreadMarker, MainThreadOnly,
+    define_class, msg_send, AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly,
   };
   use objc2_app_kit::{
     NSDragOperation, NSDraggingContext, NSDraggingItem, NSDraggingSession, NSDraggingSource,
@@ -1020,7 +1011,12 @@ mod drag {
   use objc2_foundation::{
     NSArray, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString, NSURL,
   };
-  use std::ffi::c_void;
+  use std::{cell::Cell, ffi::c_void};
+
+  #[derive(Default)]
+  struct DragSourceIvars {
+    release_scheduled: Cell<bool>,
+  }
 
   // `DWFileDragSource` 是一个实现 `NSDraggingSource` 协议的 NSObject 子类：
   // 所有 context 下均返回 `NSDragOperationCopy`。标记为 `MainThreadOnly` 以匹配
@@ -1029,6 +1025,7 @@ mod drag {
     #[unsafe(super(NSObject))]
     #[thread_kind = MainThreadOnly]
     #[name = "DWFileDragSource"]
+    #[ivars = DragSourceIvars]
     struct DWFileDragSource;
 
     /// NSObject 协议合规（`define_class!` 不会自动实现）。
@@ -1048,9 +1045,8 @@ mod drag {
         NSDragOperation::Copy
       }
 
-      // 拖拽结束回调：释放 `begin_drag` 中通过 `Retained::into_raw` 泄漏的 +1
-      // 引用计数。此时 session 尚未释放 source（释放发生在回调返回之后），因此
-      // `self` 仍然有效。
+      // 拖拽结束回调：把 `begin_drag` 留下的 +1 所有权交给当前 autorelease
+      // pool，延迟到回调返回后释放，避免在 Rust `&self` 仍有效时析构对象。
       #[allow(non_snake_case)]
       #[unsafe(method(draggingSession:endedAtPoint:operation:))]
       fn draggingSession_endedAtPoint_operation(
@@ -1059,11 +1055,17 @@ mod drag {
         _screen_point: NSPoint,
         _operation: NSDragOperation,
       ) {
-        // SAFETY: `begin_drag` 通过 `DWFileDragSource::new` 创建了 `self`（+1），
-        // 并用 `Retained::into_raw` 泄漏了这个 +1。session 也 retain 了 `self`
-        //（+1）。此处 `release` 释放泄漏的 +1；session 的 +1 在回调返回后由
-        // session dealloc 释放。回调返回后不再访问 `self`。
-        let _: () = unsafe { msg_send![self, release] };
+        if self.ivars().release_scheduled.replace(true) {
+          return;
+        }
+
+        // SAFETY: `begin_drag` 对这个实例恰好调用了一次 `Retained::into_raw`，
+        // 留下可被恢复的 +1 所有权；`release_scheduled` 保证该所有权只恢复一次。
+        // `autorelease_ptr` 不会立即释放对象，而是在当前 autorelease pool 排空时
+        // 释放，因此 `self` 在本回调剩余期间保持有效。
+        let owned = unsafe { Retained::from_raw(self as *const Self as *mut Self) }
+          .expect("drag source self pointer must not be null");
+        let _autoreleased_source = Retained::autorelease_ptr(owned);
       }
     }
   );
@@ -1073,9 +1075,9 @@ mod drag {
     fn new(mtm: MainThreadMarker) -> Retained<Self> {
       // `MainThreadOnly::alloc` 要求显式 `MainThreadMarker`，由调用方保证。
       let allocated = <Self as MainThreadOnly>::alloc(mtm);
-      // `Allocated` → `PartialInit`：无 ivar 时传 `()`。`super` 调用 `init`
-      // 要求 receiver 为 `PartialInit<T>`（见 objc2 的 RetainSemantics 约束）。
-      let partial = allocated.set_ivars(());
+      // `Allocated` → `PartialInit`：先初始化防重复释放标记。`super` 调用
+      // `init` 要求 receiver 为 `PartialInit<T>`。
+      let partial = allocated.set_ivars(DragSourceIvars::default());
       // SAFETY: `partial` 是刚 alloc 且 ivar 已就绪的实例，调用 NSObject 的
       // `init` 是其指定初始化器；返回的 `Retained` 拥有 +1 引用计数，符合
       // init 家族语义。
@@ -1100,8 +1102,14 @@ mod drag {
 
     // --- Drag source instance ---
     let source = DWFileDragSource::new(mtm);
+    // `into_raw` 保留 `new` 返回的 +1 所有权，使 source 的生命周期独立于
+    // AppKit 的内部所有权策略。结束回调会把这份所有权交给 autorelease pool。
+    let source_ptr = Retained::into_raw(source);
+    // SAFETY: `source_ptr` 来自非空的 `Retained`，上面的 +1 保证它在结束回调
+    // 安排延迟释放前一直有效。
+    let source = unsafe { &*source_ptr };
     let source_ref: &ProtocolObject<dyn NSDraggingSource> =
-      ProtocolObject::from_ref(&*source);
+      ProtocolObject::from_ref(source);
 
     // --- File URL ---
     let path_nsstring = NSString::from_str(path_str);
@@ -1182,15 +1190,6 @@ mod drag {
     let _session =
       view.beginDraggingSessionWithItems_event_source(&items, &event, source_ref);
 
-    // --- Leak source to guarantee lifetime across the drag session ---
-    // `Retained::into_raw` 消费 `source` 并返回裸指针，不执行 release。这样
-    // source 的 +1 引用计数（来自 `new`）在整个拖拽期间不会被释放。当拖拽
-    // 结束时，`draggingSession:endedAtPoint:operation:` 回调会调用 `release`
-    // 来平衡这个 +1（见 DWFileDragSource 的 NSDraggingSource impl）。
-    //
-    // Apple 文档保证 session 会 retain source，因此即使我们的
-    // Retained<NSDraggingSession> 被 drop，source 仍然存活。
-    let _leaked_source_ptr = Retained::into_raw(source);
   }
 }
 
