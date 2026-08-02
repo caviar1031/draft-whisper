@@ -150,7 +150,7 @@ cargo clippy --all-targets -- -D warnings
 - `unsafe` 代码变化和安全依据
 - 已知风险与建议的后续工作
 
-不得自行合并到 `developer`，也不得重写或删除其他分支。提交前应检查 `.gitignore`，
+不得自行合并到 `develop`，也不得重写或删除其他分支。提交前应检查 `.gitignore`，
 仅提交与本需求直接相关的文件。
 
 ## 8. 评审重点

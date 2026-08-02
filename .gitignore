@@ -41,6 +41,7 @@ src-tauri/gen/
 .DS_Store
 .trae/
 .trae-cn/
+.workbuddy/
 *.suo
 *.ntvs*
 *.njsproj

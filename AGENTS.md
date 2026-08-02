@@ -393,3 +393,59 @@ interface Project {
 - 新增前端 service：放 `src/services/`，命名 kebab-case；通过 `index.ts` re-export。
 - 新增依赖：前端用 `npm i`；后端改 [Cargo.toml](src-tauri/Cargo.toml) 后 `cargo check`。
 - 涉及文件系统/网络新权限：改 [src-tauri/capabilities/default.json](src-tauri/capabilities/default.json)。
+
+---
+
+## 12. 多 Agent、worktree 与代码评审
+
+### 12.1 任务分发
+
+- 并行开发使用独立 `git worktree`，从明确的目标分支和提交创建；创建前检查
+  `git status`、`git worktree list` 和同名分支。
+- 分支默认使用 `codex/<task-name>`；worktree 放在仓库同级目录，避免嵌套 worktree
+  污染主仓库。
+- 需求文档写在任务 worktree 内，至少包含：背景、目标、允许修改范围、非目标、
+  行为兼容要求、自动化验收、手工验收和交付格式。
+- 实现 Agent 只能修改任务范围内的文件，不得合并目标分支，不得删除其他 worktree，
+  不得提交 `.workbuddy/` 等本地 Agent 元数据。
+- 交付前必须报告未完成的手工验证；“无法验证”不能写成“通过”。
+
+### 12.2 评审门禁
+
+评审按以下顺序执行：
+
+1. 确认实现分支基线、PR base、HEAD SHA、工作区清洁度和未跟踪文件。
+2. 审查 `develop...HEAD` 的完整差异；大量纯格式化变化应拆出，不能掩盖功能修改。
+3. 执行 `git diff --check`，不接受多余空白或文件末尾格式错误。
+4. 执行需求中规定的 lint、build、test、`cargo check` 和 Clippy。
+5. 涉及 macOS 原生窗口、Keychain、剪贴板或拖拽时，必须进行对应的真实 GUI 回归。
+6. 只有阻断项清零、目标工作区干净后才能合并；合并后再注销 worktree。
+7. 注销前检查未跟踪文件，不得用 `--force` 静默删除来源不明的文件。
+
+### 12.3 GitHub 评审可见性
+
+- Codex 回复中的 `::code-comment` 只属于当前任务界面的本地批注，**不会自动发布到
+  GitHub**。
+- 用户或开发 Agent 需要在 PR 中看到意见时，必须显式提交 GitHub PR review 或
+  Conversation comment。
+- 发布前确认仓库、PR number、base/head 分支和 HEAD SHA，避免评论锚定到错误提交。
+- 发布后必须回读 PR review，确认作者、状态、正文和 commit SHA；只运行发布命令但
+  没有回读不能视为成功。
+- 当前账号是 PR 作者时，GitHub 可能不允许 `REQUEST_CHANGES`；此时使用
+  `COMMENTED` review，并在正文首行明确写出“需要修改，暂不合并”。
+- GitHub 连接器不可用时可回退到 `gh`，但应先运行 `gh auth status`；授权失败、
+  仓库权限不足或 PR 返回 404 时，必须明确报告，不能声称评论已发布。
+
+### 12.4 Rust / Objective-C 评审经验
+
+- 清理旧 `objc` 宏的 `unexpected_cfgs` 警告时，优先迁移到 `objc2` 类型化 API；
+  禁止通过全局 `allow`、关闭 `check-cfg` 或 `RUSTFLAGS=-A warnings` 掩盖问题。
+- selector 的参数、返回类型、method family 和 Objective-C ABI 必须由框架绑定或
+  Apple 头文件验证，不能靠猜测。
+- AppKit 对象要求主线程时使用 `MainThreadMarker` 或明确的主线程调度，不得仅依赖
+  “当前通常在主线程”的假设。
+- delegate/source 类型对象要覆盖完整原生会话生命周期。把局部 `Retained` 作为借用
+  参数传给 AppKit 后，不能未经证明就假设系统会强持有它；应持有到对应结束回调。
+- `unsafe` 块需要说明指针来源、有效期、线程约束、对象所有权和调用期间不会释放的依据。
+- 编译无警告不能替代原生行为回归；窗口透明、交通灯、Dock 恢复、Finder 定位和文件
+  拖拽应分别验证。
