@@ -4,15 +4,11 @@ import { useSettingsStore } from "@/stores/settings-store"
 import type { ApiConfig, LanguagePreference, ThemePreference } from "@/types"
 import { PROVIDERS, TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
 import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
-import { Check, ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2, X } from "lucide-react"
+import { Check, ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2 } from "lucide-react"
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiConfigEditor } from "./api-config-editor"
 import { VoiceLibrarySection } from "./voice-library-section"
-
-interface SettingsPageProps {
-  onClose: () => void
-}
 
 interface EditorState {
   config: ApiConfig
@@ -23,7 +19,7 @@ function generateApiConfigId(): string {
   return `api_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
 }
 
-export function SettingsPage({ onClose }: SettingsPageProps) {
+export function SettingsPage() {
   const { t } = useTranslation()
   const settings = useSettingsStore()
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -68,14 +64,6 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
           <h1 className="dw-settings-page-title">{t("settings.title")}</h1>
           <p className="dw-settings-page-subtitle">{t("settings.subtitle")}</p>
         </div>
-        <button
-          type="button"
-          className="dw-settings-close"
-          onClick={onClose}
-          aria-label={t("common.close")}
-        >
-          <X size={16} strokeWidth={2} />
-        </button>
       </header>
 
       <main className="dw-settings-content">

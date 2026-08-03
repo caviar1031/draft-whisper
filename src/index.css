@@ -1385,12 +1385,15 @@
 
   .dw-settings-page-header {
     display: flex;
-    align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-    padding: 18px 22px 16px;
+    height: 56px;
+    min-height: 56px;
+    padding: 0 22px;
     border-bottom: 1px solid var(--glass-divider);
     background: transparent;
+    align-items: center;
+    box-sizing: border-box;
     flex-shrink: 0;
   }
 

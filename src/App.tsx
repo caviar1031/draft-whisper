@@ -469,7 +469,7 @@ function App() {
 
       {settingsOpen ? (
         <Suspense fallback={<div className="dw-page-loading">{t("app.loadingSettings")}</div>}>
-          <SettingsPage onClose={() => setSettingsOpen(false)} />
+          <SettingsPage />
         </Suspense>
       ) : (
         <>
