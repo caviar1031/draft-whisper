@@ -42,6 +42,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "files": {
+        "Resources/Assets.car": "icons/Assets.car",
+        "Resources/draft-whisper.icns": "icons/icon.icns"
+      }
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
