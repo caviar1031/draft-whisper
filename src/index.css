@@ -3314,6 +3314,32 @@
     z-index: 120;
   }
 
+  .dw-resource-editor-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dw-resource-editor-section + .dw-resource-editor-section {
+    padding-top: 14px;
+    border-top: 1px solid var(--glass-divider);
+  }
+
+  .dw-resource-editor-section h3 {
+    margin: 0;
+    color: var(--text-700);
+    font-size: 12px;
+    font-weight: 680;
+  }
+
+  .dw-resource-editor .dw-resource-editor-textarea {
+    flex: 0 1 auto;
+    min-height: 96px;
+    max-height: 320px;
+    margin-bottom: 0;
+    resize: vertical;
+  }
+
   .dw-resource-file-path,
   .dw-resource-rule {
     margin: 0;

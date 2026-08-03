@@ -495,76 +495,88 @@ function VoiceDesignEditor({
         </button>
       </header>
       <div className="dw-api-editor-body">
-        <label className="dw-settings-label">
-          {t("voiceLibrary.name")}
-          <input
-            className="dw-settings-input"
-            value={draft.name}
-            onChange={(event) => update({ name: event.target.value })}
-          />
-        </label>
-        <label className="dw-settings-label">
-          {t("voiceLibrary.design.prompt")}
-          <textarea
-            className="dw-editor-textarea"
-            value={draft.prompt}
-            maxLength={500}
-            onChange={(event) => update({ prompt: event.target.value }, true)}
-          />
-        </label>
-        <label className="dw-settings-label">
-          {t("editor.apiConfig")}
-          <select
-            className="dw-settings-select"
-            value={draft.previewApiConfigId ?? ""}
-            onChange={(event) => update({ previewApiConfigId: event.target.value || null }, true)}
-          >
-            <option value="">{t("editor.selectApiConfig")}</option>
-            {settings.apiConfigs.map((config) => (
-              <option key={config.id} value={config.id}>
-                {config.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="dw-settings-label">
-          {t("voiceLibrary.previewText")}
-          <textarea
-            className="dw-editor-textarea"
-            value={draft.previewText}
-            maxLength={200}
-            onChange={(event) => update({ previewText: event.target.value }, true)}
-          />
-        </label>
-        <div className="dw-preview-panel">
-          <div className="dw-preview-panel-actions">
-            <button
-              type="button"
-              className="dw-preview-generate-btn"
-              disabled={testing}
-              onClick={() => void test()}
+        <section
+          className="dw-resource-editor-section"
+          aria-labelledby="voice-design-section-title"
+        >
+          <h3 id="voice-design-section-title">{t("voiceLibrary.design.sectionTitle")}</h3>
+          <label className="dw-settings-label">
+            {t("voiceLibrary.name")}
+            <input
+              className="dw-settings-input"
+              value={draft.name}
+              onChange={(event) => update({ name: event.target.value })}
+            />
+          </label>
+          <label className="dw-settings-label">
+            {t("voiceLibrary.design.prompt")}
+            <textarea
+              className="dw-editor-textarea dw-resource-editor-textarea"
+              value={draft.prompt}
+              maxLength={500}
+              onChange={(event) => update({ prompt: event.target.value }, true)}
+            />
+          </label>
+        </section>
+        <section
+          className="dw-resource-editor-section"
+          aria-labelledby="voice-preview-section-title"
+        >
+          <h3 id="voice-preview-section-title">{t("voiceLibrary.design.previewSectionTitle")}</h3>
+          <label className="dw-settings-label">
+            {t("editor.apiConfig")}
+            <select
+              className="dw-settings-select"
+              value={draft.previewApiConfigId ?? ""}
+              onChange={(event) => update({ previewApiConfigId: event.target.value || null }, true)}
             >
-              <Sparkles size={13} />
-              {testing ? t("common.testing") : t("voiceLibrary.design.test")}
-            </button>
-            {draft.previewAudioPath && (
+              <option value="">{t("editor.selectApiConfig")}</option>
+              {settings.apiConfigs.map((config) => (
+                <option key={config.id} value={config.id}>
+                  {config.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="dw-settings-label">
+            {t("voiceLibrary.previewText")}
+            <textarea
+              className="dw-editor-textarea dw-resource-editor-textarea"
+              value={draft.previewText}
+              maxLength={200}
+              onChange={(event) => update({ previewText: event.target.value }, true)}
+            />
+          </label>
+          <div className="dw-preview-panel">
+            <div className="dw-preview-panel-actions">
               <button
                 type="button"
-                className="dw-preview-play-btn"
-                onClick={() => void playPreview()}
+                className="dw-preview-generate-btn"
+                disabled={testing}
+                onClick={() => void test()}
               >
-                {playing ? <Pause size={13} /> : <Play size={13} />}
-                {t(playing ? "sentence.pause" : "sentence.play")}
+                <Sparkles size={13} />
+                {testing ? t("common.testing") : t("voiceLibrary.design.test")}
               </button>
+              {draft.previewAudioPath && (
+                <button
+                  type="button"
+                  className="dw-preview-play-btn"
+                  onClick={() => void playPreview()}
+                >
+                  {playing ? <Pause size={13} /> : <Play size={13} />}
+                  {t(playing ? "sentence.pause" : "sentence.play")}
+                </button>
+              )}
+            </div>
+            {draft.previewAudioPath && (
+              <output className="dw-preview-ready">
+                <CheckCircle2 size={13} />
+                <span>{t("voiceLibrary.design.testSuccess")}</span>
+              </output>
             )}
           </div>
-          {draft.previewAudioPath && (
-            <output className="dw-preview-ready">
-              <CheckCircle2 size={13} />
-              <span>{t("voiceLibrary.design.testSuccess")}</span>
-            </output>
-          )}
-        </div>
+        </section>
         {error && <div className="dw-settings-inline-error">{error}</div>}
       </div>
       <footer className="dw-api-editor-footer">
