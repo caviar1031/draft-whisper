@@ -388,7 +388,7 @@ pub fn tts_create_project(name: String, app: AppHandle) -> Result<Vec<String>, S
   }
   std::fs::create_dir_all(&dir)
     .map_err(|e| format!("Failed to create project directory: {e}"))?;
-  log::info!("✓ 已创建项目: {}", dir.display());
+  log::info!("Created project: {}", dir.display());
   tts_list_projects(app)
 }
 
@@ -428,17 +428,17 @@ fn ensure_audio_dir(app: &AppHandle) -> Result<PathBuf, String> {
   let mut candidates: Vec<PathBuf> = Vec::new();
   if let Ok(p) = app.path().app_cache_dir() {
     candidates.push(p.join("audio"));
-    log::info!("candidate app_cache_dir = {}", p.display());
+    log::info!("Candidate app cache directory: {}", p.display());
   }
   if let Ok(p) = app.path().app_data_dir() {
     candidates.push(p.join("audio"));
-    log::info!("candidate app_data_dir = {}", p.display());
+    log::info!("Candidate app data directory: {}", p.display());
   }
 
   for dir in &candidates {
-    log::info!("尝试目录: {}", dir.display());
+    log::info!("Trying audio directory: {}", dir.display());
     if let Err(e) = std::fs::create_dir_all(dir) {
-      log::warn!("create_dir_all 失败 {dir:?}: {e}");
+      log::warn!("Failed to create audio directory {dir:?}: {e}");
       continue;
     }
     // 验证可写
@@ -446,11 +446,11 @@ fn ensure_audio_dir(app: &AppHandle) -> Result<PathBuf, String> {
     match std::fs::write(&probe, b"") {
       Ok(()) => {
         let _ = std::fs::remove_file(&probe);
-        log::info!("✓ 使用目录: {}", dir.display());
+        log::info!("Using audio directory: {}", dir.display());
         return Ok(dir.clone());
       }
       Err(e) => {
-        log::warn!("写探测失败 {dir:?}: {e}");
+        log::warn!("Failed to write audio directory probe {dir:?}: {e}");
         let _ = std::fs::remove_file(&probe);
       }
     }
@@ -461,7 +461,7 @@ fn ensure_audio_dir(app: &AppHandle) -> Result<PathBuf, String> {
     .map_err(|e| format!("Failed to get cwd: {e}"))?
     .join(".cache")
     .join("audio");
-  log::info!("fallback local dir: {}", local.display());
+  log::info!("Using local audio directory fallback: {}", local.display());
   std::fs::create_dir_all(&local)
     .map_err(|e| format!("All directories unwritable, local fallback also failed: {local:?} -> {e}"))?;
   Ok(local)
@@ -798,7 +798,7 @@ pub fn save_voice_sample(
     let dest = dir.join(&file_name);
     std::fs::write(&dest, &bytes).map_err(|e| format!("Failed to save audio file: {e}"))?;
 
-    log::info!("✓ 已保存音色样本: {}", dest.display());
+    log::info!("Saved voice sample: {}", dest.display());
     Ok(VoiceSampleResult {
       file_path: dest.to_string_lossy().to_string(),
       format: format.to_string(),
@@ -817,7 +817,7 @@ pub fn delete_voice_sample(path: String, app: AppHandle) -> Result<(), String> {
     let safe_path = is_in_audio_dir(&app, &path)?;
     if safe_path.exists() {
         std::fs::remove_file(&safe_path).map_err(|e| format!("Failed to delete sample file: {e}"))?;
-        log::info!("✓ 已删除音色样本: {}", safe_path.display());
+        log::info!("Deleted voice sample: {}", safe_path.display());
     }
     Ok(())
 }
@@ -1018,7 +1018,7 @@ pub fn tts_drag_file(path: String, window: tauri::Window, app: AppHandle) -> Res
   // - source 的生命周期由 `drag::begin_drag` 内部管理（见该函数注释）。
   unsafe { drag::begin_drag(ns_view_ptr, mtm, &safe_path_str) };
 
-  log::info!("原生文件拖拽已启动: {}", safe_path_str);
+  log::info!("Native file drag started: {}", safe_path_str);
   Ok(())
 }
 
