@@ -2229,6 +2229,11 @@
     font-weight: 500;
   }
 
+  .dw-project-current .dw-project-remove-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
   .dw-project-none {
     padding: 12px 16px;
     border-radius: 12px;
@@ -2356,7 +2361,7 @@
 
   .dw-project-input:focus {
     border-color: var(--brand-500);
-    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+    box-shadow: none;
   }
 
   .dw-project-remove-btn {

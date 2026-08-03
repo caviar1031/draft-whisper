@@ -125,23 +125,20 @@ export function ProjectConfigCard({
             </div>
           )}
           <div className="dw-project-config-section">
-            <div className="dw-project-config-label">
-              {t("project.selected")}
-              {currentProject && (
+            <div className="dw-project-config-label">{t("project.selected")}</div>
+            {currentProject ? (
+              <div className="dw-project-current">
+                <Folder size={16} strokeWidth={2} />
+                <span>{currentProject}</span>
                 <button
                   type="button"
                   className="dw-project-remove-btn"
                   onClick={handleRemoveSelection}
                   title={t("project.removeSelection")}
+                  aria-label={t("project.removeSelection")}
                 >
                   <X size={14} strokeWidth={2} />
                 </button>
-              )}
-            </div>
-            {currentProject ? (
-              <div className="dw-project-current">
-                <Folder size={16} strokeWidth={2} />
-                <span>{currentProject}</span>
               </div>
             ) : (
               <div className="dw-project-none">{t("project.none")}</div>
