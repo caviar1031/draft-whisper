@@ -1,10 +1,20 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
+
+/// 旧版本使用过的 Bundle Identifier。
+///
+/// macOS 会把 Bundle Identifier 纳入缓存目录；应用升级后，项目元数据中
+/// 可能仍然引用这些目录里的历史音频。它们只作为受限的兼容 allowlist，
+/// 新生成的音频仍始终写入当前应用目录。
+const LEGACY_APP_IDENTIFIERS: &[&str] = &[
+    "com.draftwhisper.app",
+    "top.caviarlab.draftwhisper",
+];
 
 /// 全局共享的 HTTP Client（复用连接池 + 超时配置）。
 fn http_client() -> &'static reqwest::Client {
@@ -18,17 +28,48 @@ fn http_client() -> &'static reqwest::Client {
     })
 }
 
-/// 校验路径是否在音频缓存目录内（防止路径遍历攻击）。
+/// 返回当前目录及历史版本目录中的已存在音频目录。
+fn allowed_audio_dirs(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
+    let current = ensure_audio_dir(app)?;
+    let mut dirs = vec![current];
+
+    for base in [app.path().app_cache_dir().ok(), app.path().app_data_dir().ok()]
+        .into_iter()
+        .flatten()
+    {
+        let Some(parent) = base.parent() else {
+            continue;
+        };
+        for identifier in LEGACY_APP_IDENTIFIERS {
+            let legacy = parent.join(identifier).join("audio");
+            if legacy.is_dir() && !dirs.iter().any(|dir| dir == &legacy) {
+                dirs.push(legacy);
+            }
+        }
+    }
+
+    Ok(dirs)
+}
+
+fn is_path_in_allowed_dirs(path: &Path, dirs: &[PathBuf]) -> bool {
+    dirs.iter().any(|dir| path.starts_with(dir))
+}
+
+/// 校验路径是否在受信任的音频缓存目录内（防止路径遍历攻击）。
 ///
 /// 会 canonicalize 路径以解析 `..` 等遍历符号。
 /// 文件不存在时（如 delete 场景），校验其父目录。
 fn is_in_audio_dir(app: &AppHandle, path: &str) -> Result<PathBuf, String> {
-    let audio_dir = ensure_audio_dir(app)?;
-    let canonical_dir = audio_dir
-        .canonicalize()
-        .map_err(|e| format!("Failed to canonicalize audio dir: {e}"))?;
+    let audio_dirs = allowed_audio_dirs(app)?;
+    let canonical_dirs = audio_dirs
+        .iter()
+        .map(|dir| {
+            dir.canonicalize()
+                .map_err(|e| format!("Failed to canonicalize audio dir: {e}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let target = std::path::Path::new(path);
+    let target = Path::new(path);
     let canonical_path = if target.exists() {
         target
             .canonicalize()
@@ -42,11 +83,15 @@ fn is_in_audio_dir(app: &AppHandle, path: &str) -> Result<PathBuf, String> {
         canonical_parent.join(target.file_name().unwrap_or_default())
     };
 
-    if !canonical_path.starts_with(&canonical_dir) {
+    if !is_path_in_allowed_dirs(&canonical_path, &canonical_dirs) {
+        let allowed = canonical_dirs
+            .iter()
+            .map(|dir| dir.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
         return Err(format!(
-            "Path is outside audio directory: {} (allowed: {})",
-            path,
-            audio_dir.display()
+            "Path is outside audio directories: {} (allowed: {})",
+            path, allowed
         ));
     }
     Ok(canonical_path)
@@ -1195,10 +1240,13 @@ mod drag {
 
 #[cfg(test)]
 mod tests {
+  use std::path::PathBuf;
+
   use super::{
     audio_duration_ms, audio_format, build_chat_endpoint, build_speech_body, sanitize_filename,
-    validate_audio_signature, validate_project_name, validate_voice_clone_data_uri_size,
-    validate_voice_clone_duration, ProviderId, TtsMode, TtsParams,
+    is_path_in_allowed_dirs, validate_audio_signature, validate_project_name,
+    validate_voice_clone_data_uri_size, validate_voice_clone_duration, ProviderId, TtsMode,
+    TtsParams,
     MAX_VOICE_CLONE_DATA_URI_SIZE,
   };
 
@@ -1234,6 +1282,26 @@ mod tests {
       assert!(validate_project_name(invalid).is_err(), "accepted {invalid:?}");
     }
     assert_eq!(validate_project_name(" Demo Project ").unwrap(), "Demo Project");
+  }
+
+  #[test]
+  fn accepts_current_and_legacy_audio_dirs_only() {
+    let current = PathBuf::from("/tmp/draft-whisper/current/audio");
+    let legacy = PathBuf::from("/tmp/draft-whisper/legacy/audio");
+    let allowed = vec![current.clone(), legacy.clone()];
+
+    assert!(is_path_in_allowed_dirs(
+      &current.join("projects/demo/audio.wav"),
+      &allowed
+    ));
+    assert!(is_path_in_allowed_dirs(
+      &legacy.join("projects/demo/audio.wav"),
+      &allowed
+    ));
+    assert!(!is_path_in_allowed_dirs(
+      &PathBuf::from("/tmp/draft-whisper/other/audio.wav"),
+      &allowed
+    ));
   }
 
   #[test]
