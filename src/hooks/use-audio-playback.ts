@@ -106,5 +106,9 @@ export function useAudioPlayback() {
     setPlayingId(null)
   }, [])
 
-  return { playingId, playbackError, handlePlay, handlePause }
+  const clearPlaybackError = useCallback(() => {
+    setPlaybackError(null)
+  }, [])
+
+  return { playingId, playbackError, handlePlay, handlePause, clearPlaybackError }
 }

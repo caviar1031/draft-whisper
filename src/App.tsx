@@ -26,7 +26,7 @@ import { applyTheme, getThemeMediaQuery } from "@/utils/theme"
 import { getTtsConfigurationError } from "@/utils/tts-config"
 import { resolveProjectVoiceResources } from "@/utils/voice-resources"
 import { getCurrentWindow } from "@tauri-apps/api/window"
-import { RefreshCw, TriangleAlert } from "lucide-react"
+import { RefreshCw, TriangleAlert, X } from "lucide-react"
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -118,7 +118,8 @@ function App() {
     if (!projectApiConfigId && defaultApiConfigId) setProjectApiConfigId(defaultApiConfigId)
   }, [defaultApiConfigId, projectApiConfigId, setProjectApiConfigId])
 
-  const { playingId, playbackError, handlePlay, handlePause } = useAudioPlayback()
+  const { playingId, playbackError, handlePlay, handlePause, clearPlaybackError } =
+    useAudioPlayback()
   const { runGeneration, generateAll, retryFailed, cancelGeneration } = useTtsGeneration()
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -484,8 +485,17 @@ function App() {
             <div className="dw-retry-all-bar" role="alert">
               <span className="dw-retry-all-label">
                 <TriangleAlert size={14} strokeWidth={2} style={{ color: "var(--state-error)" }} />
-                Playback failed: {playbackError}
+                <span className="dw-retry-all-message">Playback failed: {playbackError}</span>
               </span>
+              <button
+                type="button"
+                className="dw-retry-all-close"
+                onClick={clearPlaybackError}
+                aria-label={t("common.close")}
+                title={t("common.close")}
+              >
+                <X size={14} strokeWidth={2} />
+              </button>
             </div>
           )}
 
@@ -493,7 +503,7 @@ function App() {
             <div className="dw-retry-all-bar" role="alert">
               <span className="dw-retry-all-label">
                 <TriangleAlert size={14} strokeWidth={2} style={{ color: "var(--state-error)" }} />
-                {localizedTtsConfigurationError}
+                <span className="dw-retry-all-message">{localizedTtsConfigurationError}</span>
               </span>
               <button type="button" className="dw-retry-all-btn" onClick={handleOpenScriptEditor}>
                 {t("app.configureVoice")}
@@ -505,7 +515,9 @@ function App() {
             <div className="dw-retry-all-bar">
               <span className="dw-retry-all-label">
                 <TriangleAlert size={14} strokeWidth={2} style={{ color: "var(--state-error)" }} />
-                {t("app.failedCount", { count: failedCount })}
+                <span className="dw-retry-all-message">
+                  {t("app.failedCount", { count: failedCount })}
+                </span>
               </span>
               <button type="button" className="dw-retry-all-btn" onClick={handleRetryAll}>
                 <RefreshCw size={14} strokeWidth={2} />
