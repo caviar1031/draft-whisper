@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DraftWhisper",
   "version": "0.1.0",
-  "identifier": "top.caviarlab.draftwhisper",
+  "identifier": "com.github.caviar1031.draftwhisper",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
