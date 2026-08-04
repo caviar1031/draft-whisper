@@ -1,0 +1,106 @@
+name: Release macOS
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-15
+            target: aarch64-apple-darwin
+            arch: arm64
+          - platform: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x64
+    env:
+      CARGO_TERM_COLOR: always
+      RUSTUP_TOOLCHAIN: stable
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Rust target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add ${{ matrix.target }} --toolchain stable
+
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs")
+
+          const tag = process.env.RELEASE_TAG
+          const expectedVersion = tag.replace(/^v/, "")
+          const packageVersion = JSON.parse(fs.readFileSync("package.json", "utf8")).version
+          const tauriVersion = JSON.parse(
+            fs.readFileSync("src-tauri/tauri.conf.json", "utf8"),
+          ).version
+          const cargoToml = fs.readFileSync("src-tauri/Cargo.toml", "utf8")
+          const cargoVersion = cargoToml.match(/^version\s*=\s*"([^"]+)"/m)?.[1]
+          const versions = { packageVersion, tauriVersion, cargoVersion }
+
+          if (!/^v\d+\.\d+\.\d+$/.test(tag)) {
+            throw new Error(`Release tag must be a stable semver tag, got ${tag}`)
+          }
+
+          if (!cargoVersion || new Set(Object.values(versions)).size !== 1) {
+            throw new Error(`Version mismatch: ${JSON.stringify(versions)}`)
+          }
+
+          if (expectedVersion !== packageVersion) {
+            throw new Error(
+              `Tag ${tag} does not match the project version ${packageVersion}`,
+            )
+          }
+
+          console.log(`Preparing DraftWhisper ${tag}`)
+          NODE
+
+      - name: Build and upload unsigned Draft Release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "DraftWhisper ${{ github.ref_name }}"
+          releaseBody: |
+            This is an unsigned macOS build for testing.
+
+            - Apple Silicon: arm64
+            - Intel: x86_64
+            - Code signing and notarization are not configured yet.
+          releaseDraft: true
+          prerelease: false
+          args: --target ${{ matrix.target }} --bundles app,dmg
+          releaseAssetNamePattern: "DraftWhisper_[version]_[arch]_[bundle][ext]"
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
+          retryAttempts: 2
