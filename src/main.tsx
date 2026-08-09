@@ -5,6 +5,10 @@ import "./i18n"
 import App from "./App.tsx"
 import { applyStoredTheme } from "./utils/theme"
 
+if (navigator.userAgent.includes("Windows")) {
+  document.documentElement.dataset.platform = "windows"
+}
+
 applyStoredTheme()
 
 createRoot(document.getElementById("root")!).render(
