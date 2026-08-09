@@ -26,7 +26,7 @@ tauri-build = { version = "2.6.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3", features = [] }
+tauri = { version = "2.11.3", features = ["macos-private-api"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
@@ -48,7 +48,6 @@ windows-core = "0.61.2"
 
 # macOS 原生文件拖拽 — 用于将音频文件拖入剪映/Premiere 等剪辑软件
 [target.'cfg(target_os = "macos")'.dependencies]
-tauri = { version = "2.11.3", features = ["macos-private-api"] }
 objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"

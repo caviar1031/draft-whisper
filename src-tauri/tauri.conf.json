@@ -10,6 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "withGlobalTauri": false,
     "security": {
       "csp": "default-src 'self' blob: data: https:; script-src 'self'; style-src 'self' 'unsafe-inline'"
