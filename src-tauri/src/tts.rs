@@ -1015,42 +1015,47 @@ pub fn tts_copy_to_clipboard(path: String, app: AppHandle) -> Result<(), String>
       let stderr = String::from_utf8_lossy(&output.stderr);
       return Err(format!("Failed to copy to clipboard: {stderr}"));
     }
+
+    Ok(())
   }
 
   #[cfg(not(target_os = "macos"))]
   {
     let _ = script; // 非 macOS 平台暂不支持
-    return Err("File copy to clipboard is only supported on macOS".into());
+    Err("File copy to clipboard is only supported on macOS".into())
   }
-
-  Ok(())
 }
 
-/// 在 Finder 中显示音频文件。
+/// 在系统文件管理器中显示并选中音频文件。
 ///
-/// 使用 `open -R <path>` 打开 Finder 并选中该文件。
+/// macOS 使用 `open -R <path>`，Windows 使用 Explorer 的 `/select,` 参数。
 ///
 /// 前端调用: `invoke("tts_show_in_finder", { path })`
 #[tauri::command]
 pub fn tts_show_in_finder(path: String, app: AppHandle) -> Result<(), String> {
   let safe_path = is_in_audio_dir(&app, &path)?;
-  let safe_path_str = safe_path.to_string_lossy().to_string();
 
   #[cfg(target_os = "macos")]
   {
+    let safe_path_str = safe_path.to_string_lossy().to_string();
     std::process::Command::new("open")
       .args(["-R", &safe_path_str])
       .spawn()
       .map_err(|e| format!("Failed to open Finder: {e}"))?;
+
+    Ok(())
   }
 
-  #[cfg(not(target_os = "macos"))]
+  #[cfg(target_os = "windows")]
   {
-    let _ = safe_path_str;
-    return Err("Show in Finder is only supported on macOS".into());
+    windows_drag::reveal_in_explorer(&safe_path)
   }
 
-  Ok(())
+  #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+  {
+    let _ = safe_path;
+    Err("Show in file manager is only supported on macOS and Windows".into())
+  }
 }
 
 /// 发起 macOS 原生文件拖拽，将音频文件拖入剪映/Premiere 等剪辑软件。
@@ -1092,11 +1097,335 @@ pub fn tts_drag_file(path: String, window: tauri::Window, app: AppHandle) -> Res
   Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+#[tauri::command]
+pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Result<(), String> {
+  let safe_path = is_in_audio_dir(&app, &path)?;
+  windows_drag::begin_drag(&safe_path)?;
+  log::info!("Windows native file drag finished: {}", safe_path.display());
+  Ok(())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 #[tauri::command]
 pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Result<(), String> {
   let _ = (path, app);
-  Err("Native file drag is only supported on macOS".into())
+  Err("Native file drag is only supported on macOS and Windows".into())
+}
+
+/// Windows native file drag backed by the Shell's OLE drag-and-drop implementation.
+///
+/// A Shell `IDataObject` exposes the same file formats as Explorer (including
+/// `CF_HDROP`), so native editing applications receive an existing audio file
+/// rather than browser text or a virtual download.
+#[cfg(target_os = "windows")]
+mod windows_drag {
+  use std::{
+    ffi::OsString,
+    os::windows::ffi::OsStrExt,
+    os::windows::ffi::OsStringExt,
+    path::Path,
+  };
+
+  use windows::{
+    core::{implement, Interface, BOOL, PCWSTR},
+    Win32::{
+      Foundation::{
+        COLORREF, DRAGDROP_S_CANCEL, DRAGDROP_S_DROP, DRAGDROP_S_USEDEFAULTCURSORS, POINT,
+        SIZE, S_OK,
+      },
+      Graphics::Gdi::{DeleteObject, HBITMAP, HGDIOBJ, CLR_INVALID},
+      System::{
+        Com::{CoCreateInstance, IDataObject, CLSCTX_INPROC_SERVER},
+        Ole::{
+          DoDragDrop, IDropSource, IDropSource_Impl, OleInitialize, OleUninitialize,
+          DROPEFFECT, DROPEFFECT_COPY,
+        },
+        SystemServices::{MODIFIERKEYS_FLAGS, MK_LBUTTON},
+      },
+      UI::Shell::{
+        IDragSourceHelper, IShellItem, IShellItemImageFactory, SHCreateItemFromParsingName,
+        BHID_DataObject, CLSID_DragDropHelper, SHDRAGIMAGE, SIIGBF_ICONONLY,
+        SIIGBF_INCACHEONLY,
+      },
+    },
+  };
+
+  struct OleApartment;
+
+  impl OleApartment {
+    fn initialize() -> Result<Self, String> {
+      // SAFETY: `OleInitialize` is balanced by this guard's `Drop` implementation
+      // on the same synchronous Tauri command thread. A failed initialization does
+      // not construct the guard and therefore is not uninitialized.
+      unsafe { OleInitialize(None) }
+        .map_err(|error| format!("Failed to initialize Windows OLE drag support: {error}"))?;
+      Ok(Self)
+    }
+  }
+
+  impl Drop for OleApartment {
+    fn drop(&mut self) {
+      // SAFETY: this guard is neither moved to another thread nor constructed
+      // unless the matching `OleInitialize` call succeeded.
+      unsafe { OleUninitialize() };
+    }
+  }
+
+  #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+  enum DragDecision {
+    Continue,
+    Drop,
+    Cancel,
+  }
+
+  fn drag_decision(escape_pressed: bool, key_state: MODIFIERKEYS_FLAGS) -> DragDecision {
+    if escape_pressed {
+      DragDecision::Cancel
+    } else if !key_state.contains(MK_LBUTTON) {
+      DragDecision::Drop
+    } else {
+      DragDecision::Continue
+    }
+  }
+
+  #[implement(IDropSource)]
+  struct FileDropSource;
+
+  impl IDropSource_Impl for FileDropSource_Impl {
+    fn QueryContinueDrag(
+      &self,
+      escape_pressed: BOOL,
+      key_state: MODIFIERKEYS_FLAGS,
+    ) -> windows::core::HRESULT {
+      match drag_decision(escape_pressed.as_bool(), key_state) {
+        DragDecision::Continue => S_OK,
+        DragDecision::Drop => DRAGDROP_S_DROP,
+        DragDecision::Cancel => DRAGDROP_S_CANCEL,
+      }
+    }
+
+    fn GiveFeedback(&self, _effect: DROPEFFECT) -> windows::core::HRESULT {
+      DRAGDROP_S_USEDEFAULTCURSORS
+    }
+  }
+
+  struct DragImage {
+    bitmap: HBITMAP,
+    _helper: IDragSourceHelper,
+  }
+
+  impl Drop for DragImage {
+    fn drop(&mut self) {
+      // SAFETY: `bitmap` is returned by `IShellItemImageFactory::GetImage`, remains
+      // alive for the complete `DoDragDrop` session, and is deleted exactly once.
+      let _ = unsafe { DeleteObject(HGDIOBJ(self.bitmap.0)) };
+    }
+  }
+
+  fn attach_cached_drag_image(
+    shell_item: &IShellItem,
+    data_object: &IDataObject,
+  ) -> Option<DragImage> {
+    let image_factory: IShellItemImageFactory = shell_item.cast().ok()?;
+
+    // Only use an already-cached Shell icon on this UI thread. Missing cache data
+    // is non-fatal: Windows will still show its standard copy/no-drop cursors.
+    let bitmap = unsafe {
+      image_factory
+        .GetImage(
+          SIZE { cx: 48, cy: 48 },
+          SIIGBF_ICONONLY | SIIGBF_INCACHEONLY,
+        )
+        .ok()?
+    };
+
+    let helper: IDragSourceHelper =
+      unsafe { CoCreateInstance(&CLSID_DragDropHelper, None, CLSCTX_INPROC_SERVER) }.ok()?;
+    let drag_image = SHDRAGIMAGE {
+      sizeDragImage: SIZE { cx: 48, cy: 48 },
+      ptOffset: POINT { x: 12, y: 12 },
+      hbmpDragImage: bitmap,
+      crColorKey: COLORREF(CLR_INVALID),
+    };
+
+    if unsafe { helper.InitializeFromBitmap(&drag_image, data_object) }.is_err() {
+      // SAFETY: the helper rejected the bitmap, so no drag session can reference it.
+      let _ = unsafe { DeleteObject(HGDIOBJ(bitmap.0)) };
+      return None;
+    }
+
+    Some(DragImage {
+      bitmap,
+      _helper: helper,
+    })
+  }
+
+  fn shell_parsing_name(path: &Path) -> Vec<u16> {
+    let path_wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+    let extended_prefix = [b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16];
+    let extended_unc_prefix = [
+      b'\\' as u16,
+      b'\\' as u16,
+      b'?' as u16,
+      b'\\' as u16,
+      b'U' as u16,
+      b'N' as u16,
+      b'C' as u16,
+      b'\\' as u16,
+    ];
+
+    let mut parsing_name = if path_wide.starts_with(&extended_unc_prefix) {
+      let mut unc = vec![b'\\' as u16, b'\\' as u16];
+      unc.extend_from_slice(&path_wide[extended_unc_prefix.len()..]);
+      unc
+    } else if path_wide.starts_with(&extended_prefix) {
+      path_wide[extended_prefix.len()..].to_vec()
+    } else {
+      path_wide
+    };
+    parsing_name.push(0);
+    parsing_name
+  }
+
+  fn explorer_select_argument(path: &Path) -> OsString {
+    let parsing_name = shell_parsing_name(path);
+    let shell_path = OsString::from_wide(&parsing_name[..parsing_name.len() - 1]);
+    let mut select_argument = OsString::from("/select,");
+    select_argument.push(shell_path);
+    select_argument
+  }
+
+  pub(super) fn reveal_in_explorer(path: &Path) -> Result<(), String> {
+    std::process::Command::new("explorer.exe")
+      .arg(explorer_select_argument(path))
+      .spawn()
+      .map_err(|error| format!("Failed to open Windows File Explorer: {error}"))?;
+    Ok(())
+  }
+
+  fn create_shell_drag_data(path: &Path) -> Result<(IShellItem, IDataObject), String> {
+    // `std::fs::canonicalize` returns an extended-length `\\?\` path on Windows.
+    // Shell parsing APIs expect a regular drive or UNC parsing name, while the
+    // canonical path itself remains the authority for the earlier allowlist check.
+    let wide_path = shell_parsing_name(path);
+
+    // SAFETY: `wide_path` is NUL-terminated and remains alive for the call. The
+    // returned COM interfaces are reference-counted and stay alive through the
+    // modal `DoDragDrop` session below.
+    let shell_item: IShellItem = unsafe {
+      SHCreateItemFromParsingName(PCWSTR(wide_path.as_ptr()), None)
+    }
+    .map_err(|error| format!("Failed to create a Windows Shell item: {error}"))?;
+    let data_object: IDataObject = unsafe {
+      shell_item.BindToHandler(None, &BHID_DataObject)
+    }
+    .map_err(|error| format!("Failed to create a Windows file drag object: {error}"))?;
+    Ok((shell_item, data_object))
+  }
+
+  pub(super) fn begin_drag(path: &Path) -> Result<(), String> {
+    let _ole = OleApartment::initialize()?;
+    let (shell_item, data_object) = create_shell_drag_data(path)?;
+    let source: IDropSource = FileDropSource.into();
+    let _drag_image = attach_cached_drag_image(&shell_item, &data_object);
+    let mut effect = DROPEFFECT::default();
+
+    // SAFETY: OLE is initialized on this thread; `data_object`, `source`, and the
+    // optional drag bitmap all outlive the modal call. The source allows copying
+    // only, so the cache file can never be moved by a drop target.
+    let result = unsafe {
+      DoDragDrop(
+        &data_object,
+        &source,
+        DROPEFFECT_COPY,
+        &mut effect,
+      )
+    };
+
+    if result == DRAGDROP_S_DROP || result == DRAGDROP_S_CANCEL {
+      Ok(())
+    } else {
+      result
+        .ok()
+        .map_err(|error| format!("Windows native file drag failed: {error}"))
+    }
+  }
+
+  #[cfg(test)]
+  mod tests {
+    use std::path::Path;
+
+    use super::{
+      create_shell_drag_data, drag_decision, explorer_select_argument, shell_parsing_name,
+      DragDecision, OleApartment,
+    };
+    use windows::Win32::System::{
+      Com::{DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL},
+      Ole::CF_HDROP,
+      SystemServices::{MODIFIERKEYS_FLAGS, MK_LBUTTON},
+    };
+
+    #[test]
+    fn escape_cancels_drag() {
+      assert_eq!(drag_decision(true, MK_LBUTTON), DragDecision::Cancel);
+    }
+
+    #[test]
+    fn releasing_left_button_drops_file() {
+      assert_eq!(
+        drag_decision(false, MODIFIERKEYS_FLAGS::default()),
+        DragDecision::Drop
+      );
+    }
+
+    #[test]
+    fn holding_left_button_continues_drag() {
+      assert_eq!(drag_decision(false, MK_LBUTTON), DragDecision::Continue);
+    }
+
+    #[test]
+    fn converts_extended_paths_to_shell_parsing_names() {
+      let drive = shell_parsing_name(Path::new(r"\\?\C:\Audio\clip.wav"));
+      let unc = shell_parsing_name(Path::new(r"\\?\UNC\server\share\clip.wav"));
+      assert_eq!(String::from_utf16_lossy(&drive[..drive.len() - 1]), r"C:\Audio\clip.wav");
+      assert_eq!(
+        String::from_utf16_lossy(&unc[..unc.len() - 1]),
+        r"\\server\share\clip.wav"
+      );
+    }
+
+    #[test]
+    fn builds_explorer_select_argument_from_extended_path() {
+      assert_eq!(
+        explorer_select_argument(Path::new(r"\\?\C:\Audio Files\clip.wav"))
+          .to_string_lossy(),
+        r"/select,C:\Audio Files\clip.wav"
+      );
+    }
+
+    #[test]
+    fn shell_drag_object_exposes_existing_file_drop_format() {
+      let _ole = OleApartment::initialize().expect("failed to initialize OLE for the test");
+      let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("Cargo.toml")
+        .canonicalize()
+        .expect("failed to canonicalize the Shell test file");
+      let (_, data_object) =
+        create_shell_drag_data(&path).expect("failed to create Shell drag data");
+      let format = FORMATETC {
+        cfFormat: CF_HDROP.0,
+        ptd: std::ptr::null_mut(),
+        dwAspect: DVASPECT_CONTENT.0,
+        lindex: -1,
+        tymed: TYMED_HGLOBAL.0 as u32,
+      };
+
+      // SAFETY: `format` is fully initialized for the standard CF_HDROP request
+      // and remains valid for the duration of this synchronous COM call.
+      assert!(unsafe { data_object.QueryGetData(&format) }.is_ok());
+    }
+  }
 }
 
 /// macOS 原生文件拖拽实现细节。

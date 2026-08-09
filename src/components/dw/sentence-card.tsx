@@ -20,6 +20,9 @@ import { useTranslation } from "react-i18next"
 // 卡片可视状态 — 由 status 派生 + 播放/编辑等 UI 状态叠加
 export type CardView = "queued" | "generating" | "ready" | "playing" | "failed" | "editing"
 
+const WINDOWS_DRAG_THRESHOLD_PX = 4
+const isWindows = navigator.userAgent.includes("Windows")
+
 interface SentenceCardProps {
   sentence: Sentence
   index: number
@@ -60,6 +63,7 @@ export function SentenceCard({
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
   const [actionError, setActionError] = useState<string | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
+  const dragGestureCleanupRef = useRef<(() => void) | null>(null)
 
   const historyCount = sentence.audioHistory.length
   const currentIndex = useMemo(() => {
@@ -67,13 +71,7 @@ export function SentenceCard({
     return sentence.audioHistory.findIndex((v) => v.audioPath === sentence.audioPath)
   }, [sentence.audioPath, sentence.audioHistory, historyCount])
 
-  // 原生文件拖拽 — 鼠标按下拖拽手柄后启动原生 NSDraggingSession。
-  // 原生 session 会拦截所有后续鼠标事件（moved/up），与 Finder 拖拽行为一致。
-  // 使用 setTimeout 确保 invoke 在浏览器处理完 mousedown 事件后才执行。
-  const handleDragMouseDown = useCallback(() => {
-    if (!sentence.audioPath || view !== "ready") return
-    // 延迟一帧调用 Rust，避免与浏览器的 mousedown 处理冲突
-    const path = sentence.audioPath
+  const startNativeDrag = useCallback((path: string) => {
     setActionError(null)
     setTimeout(
       () =>
@@ -82,7 +80,69 @@ export function SentenceCard({
         }),
       0,
     )
-  }, [sentence.audioPath, view])
+  }, [])
+
+  // Windows Explorer uses a small movement threshold before entering its modal OLE
+  // drag loop. Keep the established immediate AppKit gesture on macOS, while avoiding
+  // accidental Windows drags when the handle is only clicked.
+  const handleDragPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!sentence.audioPath || view !== "ready" || event.button !== 0) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      const path = sentence.audioPath
+
+      if (!isWindows) {
+        startNativeDrag(path)
+        return
+      }
+
+      dragGestureCleanupRef.current?.()
+      const { pointerId, clientX: startX, clientY: startY } = event
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", handlePointerMove, true)
+        window.removeEventListener("pointerup", handlePointerEnd, true)
+        window.removeEventListener("pointercancel", handlePointerEnd, true)
+        if (dragGestureCleanupRef.current === cleanup) {
+          dragGestureCleanupRef.current = null
+        }
+      }
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        if (moveEvent.pointerId !== pointerId) return
+        if ((moveEvent.buttons & 1) === 0) {
+          cleanup()
+          return
+        }
+
+        const distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY)
+        if (distance < WINDOWS_DRAG_THRESHOLD_PX) return
+
+        moveEvent.preventDefault()
+        cleanup()
+        startNativeDrag(path)
+      }
+
+      const handlePointerEnd = (endEvent: PointerEvent) => {
+        if (endEvent.pointerId === pointerId) cleanup()
+      }
+
+      dragGestureCleanupRef.current = cleanup
+      window.addEventListener("pointermove", handlePointerMove, true)
+      window.addEventListener("pointerup", handlePointerEnd, true)
+      window.addEventListener("pointercancel", handlePointerEnd, true)
+    },
+    [sentence.audioPath, startNativeDrag, view],
+  )
+
+  useEffect(
+    () => () => {
+      dragGestureCleanupRef.current?.()
+    },
+    [],
+  )
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
@@ -161,7 +221,7 @@ export function SentenceCard({
       data-sentence-id={sentence.id}
       onContextMenu={handleContextMenu}
     >
-      <div className="dw-drag-handle" onMouseDown={handleDragMouseDown}>
+      <div className="dw-drag-handle" onPointerDown={handleDragPointerDown}>
         <GripVertical size={16} strokeWidth={2} />
       </div>
 
@@ -188,7 +248,7 @@ export function SentenceCard({
               onClick={() => void handleShowInFinder()}
             >
               <FolderOpen size={14} strokeWidth={2} />
-              {t("sentence.showFinder")}
+              {t(isWindows ? "sentence.showExplorer" : "sentence.showFinder")}
             </button>
           </div>,
           document.body,

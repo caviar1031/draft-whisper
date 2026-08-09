@@ -181,7 +181,7 @@ export async function showInFinder(path: string): Promise<void> {
 }
 
 /**
- * 发起 macOS 原生文件拖拽（将音频文件拖入剪映/Premiere 等剪辑软件）。
+ * 发起 macOS / Windows 原生文件拖拽（将音频文件拖入剪映/Premiere 等剪辑软件）。
  *
  * 后端: invoke("tts_drag_file", { path, window })
  */

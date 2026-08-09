@@ -917,7 +917,13 @@
     align-items: center;
     color: var(--glass-handle);
     cursor: grab;
+    touch-action: none;
+    user-select: none;
     transition: color 0.15s ease;
+  }
+
+  .dw-drag-handle:active {
+    cursor: grabbing;
   }
 
   .dw-sentence-card:hover .dw-drag-handle {
