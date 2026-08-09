@@ -11,10 +11,7 @@ use tauri::{AppHandle, Manager};
 /// macOS 会把 Bundle Identifier 纳入缓存目录；应用升级后，项目元数据中
 /// 可能仍然引用这些目录里的历史音频。它们只作为受限的兼容 allowlist，
 /// 新生成的音频仍始终写入当前应用目录。
-const LEGACY_APP_IDENTIFIERS: &[&str] = &[
-    "com.draftwhisper.app",
-    "top.caviarlab.draftwhisper",
-];
+const LEGACY_APP_IDENTIFIERS: &[&str] = &["com.draftwhisper.app", "top.caviarlab.draftwhisper"];
 
 /// 全局共享的 HTTP Client（复用连接池 + 超时配置）。
 fn http_client() -> &'static reqwest::Client {
@@ -33,7 +30,10 @@ fn allowed_audio_dirs(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
     let current = ensure_audio_dir(app)?;
     let mut dirs = vec![current];
 
-    for base in [app.path().app_cache_dir().ok(), app.path().app_data_dir().ok()]
+    for base in [
+        app.path().app_cache_dir().ok(),
+        app.path().app_data_dir().ok(),
+    ]
         .into_iter()
         .flatten()
     {
@@ -221,7 +221,8 @@ fn wav_duration_ms(bytes: &[u8]) -> Result<u64, String> {
   let mut data_size = None;
   while offset + 8 <= bytes.len() {
     let chunk_id = &bytes[offset..offset + 4];
-    let chunk_size = u32::from_le_bytes(bytes[offset + 4..offset + 8].try_into().unwrap()) as usize;
+        let chunk_size =
+            u32::from_le_bytes(bytes[offset + 4..offset + 8].try_into().unwrap()) as usize;
     let data_start = offset + 8;
     if data_start + chunk_size > bytes.len() {
       return Err("Invalid WAV chunk size".into());
@@ -235,7 +236,9 @@ fn wav_duration_ms(bytes: &[u8]) -> Result<u64, String> {
     }
     offset = data_start + chunk_size + (chunk_size % 2);
   }
-  let byte_rate = byte_rate.filter(|rate| *rate > 0).ok_or("WAV byte rate is missing")?;
+    let byte_rate = byte_rate
+        .filter(|rate| *rate > 0)
+        .ok_or("WAV byte rate is missing")?;
   let data_size = data_size.ok_or("WAV audio data is missing")?;
   Ok(data_size.saturating_mul(1000) / u64::from(byte_rate))
 }
@@ -261,16 +264,34 @@ fn mp3_duration_ms(bytes: &[u8]) -> Result<u64, String> {
     let layer = (header >> 17) & 0b11;
     let bitrate_index = ((header >> 12) & 0b1111) as usize;
     let sample_index = ((header >> 10) & 0b11) as usize;
-    if version == 0b01 || layer != 0b01 || bitrate_index == 0 || bitrate_index == 15 || sample_index == 3 {
+        if version == 0b01
+            || layer != 0b01
+            || bitrate_index == 0
+            || bitrate_index == 15
+            || sample_index == 3
+        {
       offset += 1;
       continue;
     }
-    const MPEG1_BITRATES: [u32; 16] = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
-    const MPEG2_BITRATES: [u32; 16] = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
+        const MPEG1_BITRATES: [u32; 16] = [
+            0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0,
+        ];
+        const MPEG2_BITRATES: [u32; 16] = [
+            0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0,
+        ];
     const BASE_SAMPLE_RATES: [u32; 3] = [44_100, 48_000, 32_000];
     let is_mpeg1 = version == 0b11;
-    let bitrate = if is_mpeg1 { MPEG1_BITRATES[bitrate_index] } else { MPEG2_BITRATES[bitrate_index] };
-    let divisor = match version { 0b11 => 1, 0b10 => 2, 0b00 => 4, _ => unreachable!() };
+        let bitrate = if is_mpeg1 {
+            MPEG1_BITRATES[bitrate_index]
+        } else {
+            MPEG2_BITRATES[bitrate_index]
+        };
+        let divisor = match version {
+            0b11 => 1,
+            0b10 => 2,
+            0b00 => 4,
+            _ => unreachable!(),
+        };
     let sample_rate = BASE_SAMPLE_RATES[sample_index] / divisor;
     let padding = ((header >> 9) & 1) as usize;
     let coefficient = if is_mpeg1 { 144 } else { 72 };
@@ -325,8 +346,7 @@ fn build_voice_clone_data_uri(path: &std::path::Path) -> Result<String, String> 
 fn projects_root(app: &AppHandle) -> Result<PathBuf, String> {
   let base = ensure_audio_dir(app)?;
   let root = base.join("projects");
-  std::fs::create_dir_all(&root)
-    .map_err(|e| format!("Failed to create projects root: {e}"))?;
+    std::fs::create_dir_all(&root).map_err(|e| format!("Failed to create projects root: {e}"))?;
   Ok(root)
 }
 
@@ -343,7 +363,40 @@ fn validate_project_name(name: &str) -> Result<&str, String> {
   {
     return Err("Project name cannot contain /, \\ or start with .".into());
   }
+
+    #[cfg(target_os = "windows")]
+    validate_windows_project_name(trimmed)?;
+
   Ok(trimmed)
+}
+
+#[cfg(target_os = "windows")]
+fn validate_windows_project_name(name: &str) -> Result<(), String> {
+    if name.ends_with('.')
+        || name.chars().any(|character| {
+            character <= '\u{1f}' || matches!(character, '<' | '>' | ':' | '"' | '|' | '?' | '*')
+        })
+    {
+        return Err("Project name contains characters that are not allowed on Windows".into());
+    }
+
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_uppercase();
+    let is_reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || stem
+            .strip_prefix("COM")
+            .or_else(|| stem.strip_prefix("LPT"))
+            .is_some_and(|number| {
+                matches!(number, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
+            });
+    if is_reserved {
+        return Err("Project name is reserved by Windows".into());
+    }
+
+    Ok(())
 }
 
 fn project_dir(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
@@ -358,8 +411,8 @@ fn project_dir(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
 pub fn tts_list_projects(app: AppHandle) -> Result<Vec<String>, String> {
   let root = projects_root(&app)?;
   let mut names: Vec<String> = Vec::new();
-  for entry in std::fs::read_dir(&root)
-    .map_err(|e| format!("Failed to read projects directory: {e}"))?
+    for entry in
+        std::fs::read_dir(&root).map_err(|e| format!("Failed to read projects directory: {e}"))?
   {
     let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
     if entry
@@ -462,15 +515,15 @@ fn ensure_audio_dir(app: &AppHandle) -> Result<PathBuf, String> {
     .join(".cache")
     .join("audio");
   log::info!("Using local audio directory fallback: {}", local.display());
-  std::fs::create_dir_all(&local)
-    .map_err(|e| format!("All directories unwritable, local fallback also failed: {local:?} -> {e}"))?;
+    std::fs::create_dir_all(&local).map_err(|e| {
+        format!("All directories unwritable, local fallback also failed: {local:?} -> {e}")
+    })?;
   Ok(local)
 }
 
 /// 把任意字符串转成安全的文件名（仅保留字母数字、`-`、`_`）。
 fn sanitize_filename(name: &str) -> String {
-  name
-    .chars()
+    name.chars()
     .map(|c| {
       if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
         c
@@ -591,9 +644,7 @@ async fn request_speech(
         .and_then(|m| m.get("audio"))
         .and_then(|a| a.get("data"))
         .and_then(|d| d.as_str())
-        .ok_or_else(|| {
-            format!("Response missing choices[0].message.audio.data: {}", json)
-        })?;
+        .ok_or_else(|| format!("Response missing choices[0].message.audio.data: {}", json))?;
 
     STANDARD
         .decode(audio_data)
@@ -735,7 +786,9 @@ pub async fn tts_preview_voice(
   let file_path = voice_previews_dir(&app)?.join(format!("voice_preview_{timestamp}.wav"));
   std::fs::write(&file_path, &bytes)
     .map_err(|e| format!("Failed to write voice preview: {e}"))?;
-  Ok(TtsResult { audio_path: file_path.to_string_lossy().to_string() })
+    Ok(TtsResult {
+        audio_path: file_path.to_string_lossy().to_string(),
+    })
 }
 
 /// 读取本地音频文件，返回 base64 编码的字符串。
@@ -816,7 +869,8 @@ pub fn save_voice_sample(
 pub fn delete_voice_sample(path: String, app: AppHandle) -> Result<(), String> {
     let safe_path = is_in_audio_dir(&app, &path)?;
     if safe_path.exists() {
-        std::fs::remove_file(&safe_path).map_err(|e| format!("Failed to delete sample file: {e}"))?;
+        std::fs::remove_file(&safe_path)
+            .map_err(|e| format!("Failed to delete sample file: {e}"))?;
         log::info!("Deleted voice sample: {}", safe_path.display());
     }
     Ok(())
@@ -843,8 +897,10 @@ fn load_credential_account(account: &str) -> Result<Option<String>, String> {
     let output = std::process::Command::new("security")
         .args([
             "find-generic-password",
-            "-s", CREDENTIAL_SERVICE,
-            "-a", account,
+            "-s",
+            CREDENTIAL_SERVICE,
+            "-a",
+            account,
             "-w",
         ])
         .output()
@@ -861,9 +917,12 @@ fn save_credential_account(account: &str, api_key: &str) -> Result<(), String> {
     let output = std::process::Command::new("security")
         .args([
             "add-generic-password",
-            "-s", CREDENTIAL_SERVICE,
-            "-a", account,
-            "-w", api_key,
+            "-s",
+            CREDENTIAL_SERVICE,
+            "-a",
+            account,
+            "-w",
+            api_key,
             "-U",
         ])
         .output()
@@ -880,8 +939,10 @@ fn delete_credential_account(account: &str) -> Result<(), String> {
     let output = std::process::Command::new("security")
         .args([
             "delete-generic-password",
-            "-s", CREDENTIAL_SERVICE,
-            "-a", account,
+            "-s",
+            CREDENTIAL_SERVICE,
+            "-a",
+            account,
         ])
         .output()
         .map_err(|e| format!("Failed to run security command: {e}"))?;
@@ -987,25 +1048,27 @@ pub fn migrate_legacy_api_key(config_id: String) -> Result<Option<String>, Strin
     Ok(Some(legacy))
 }
 
-/// 将音频文件复制到 macOS 系统剪贴板（文件引用，非文本）。
+/// 将音频文件复制到系统剪贴板（文件引用，非文本）。
 ///
-/// 使用 AppleScript 的 `set the clipboard to (POSIX file "...")` 实现。
-/// 用户随后可以在 Finder / 剪映 / Premiere 等应用中 Cmd+V 粘贴文件。
+/// macOS 使用 AppleScript 的文件引用，Windows 使用原生 `CF_HDROP` 文件列表。
 ///
 /// 前端调用: `invoke("tts_copy_to_clipboard", { path })`
 #[tauri::command]
-pub fn tts_copy_to_clipboard(path: String, app: AppHandle) -> Result<(), String> {
+pub fn tts_copy_to_clipboard(
+    path: String,
+    _window: tauri::Window,
+    app: AppHandle,
+) -> Result<(), String> {
   let safe_path = is_in_audio_dir(&app, &path)?;
 
+    #[cfg(target_os = "macos")]
+    {
   // 先转义反斜杠，再转义双引号（顺序不能反）
   let escaped = safe_path
     .to_string_lossy()
     .replace('\\', "\\\\")
     .replace('"', "\\\"");
   let script = format!("set the clipboard to (POSIX file \"{}\")", escaped);
-
-  #[cfg(target_os = "macos")]
-  {
     let output = std::process::Command::new("osascript")
       .args(["-e", &script])
       .output()
@@ -1019,10 +1082,17 @@ pub fn tts_copy_to_clipboard(path: String, app: AppHandle) -> Result<(), String>
     Ok(())
   }
 
-  #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        let hwnd = _window
+            .hwnd()
+            .map_err(|error| format!("Failed to get Windows clipboard owner window: {error}"))?;
+        windows_drag::copy_file_to_clipboard(&safe_path, hwnd)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
   {
-    let _ = script; // 非 macOS 平台暂不支持
-    Err("File copy to clipboard is only supported on macOS".into())
+        Err("File copy to clipboard is only supported on macOS and Windows".into())
   }
 }
 
@@ -1121,35 +1191,35 @@ pub fn tts_drag_file(path: String, _window: tauri::Window, app: AppHandle) -> Re
 #[cfg(target_os = "windows")]
 mod windows_drag {
   use std::{
-    ffi::OsString,
-    os::windows::ffi::OsStrExt,
-    os::windows::ffi::OsStringExt,
-    path::Path,
+        ffi::OsString, os::windows::ffi::OsStrExt, os::windows::ffi::OsStringExt, path::Path,
   };
 
   use windows::{
     core::{implement, Interface, BOOL, PCWSTR},
     Win32::{
       Foundation::{
-        COLORREF, DRAGDROP_S_CANCEL, DRAGDROP_S_DROP, DRAGDROP_S_USEDEFAULTCURSORS, POINT,
-        SIZE, S_OK,
+                COLORREF, DRAGDROP_S_CANCEL, DRAGDROP_S_DROP, DRAGDROP_S_USEDEFAULTCURSORS, HANDLE,
+                HGLOBAL, POINT, SIZE, S_OK,
       },
-      Graphics::Gdi::{DeleteObject, HBITMAP, HGDIOBJ, CLR_INVALID},
+            Graphics::Gdi::{DeleteObject, CLR_INVALID, HBITMAP, HGDIOBJ},
       System::{
         Com::{CoCreateInstance, IDataObject, CLSCTX_INPROC_SERVER},
+                DataExchange::{CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData},
+                Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE, GMEM_ZEROINIT},
         Ole::{
           DoDragDrop, IDropSource, IDropSource_Impl, OleInitialize, OleUninitialize,
-          DROPEFFECT, DROPEFFECT_COPY,
+                    CF_HDROP, DROPEFFECT, DROPEFFECT_COPY,
         },
-        SystemServices::{MODIFIERKEYS_FLAGS, MK_LBUTTON},
+                SystemServices::{MK_LBUTTON, MODIFIERKEYS_FLAGS},
       },
       UI::Shell::{
-        IDragSourceHelper, IShellItem, IShellItemImageFactory, SHCreateItemFromParsingName,
-        BHID_DataObject, CLSID_DragDropHelper, SHDRAGIMAGE, SIIGBF_ICONONLY,
-        SIIGBF_INCACHEONLY,
+                BHID_DataObject, CLSID_DragDropHelper, IDragSourceHelper, IShellItem,
+                IShellItemImageFactory, SHCreateItemFromParsingName, DROPFILES, SHDRAGIMAGE,
+                SIIGBF_ICONONLY, SIIGBF_INCACHEONLY,
       },
     },
   };
+    use windows_core::Free;
 
   struct OleApartment;
 
@@ -1158,8 +1228,9 @@ mod windows_drag {
       // SAFETY: `OleInitialize` is balanced by this guard's `Drop` implementation
       // on the same synchronous Tauri command thread. A failed initialization does
       // not construct the guard and therefore is not uninitialized.
-      unsafe { OleInitialize(None) }
-        .map_err(|error| format!("Failed to initialize Windows OLE drag support: {error}"))?;
+            unsafe { OleInitialize(None) }.map_err(|error| {
+                format!("Failed to initialize Windows OLE drag support: {error}")
+            })?;
       Ok(Self)
     }
   }
@@ -1171,6 +1242,102 @@ mod windows_drag {
       unsafe { OleUninitialize() };
     }
   }
+
+    struct ClipboardGuard;
+
+    impl ClipboardGuard {
+        fn open(owner: windows::Win32::Foundation::HWND) -> Result<Self, String> {
+            let mut last_error = String::new();
+            for _ in 0..10 {
+                // SAFETY: `owner` belongs to the live Tauri window. The successful open
+                // is always balanced by this guard's `Drop` implementation.
+                match unsafe { OpenClipboard(Some(owner)) } {
+                    Ok(()) => return Ok(Self),
+                    Err(error) => {
+                        last_error = error.to_string();
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                }
+            }
+            Err(format!("Failed to open Windows clipboard: {last_error}"))
+        }
+    }
+
+    impl Drop for ClipboardGuard {
+        fn drop(&mut self) {
+            // SAFETY: `ClipboardGuard` can only be constructed after `OpenClipboard`
+            // succeeds and remains on the same synchronous command thread.
+            let _ = unsafe { CloseClipboard() };
+        }
+    }
+
+    struct OwnedGlobalMemory(Option<HGLOBAL>);
+
+    impl Drop for OwnedGlobalMemory {
+        fn drop(&mut self) {
+            if let Some(mut memory) = self.0.take() {
+                // SAFETY: this guard owns the allocation until `SetClipboardData`
+                // succeeds. Ownership is explicitly removed at that point.
+                unsafe { memory.free() };
+            }
+        }
+    }
+
+    fn clipboard_file_list(path: &Path) -> Vec<u16> {
+        let mut file_list = shell_parsing_name(path);
+        file_list.push(0);
+        file_list
+    }
+
+    pub(super) fn copy_file_to_clipboard(
+        path: &Path,
+        owner: windows::Win32::Foundation::HWND,
+    ) -> Result<(), String> {
+        let file_list = clipboard_file_list(path);
+        let header = DROPFILES {
+            pFiles: std::mem::size_of::<DROPFILES>() as u32,
+            pt: POINT::default(),
+            fNC: BOOL(0),
+            fWide: BOOL(1),
+        };
+        let header_size = std::mem::size_of::<DROPFILES>();
+        let file_list_size = file_list.len() * std::mem::size_of::<u16>();
+        let allocation_size = header_size + file_list_size;
+
+        // SAFETY: the allocation remains owned by `memory` until the clipboard
+        // accepts it. The header and UTF-16 file list are copied within the exact
+        // allocation bounds, and the list ends with the two NULs required by CF_HDROP.
+        let global = unsafe { GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, allocation_size) }
+            .map_err(|error| format!("Failed to allocate Windows clipboard data: {error}"))?;
+        let mut memory = OwnedGlobalMemory(Some(global));
+        let destination = unsafe { GlobalLock(global) };
+        if destination.is_null() {
+            return Err("Failed to lock Windows clipboard data".into());
+        }
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                (&header as *const DROPFILES).cast::<u8>(),
+                destination.cast::<u8>(),
+                header_size,
+            );
+            std::ptr::copy_nonoverlapping(
+                file_list.as_ptr().cast::<u8>(),
+                destination.cast::<u8>().add(header_size),
+                file_list_size,
+            );
+            let _ = GlobalUnlock(global);
+        }
+
+        let _clipboard = ClipboardGuard::open(owner)?;
+        // SAFETY: the clipboard is open on this thread. `EmptyClipboard` establishes
+        // clipboard ownership, and `SetClipboardData` receives the movable allocation.
+        unsafe { EmptyClipboard() }
+            .map_err(|error| format!("Failed to clear Windows clipboard: {error}"))?;
+        unsafe { SetClipboardData(CF_HDROP.0 as u32, Some(HANDLE(global.0))) }
+            .map_err(|error| format!("Failed to copy audio file to Windows clipboard: {error}"))?;
+        memory.0.take();
+        Ok(())
+    }
 
   #[derive(Clone, Copy, Debug, Eq, PartialEq)]
   enum DragDecision {
@@ -1313,13 +1480,10 @@ mod windows_drag {
     // SAFETY: `wide_path` is NUL-terminated and remains alive for the call. The
     // returned COM interfaces are reference-counted and stay alive through the
     // modal `DoDragDrop` session below.
-    let shell_item: IShellItem = unsafe {
-      SHCreateItemFromParsingName(PCWSTR(wide_path.as_ptr()), None)
-    }
+        let shell_item: IShellItem =
+            unsafe { SHCreateItemFromParsingName(PCWSTR(wide_path.as_ptr()), None) }
     .map_err(|error| format!("Failed to create a Windows Shell item: {error}"))?;
-    let data_object: IDataObject = unsafe {
-      shell_item.BindToHandler(None, &BHID_DataObject)
-    }
+        let data_object: IDataObject = unsafe { shell_item.BindToHandler(None, &BHID_DataObject) }
     .map_err(|error| format!("Failed to create a Windows file drag object: {error}"))?;
     Ok((shell_item, data_object))
   }
@@ -1334,14 +1498,7 @@ mod windows_drag {
     // SAFETY: OLE is initialized on this thread; `data_object`, `source`, and the
     // optional drag bitmap all outlive the modal call. The source allows copying
     // only, so the cache file can never be moved by a drop target.
-    let result = unsafe {
-      DoDragDrop(
-        &data_object,
-        &source,
-        DROPEFFECT_COPY,
-        &mut effect,
-      )
-    };
+        let result = unsafe { DoDragDrop(&data_object, &source, DROPEFFECT_COPY, &mut effect) };
 
     if result == DRAGDROP_S_DROP || result == DRAGDROP_S_CANCEL {
       Ok(())
@@ -1357,13 +1514,13 @@ mod windows_drag {
     use std::path::Path;
 
     use super::{
-      create_shell_drag_data, drag_decision, explorer_select_argument, shell_parsing_name,
-      DragDecision, OleApartment,
+            clipboard_file_list, create_shell_drag_data, drag_decision, explorer_select_argument,
+            shell_parsing_name, DragDecision, OleApartment,
     };
     use windows::Win32::System::{
       Com::{DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL},
       Ole::CF_HDROP,
-      SystemServices::{MODIFIERKEYS_FLAGS, MK_LBUTTON},
+            SystemServices::{MK_LBUTTON, MODIFIERKEYS_FLAGS},
     };
 
     #[test]
@@ -1388,7 +1545,10 @@ mod windows_drag {
     fn converts_extended_paths_to_shell_parsing_names() {
       let drive = shell_parsing_name(Path::new(r"\\?\C:\Audio\clip.wav"));
       let unc = shell_parsing_name(Path::new(r"\\?\UNC\server\share\clip.wav"));
-      assert_eq!(String::from_utf16_lossy(&drive[..drive.len() - 1]), r"C:\Audio\clip.wav");
+            assert_eq!(
+                String::from_utf16_lossy(&drive[..drive.len() - 1]),
+                r"C:\Audio\clip.wav"
+            );
       assert_eq!(
         String::from_utf16_lossy(&unc[..unc.len() - 1]),
         r"\\server\share\clip.wav"
@@ -1403,6 +1563,16 @@ mod windows_drag {
         r"/select,C:\Audio Files\clip.wav"
       );
     }
+
+        #[test]
+        fn builds_double_null_terminated_clipboard_file_list() {
+            let file_list = clipboard_file_list(Path::new(r"\\?\C:\Audio Files\clip.wav"));
+            assert_eq!(&file_list[file_list.len() - 2..], &[0, 0]);
+            assert_eq!(
+                String::from_utf16_lossy(&file_list[..file_list.len() - 2]),
+                r"C:\Audio Files\clip.wav"
+            );
+        }
 
     #[test]
     fn shell_drag_object_exposes_existing_file_drop_format() {
@@ -1452,9 +1622,7 @@ mod drag {
     NSDragOperation, NSDraggingContext, NSDraggingItem, NSDraggingSession, NSDraggingSource,
     NSEvent, NSEventModifierFlags, NSEventType, NSPasteboardWriting, NSView, NSWorkspace,
   };
-  use objc2_foundation::{
-    NSArray, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString, NSURL,
-  };
+    use objc2_foundation::{NSArray, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString, NSURL};
   use std::{cell::Cell, ffi::c_void};
 
   #[derive(Default)]
@@ -1552,8 +1720,7 @@ mod drag {
     // SAFETY: `source_ptr` 来自非空的 `Retained`，上面的 +1 保证它在结束回调
     // 安排延迟释放前一直有效。
     let source = unsafe { &*source_ptr };
-    let source_ref: &ProtocolObject<dyn NSDraggingSource> =
-      ProtocolObject::from_ref(source);
+        let source_ref: &ProtocolObject<dyn NSDraggingSource> = ProtocolObject::from_ref(source);
 
     // --- File URL ---
     let path_nsstring = NSString::from_str(path_str);
@@ -1597,8 +1764,7 @@ mod drag {
 
     // --- NSDraggingItem with the file URL as pasteboard content ---
     // NSURL 遵循 NSPasteboardWriting 协议，可安全转换为协议对象。
-    let writer: &ProtocolObject<dyn NSPasteboardWriting> =
-      ProtocolObject::from_ref(&*file_url);
+        let writer: &ProtocolObject<dyn NSPasteboardWriting> = ProtocolObject::from_ref(&*file_url);
     // `NSDraggingItem::alloc()` 需要 `AnyThread` trait 在作用域内
     //（NSDraggingItem 是 AnyThread 类型，非 MainThreadOnly）。
     let allocated_item = <NSDraggingItem as AnyThread>::alloc();
@@ -1631,9 +1797,7 @@ mod drag {
     // 返回的 NSDraggingSession 由系统 retain 直到拖拽完成（见 Apple 文档）。
     // 我们的 Retained<NSDraggingSession> 在函数返回时 drop，仅释放我们持有的
     // +1；系统的 retain 仍然有效。
-    let _session =
-      view.beginDraggingSessionWithItems_event_source(&items, &event, source_ref);
-
+        let _session = view.beginDraggingSessionWithItems_event_source(&items, &event, source_ref);
   }
 }
 
@@ -1642,11 +1806,10 @@ mod tests {
   use std::path::PathBuf;
 
   use super::{
-    audio_duration_ms, audio_format, build_chat_endpoint, build_speech_body, credential_account,
-    is_path_in_allowed_dirs, sanitize_filename, validate_audio_signature, validate_project_name,
-    validate_voice_clone_data_uri_size, validate_voice_clone_duration, ProviderId, TtsMode,
-    TtsParams,
-    MAX_VOICE_CLONE_DATA_URI_SIZE,
+        audio_duration_ms, audio_format, build_chat_endpoint, build_speech_body,
+        credential_account, is_path_in_allowed_dirs, sanitize_filename, validate_audio_signature,
+        validate_project_name, validate_voice_clone_data_uri_size, validate_voice_clone_duration,
+        ProviderId, TtsMode, TtsParams, MAX_VOICE_CLONE_DATA_URI_SIZE,
   };
 
   #[cfg(target_os = "windows")]
@@ -1680,10 +1843,53 @@ mod tests {
 
   #[test]
   fn rejects_unsafe_project_names() {
-    for invalid in ["", " ", ".hidden", "..", "../escape", "nested/name", "nested\\name"] {
-      assert!(validate_project_name(invalid).is_err(), "accepted {invalid:?}");
+        for invalid in [
+            "",
+            " ",
+            ".hidden",
+            "..",
+            "../escape",
+            "nested/name",
+            "nested\\name",
+        ] {
+            assert!(
+                validate_project_name(invalid).is_err(),
+                "accepted {invalid:?}"
+            );
+        }
+        assert_eq!(
+            validate_project_name(" Demo Project ").unwrap(),
+            "Demo Project"
+        );
     }
-    assert_eq!(validate_project_name(" Demo Project ").unwrap(), "Demo Project");
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn rejects_windows_reserved_project_names() {
+        for invalid in [
+            "bad:name",
+            "bad*name",
+            "bad?name",
+            "bad\"name",
+            "bad<name",
+            "bad>name",
+            "bad|name",
+            "trailing.",
+            "CON",
+            "con.txt",
+            "NUL",
+            "COM1",
+            "lpt9.project",
+        ] {
+            assert!(
+                validate_project_name(invalid).is_err(),
+                "accepted {invalid:?}"
+            );
+        }
+        assert_eq!(
+            validate_project_name("Windows Project").unwrap(),
+            "Windows Project"
+        );
   }
 
   #[test]
@@ -1747,12 +1953,8 @@ mod tests {
   #[test]
   fn builds_voice_clone_request_with_data_uri_and_performance_prompt() {
     let params = params(TtsMode::VoiceClone, "mimo-v2.5-tts-voiceclone");
-    let body = build_speech_body(
-      &params,
-      "你好",
-      Some("data:audio/wav;base64,UklGRg=="),
-    )
-    .unwrap();
+        let body =
+            build_speech_body(&params, "你好", Some("data:audio/wav;base64,UklGRg==")).unwrap();
 
     assert_eq!(body["model"], "mimo-v2.5-tts-voiceclone");
     assert_eq!(body["messages"][0]["role"], "user");
@@ -1787,8 +1989,14 @@ mod tests {
 
   #[test]
   fn validates_supported_audio_formats_and_signatures() {
-    assert_eq!(audio_format(std::path::Path::new("sample.wav")).unwrap().0, "wav");
-    assert_eq!(audio_format(std::path::Path::new("sample.mp3")).unwrap().1, "audio/mpeg");
+        assert_eq!(
+            audio_format(std::path::Path::new("sample.wav")).unwrap().0,
+            "wav"
+        );
+        assert_eq!(
+            audio_format(std::path::Path::new("sample.mp3")).unwrap().1,
+            "audio/mpeg"
+        );
     assert!(audio_format(std::path::Path::new("sample.m4a")).is_err());
     assert!(validate_audio_signature("wav", b"RIFF\0\0\0\0WAVE").is_ok());
     assert!(validate_audio_signature("mp3", b"ID3\0").is_ok());

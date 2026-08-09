@@ -162,8 +162,8 @@ export function cleanupAudioFiles(paths: string[]): void {
 }
 
 /**
- * 将音频文件复制到 macOS 系统剪贴板（文件引用）。
- * 用户随后可以在 Finder / 剪映 / Premiere 等应用中 Cmd+V 粘贴文件。
+ * 将音频文件复制到 macOS / Windows 系统剪贴板（文件引用）。
+ * 用户随后可以在 Finder、文件资源管理器或剪辑软件中粘贴文件。
  *
  * 后端: invoke("tts_copy_to_clipboard", { path })
  */

@@ -43,7 +43,7 @@ The current published release is still macOS-only. Windows support is available 
 | ------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
 | Window integration  | System title bar and macOS vibrancy            | Custom Windows title bar and platform-specific transparency |
 | API key storage     | macOS Keychain                                 | Windows Credential Manager                                  |
-| Native file handoff | Native drag, Finder reveal, and clipboard copy | Native OLE/Shell drag and File Explorer reveal              |
+| Native file handoff | Native drag, Finder reveal, and clipboard copy | Native OLE/Shell drag, File Explorer reveal, and clipboard copy |
 | Published build     | Apple Silicon DMG                              | Build from source for now                                   |
 
 ## What problem does it solve?
@@ -86,7 +86,7 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 - **Shape the voice** — use MiMo preset voices, text-based voice design, or WAV/MP3 voice cloning.
 - **Direct the performance** — add optional free-text performance direction for basic and clone modes.
 - **Preview voices separately** — test a voice without adding the preview to a sentence's history.
-- **Move audio into the edit** — drag files natively on macOS and Windows, reveal them in Finder or File Explorer, and copy them to the clipboard on macOS.
+- **Move audio into the edit** — drag or copy files natively on macOS and Windows, and reveal them in Finder or File Explorer.
 - **Keep work organized locally** — store scripts, voice settings, samples, and cached audio by project.
 
 ## Built for creators in the middle of an edit
@@ -191,7 +191,7 @@ Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
           └─ WAV files and voice samples: local cache
 ```
 
-The front end owns project and settings state. The Rust side handles HTTP requests, file I/O, audio caching, credential storage, and platform-native integrations. Generated audio is stored as local WAV files so it can be played, revealed, or dragged into another app; macOS also supports copying the file to the clipboard.
+The front end owns project and settings state. The Rust side handles HTTP requests, file I/O, audio caching, credential storage, and platform-native integrations. Generated audio is stored as local WAV files so it can be played, copied, revealed, or dragged into another app.
 
 ## Current MVP scope
 
