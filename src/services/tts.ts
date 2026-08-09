@@ -212,7 +212,7 @@ export async function deleteVoiceSample(path: string): Promise<void> {
 }
 
 /**
- * 将 API Key 存入 macOS Keychain。
+ * 将 API Key 存入当前系统的安全凭据存储。
  *
  * 后端: invoke("save_api_key", { apiKey })
  */
@@ -221,7 +221,7 @@ export async function saveApiKey(configId: string, apiKey: string): Promise<void
 }
 
 /**
- * 从 macOS Keychain 读取 API Key。
+ * 从当前系统的安全凭据存储读取 API Key。
  *
  * 后端: invoke("load_api_key") → string | null
  */
@@ -230,7 +230,7 @@ export async function loadApiKey(configId: string): Promise<string | null> {
 }
 
 /**
- * 从 macOS Keychain 删除 API Key。
+ * 从当前系统的安全凭据存储删除 API Key。
  *
  * 后端: invoke("delete_api_key")
  */

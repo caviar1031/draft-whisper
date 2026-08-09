@@ -33,6 +33,10 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 base64 = "0.22"
 # macOS 动态毛玻璃 (Vibrancy) — Tauri 2 直接在 setup 中应用
 window-vibrancy = "0.5"
+# Windows API Key 安全存储 — 使用系统 Credential Manager
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
+
 # macOS 原生文件拖拽 — 用于将音频文件拖入剪映/Premiere 等剪辑软件
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
