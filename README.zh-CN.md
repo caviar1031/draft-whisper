@@ -28,12 +28,15 @@ DraftWhisper 是一款桌面配音工具，服务于正在剪视频、做教程�
 
 前往 [GitHub Releases](https://github.com/caviar1031/draft-whisper/releases/latest) 下载最新的桌面发行版。
 
-1. 打开最新的 Release，并展开 **Assets**。
-2. 下载 `DraftWhisper_<version>_aarch64.dmg`。当前 MVP 只支持 Apple Silicon，暂未提供 Intel 版本。
-3. 打开下载的 `.dmg` 文件，将 DraftWhisper 拖入 **Applications** 文件夹。
-4. 从 **Applications** 启动 DraftWhisper。当前发行版尚未签名和公证；如果系统拦截应用，请前往 **系统设置 → 隐私与安全性 → 仍要打开**。
+当前已发布的 `v0.1.0` 仅包含 Apple Silicon DMG。使用新的跨平台流水线构建下一版本后，Release 将增加 macOS Intel，以及 Windows x64 的 NSIS 和 MSI 安装包。
 
-当前已发布的发行版仍仅支持 macOS。Windows 适配已可从源码开发和构建，但暂未发布 Windows 安装包。
+1. 打开最新的 Release，并展开 **Assets**。
+2. 对于新跨平台流水线生成的 Release，根据平台选择安装包：
+   - **macOS Apple Silicon：** 下载名称中包含 `aarch64` 的 `.dmg`。
+   - **macOS Intel：** 下载名称中包含 `x86_64` 的 `.dmg`。
+   - **Windows x64：** 下载 NSIS `-setup.exe` 安装程序；需要集中部署时也可以使用 `.msi`。
+3. macOS 用户打开 `.dmg`，将 DraftWhisper 拖入 **Applications**；Windows 用户直接运行下载的安装程序。
+4. 启动 DraftWhisper。当前发行包尚未签名，macOS 构建也尚未公证。如果 macOS 拦截应用，请前往 **系统设置 → 隐私与安全性 → 仍要打开**；如果 Windows 显示 Microsoft Defender SmartScreen，请确认文件来自本仓库后选择 **更多信息 → 仍要运行**。
 
 ## 平台支持
 
@@ -42,7 +45,7 @@ DraftWhisper 是一款桌面配音工具，服务于正在剪视频、做教程�
 | 窗口集成     | 系统标题栏与 macOS 毛玻璃效果     | 自定义 Windows 标题栏与平台专属透明效果 |
 | API Key 存储 | macOS Keychain                    | Windows 凭据管理器                      |
 | 原生文件交付 | 原生拖拽、Finder 定位与剪贴板复制 | 原生 OLE/Shell 拖拽、文件资源管理器定位与剪贴板复制 |
-| 已发布构建   | Apple Silicon DMG                 | 目前需从源码构建                        |
+| 自动发布目标 | Apple Silicon 与 Intel DMG        | x64 NSIS 安装程序与 MSI 安装包          |
 
 ## 它解决什么问题？
 

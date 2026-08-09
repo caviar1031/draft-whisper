@@ -26,12 +26,15 @@ With most TTS tools, changing one line means regenerating a long recording, find
 
 Download the latest published desktop build from [GitHub Releases](https://github.com/caviar1031/draft-whisper/releases/latest).
 
-1. Open the latest release and expand **Assets**.
-2. Download `DraftWhisper_<version>_aarch64.dmg`. The MVP release currently supports Apple Silicon only; an Intel build is not available yet.
-3. Open the downloaded `.dmg` and drag DraftWhisper into the **Applications** folder.
-4. Launch DraftWhisper from **Applications**. The current release builds are unsigned and not notarized; if the system blocks the app, use **System Settings → Privacy & Security → Open Anyway**.
+The currently published `v0.1.0` release contains an Apple Silicon DMG. Releases built by the new cross-platform pipeline will add macOS Intel packages and Windows x64 NSIS and MSI installers.
 
-The current published release is still macOS-only. Windows support is available when building from source, but a Windows installer has not been published yet.
+1. Open the latest release and expand **Assets**.
+2. For releases produced by the cross-platform pipeline, choose the package for your platform:
+   - **macOS Apple Silicon:** download the `.dmg` asset whose name contains `aarch64`.
+   - **macOS Intel:** download the `.dmg` asset whose name contains `x86_64`.
+   - **Windows x64:** download the `-setup.exe` NSIS installer, or the `.msi` installer for managed deployment.
+3. On macOS, open the `.dmg` and drag DraftWhisper into **Applications**. On Windows, run the downloaded installer.
+4. Launch DraftWhisper. Release packages are currently unsigned and macOS builds are not notarized. On macOS, use **System Settings → Privacy & Security → Open Anyway** if the system blocks the app. On Windows, review the Microsoft Defender SmartScreen prompt before choosing **More info → Run anyway**.
 
 ## Platform support
 
@@ -40,7 +43,7 @@ The current published release is still macOS-only. Windows support is available 
 | Window integration  | System title bar and macOS vibrancy            | Custom Windows title bar and platform-specific transparency |
 | API key storage     | macOS Keychain                                 | Windows Credential Manager                                  |
 | Native file handoff | Native drag, Finder reveal, and clipboard copy | Native OLE/Shell drag, File Explorer reveal, and clipboard copy |
-| Published build     | Apple Silicon DMG                              | Build from source for now                                   |
+| Automated release target | Apple Silicon and Intel DMG               | x64 NSIS setup executable and MSI installer                 |
 
 ## What problem does it solve?
 
