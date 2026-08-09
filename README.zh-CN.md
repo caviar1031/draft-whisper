@@ -37,6 +37,17 @@ DraftWhisper 是一款桌面配音工具，服务于正在剪视频、做教程�
 3. 打开下载的 `.dmg` 文件，将 DraftWhisper 拖入 **Applications** 文件夹。
 4. 从 **Applications** 启动 DraftWhisper。当前发行版尚未签名和公证；如果系统拦截应用，请前往 **系统设置 → 隐私与安全性 → 仍要打开**。
 
+当前已发布的发行版仍仅支持 macOS。Windows 适配已可从源码开发和构建，但暂未发布 Windows 安装包。
+
+## 平台支持
+
+| 能力         | macOS                             | Windows                                 |
+| ------------ | --------------------------------- | --------------------------------------- |
+| 窗口集成     | 系统标题栏与 macOS 毛玻璃效果     | 自定义 Windows 标题栏与平台专属透明效果 |
+| API Key 存储 | macOS Keychain                    | Windows 凭据管理器                      |
+| 原生文件交付 | 原生拖拽、Finder 定位与剪贴板复制 | 原生 OLE/Shell 拖拽、文件资源管理器定位与剪贴板复制 |
+| 已发布构建   | Apple Silicon DMG                 | 目前需从源码构建                        |
+
 ## 它解决什么问题？
 
 AI 配音本身已经很快，但修改配音仍然很慢。最常见的场景是：
@@ -77,7 +88,7 @@ DraftWhisper 把这条链路缩短到一句话：脚本、声音设置、当前�
 - **设计或克隆声音**：使用 MiMo 预置音色、文字声音设计，或 WAV/MP3 声音克隆。
 - **控制演绎方式**：基础音色和声音克隆支持可选的自由文本演绎指令。
 - **单独试听声音**：试听不会写入句子的音频历史。
-- **快速交给剪辑**：支持 macOS 原生拖拽、复制音频文件到剪贴板、在 Finder 中定位。
+- **快速交给剪辑**：macOS 和 Windows 均支持原生拖拽和复制音频文件，并可分别在 Finder 或文件资源管理器中定位。
 - **按项目整理工作**：脚本、声音设置、声音样本和音频缓存都可以按本地项目管理。
 
 ## 为剪辑过程中的创作者而设计
@@ -94,7 +105,7 @@ DraftWhisper 不是通用写作助手、时间线编辑器，也不是把所有�
 ## 本地优先的数据处理
 
 - 项目元数据和非敏感偏好设置保存在本地。
-- API Key 按配置隔离存储在 macOS Keychain，不写入 `localStorage`。
+- API Key 按配置隔离存储在系统凭据存储中（macOS Keychain 或 Windows 凭据管理器），不写入 `localStorage`。
 - 生成的音频和声音克隆样本缓存在本机。
 - 声音克隆样本只会在发起克隆生成或试听时发送给 MiMo。
 
@@ -126,10 +137,24 @@ API 使用方式和账号信息请参考 [MiMo v2.5 语音合成文档](https://
 - 与 Tauri 工具链兼容的 Rust 和 Cargo（Rust 1.77.2 或更高版本）
 - 一个 MiMo API Key
 
+各平台还需要：
+
+- **macOS：** Xcode Command Line Tools（`xcode-select --install`）。
+- **Windows：** 安装 Microsoft C++ Build Tools，并选择 **使用 C++ 的桌面开发** 工作负载；同时需要 Microsoft Edge WebView2 Runtime 和稳定版 MSVC Rust 工具链。当前 Windows 版本通常已预装 WebView2。
+
+安装细节请参考 Tauri 官方的[环境依赖说明](https://v2.tauri.app/start/prerequisites/)。
+
 ### 启动桌面应用
 
 ```bash
 npm install
+npm run tauri dev
+```
+
+在 Windows 安装 Rust 后，请重新打开 PowerShell，让 Cargo 路径生效。如果当前终端仍找不到 `cargo`，可为本次会话补上默认路径，再启动应用：
+
+```powershell
+$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 npm run tauri dev
 ```
 
@@ -139,7 +164,7 @@ npm run tauri dev
 2. 填入 API Key，并测试准备使用的能力。
 3. 导入脚本，选择声音模式，生成逐句音频。
 
-如果只进行前端开发，可以使用 `npm run dev`；Tauri 命令和 macOS 原生行为需要通过桌面应用命令运行。
+如果只进行前端开发，可以使用 `npm run dev`；Tauri 命令以及 macOS / Windows 原生集成需要通过桌面应用命令运行。
 
 ## 开发命令
 
@@ -164,11 +189,11 @@ React + TypeScript + Zustand
 Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
           │
           ├─ 项目元数据与偏好设置：localStorage
-          ├─ API Key：macOS Keychain
+          ├─ API Key：系统凭据存储
           └─ WAV 音频与声音样本：本地缓存
 ```
 
-前端负责项目和设置状态；Rust 负责 HTTP 请求、文件读写、音频缓存和 macOS 原生集成。生成的音频以本地 WAV 文件保存，可以播放、复制、在 Finder 中定位，或拖入其他应用。
+前端负责项目和设置状态；Rust 负责 HTTP 请求、文件读写、音频缓存、凭据存储和各平台原生集成。生成的音频以本地 WAV 文件保存，可以播放、复制、定位或拖入其他应用。
 
 ## 当前 MVP 范围
 

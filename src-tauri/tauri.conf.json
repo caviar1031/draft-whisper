@@ -10,24 +10,8 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "withGlobalTauri": false,
     "macOSPrivateApi": true,
-    "windows": [
-      {
-        "title": "DraftWhisper",
-        "width": 460,
-        "height": 700,
-        "minWidth": 460,
-        "minHeight": 480,
-        "resizable": true,
-        "fullscreen": false,
-        "decorations": true,
-        "transparent": true,
-        "hiddenTitle": true,
-        "shadow": true,
-        "titleBarStyle": "Overlay"
-      }
-    ],
+    "withGlobalTauri": false,
     "security": {
       "csp": "default-src 'self' blob: data: https:; script-src 'self'; style-src 'self' 'unsafe-inline'"
     }
@@ -42,12 +26,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "macOS": {
-      "files": {
-        "Resources/Assets.car": "icons/Assets.car",
-        "Resources/draft-whisper.icns": "icons/icon.icns"
-      }
-    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }

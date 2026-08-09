@@ -1,4 +1,6 @@
 mod tts;
+
+#[cfg(any(target_os = "macos", debug_assertions))]
 use tauri::Manager;
 
 #[cfg(target_os = "macos")]
@@ -10,11 +12,11 @@ use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 pub fn run() {
   let app = tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
-    .setup(|app| {
+    .setup(|_app| {
       // ===== macOS 动态毛玻璃 (Vibrancy) =====
       // UnderWindowBackground: 透出桌面壁纸 + 后台窗口，最接近 Liquid Glass 质感
       #[cfg(target_os = "macos")]
-      if let Some(window) = app.get_webview_window("main") {
+      if let Some(window) = _app.get_webview_window("main") {
         apply_vibrancy(
           &window,
           NSVisualEffectMaterial::UnderWindowBackground,
@@ -46,13 +48,13 @@ pub fn run() {
 
       #[cfg(debug_assertions)]
       {
-        app.handle().plugin(
+        _app.handle().plugin(
           tauri_plugin_log::Builder::default()
             .level(log::LevelFilter::Info)
             .build(),
         )?;
         // dev 模式自动打开 DevTools，方便 console 调试 invoke
-        if let Some(window) = app.get_webview_window("main") {
+        if let Some(window) = _app.get_webview_window("main") {
           window.open_devtools();
         }
       }
@@ -81,14 +83,14 @@ pub fn run() {
     .build(tauri::generate_context!())
     .expect("error while running tauri application");
 
-  app.run(|app_handle, event| {
+  app.run(|_app_handle, _event| {
     #[cfg(target_os = "macos")]
     if let tauri::RunEvent::Reopen {
       has_visible_windows: false,
       ..
-    } = event
+    } = _event
     {
-      if let Some(window) = app_handle.get_webview_window("main") {
+      if let Some(window) = _app_handle.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
       }

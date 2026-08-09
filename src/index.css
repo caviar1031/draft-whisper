@@ -324,6 +324,11 @@
     user-select: none;
     -webkit-user-select: none;
   }
+
+  html[data-platform="windows"],
+  html[data-platform="windows"] body {
+    border-radius: 0;
+  }
 }
 
 @layer utilities {
@@ -411,6 +416,10 @@
     color: var(--text-800);
   }
 
+  html[data-platform="windows"] .draftwhisper-window {
+    border-radius: 0;
+  }
+
   /* ===== TitleBar (38px — 应用图标/名称 + 右侧设置/置顶) ===== */
   /* 红黄绿使用 macOS 原生 NSWindow 控件 (Overlay 模式)，浮在 webview 之上
      左侧 padding 80px 让出原生按钮空间 */
@@ -460,6 +469,17 @@
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+  }
+
+  .dw-title-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dw-windows-app-icon,
+  .dw-windows-caption-controls {
+    display: none;
   }
 
   .dw-nav-btn {
@@ -526,6 +546,150 @@
 
   .dw-toggle-pill.is-active {
     color: var(--text-500);
+  }
+
+  html[data-platform="windows"] .dw-title-bar {
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    background: #f3f3f3;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+  }
+
+  html.dark[data-platform="windows"] .dw-title-bar {
+    background: #202020;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+
+  html[data-platform="windows"] .dw-title-left {
+    align-self: stretch;
+    flex: 1;
+    padding-left: 16px;
+    overflow: hidden;
+  }
+
+  html[data-platform="windows"] [data-tauri-drag-region] {
+    app-region: drag;
+  }
+
+  html[data-platform="windows"] .dw-title-app {
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  html[data-platform="windows"] .dw-app-icon {
+    display: none;
+  }
+
+  html[data-platform="windows"] .dw-windows-app-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  html[data-platform="windows"] .dw-app-name {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 400;
+    text-overflow: ellipsis;
+  }
+
+  html[data-platform="windows"] .dw-title-right {
+    align-self: stretch;
+    gap: 0;
+  }
+
+  html[data-platform="windows"] .dw-title-actions {
+    align-self: stretch;
+    gap: 0;
+  }
+
+  html[data-platform="windows"] .dw-title-actions .dw-nav-btn {
+    width: 36px;
+    height: 32px;
+    border-radius: 0;
+    background: transparent;
+    transition: none;
+  }
+
+  html[data-platform="windows"] .dw-title-actions .dw-toggle-pill {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 0;
+    background: transparent;
+    transition: none;
+  }
+
+  html[data-platform="windows"] .dw-title-actions .dw-nav-btn:hover,
+  html[data-platform="windows"] .dw-title-actions .dw-toggle-pill:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  html.dark[data-platform="windows"] .dw-title-actions .dw-nav-btn:hover,
+  html.dark[data-platform="windows"] .dw-title-actions .dw-toggle-pill:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  html[data-platform="windows"] .dw-windows-caption-controls {
+    display: flex;
+    height: 32px;
+  }
+
+  .dw-windows-caption-button {
+    width: 46px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-800);
+    cursor: default;
+  }
+
+  .dw-windows-caption-button:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  .dw-windows-caption-button:active {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  html.dark .dw-windows-caption-button:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  html.dark .dw-windows-caption-button:active {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .dw-windows-caption-button.is-close:hover {
+    background: #c42b1c;
+    color: #ffffff;
+  }
+
+  .dw-windows-caption-button.is-close:active {
+    background: #b32b1e;
+    color: #ffffff;
+  }
+
+  .dw-windows-caption-button:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--brand-500);
+  }
+
+  .dw-windows-caption-glyph {
+    font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets", sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  html[data-platform="windows"] .dw-title-bar.is-inactive .dw-title-app,
+  html[data-platform="windows"] .dw-title-bar.is-inactive .dw-title-actions,
+  html[data-platform="windows"] .dw-title-bar.is-inactive .dw-windows-caption-controls {
+    opacity: 0.55;
   }
 
   /* ===== Toolbar (56px) ===== */
@@ -753,7 +917,13 @@
     align-items: center;
     color: var(--glass-handle);
     cursor: grab;
+    touch-action: none;
+    user-select: none;
     transition: color 0.15s ease;
+  }
+
+  .dw-drag-handle:active {
+    cursor: grabbing;
   }
 
   .dw-sentence-card:hover .dw-drag-handle {
@@ -1647,6 +1817,11 @@
 
   .dw-secret-input-wrap .dw-settings-input {
     padding-right: 40px;
+  }
+
+  .dw-secret-input-wrap input[type="password"]::-ms-reveal,
+  .dw-secret-input-wrap input[type="password"]::-ms-clear {
+    display: none;
   }
 
   .dw-secret-toggle {
