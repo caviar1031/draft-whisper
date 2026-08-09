@@ -108,6 +108,7 @@ export function TitleBar({
             type="button"
             className={`dw-nav-btn${settingsOpen ? " is-active" : ""}`}
             aria-label={t("app.settings")}
+            title={t("app.settings")}
             aria-pressed={settingsOpen}
             onClick={onToggleSettings}
           >
@@ -117,6 +118,7 @@ export function TitleBar({
             type="button"
             className={`dw-toggle-pill${alwaysOnTop ? " is-active" : ""}`}
             aria-label={t("app.alwaysOnTop")}
+            title={t("app.alwaysOnTop")}
             aria-pressed={alwaysOnTop}
             onClick={onToggleAlwaysOnTop}
           >

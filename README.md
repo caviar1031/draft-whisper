@@ -35,6 +35,17 @@ Download the latest published desktop build from [GitHub Releases](https://githu
 3. Open the downloaded `.dmg` and drag DraftWhisper into the **Applications** folder.
 4. Launch DraftWhisper from **Applications**. The current release builds are unsigned and not notarized; if the system blocks the app, use **System Settings → Privacy & Security → Open Anyway**.
 
+The current published release is still macOS-only. Windows support is available when building from source, but a Windows installer has not been published yet.
+
+## Platform support
+
+| Capability          | macOS                                          | Windows                                                     |
+| ------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| Window integration  | System title bar and macOS vibrancy            | Custom Windows title bar and platform-specific transparency |
+| API key storage     | macOS Keychain                                 | Windows Credential Manager                                  |
+| Native file handoff | Native drag, Finder reveal, and clipboard copy | Native OLE/Shell drag and File Explorer reveal              |
+| Published build     | Apple Silicon DMG                              | Build from source for now                                   |
+
 ## What problem does it solve?
 
 AI voiceover is fast to create, but slow to revise. The painful moment usually happens after the first draft:
@@ -62,7 +73,7 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 | --- | --- |
 | Regenerate a long recording for a small text change | Regenerate only the changed sentence |
 | Search through files for the replacement | The replacement stays on the sentence card |
-| Review happens across pages, downloads, and the timeline | Play and compare versions in one workspace |
+| Review happens across pages, downloads, and the timeline | Play and compare versions in one workspace      |
 | Old audio is easy to overwrite or lose | Keep the five most recent versions per sentence |
 | Export, locate, and import manually | Drag the audio file directly into the editor |
 
@@ -75,7 +86,7 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 - **Shape the voice** — use MiMo preset voices, text-based voice design, or WAV/MP3 voice cloning.
 - **Direct the performance** — add optional free-text performance direction for basic and clone modes.
 - **Preview voices separately** — test a voice without adding the preview to a sentence's history.
-- **Move audio into the edit** — drag files natively on macOS, copy a file to the clipboard, or reveal it in Finder.
+- **Move audio into the edit** — drag files natively on macOS and Windows, reveal them in Finder or File Explorer, and copy them to the clipboard on macOS.
 - **Keep work organized locally** — store scripts, voice settings, samples, and cached audio by project.
 
 ## Built for creators in the middle of an edit
@@ -92,7 +103,7 @@ It fits especially well into workflows for:
 ## Local-first storage
 
 - Project metadata and non-sensitive preferences are stored locally.
-- API keys are stored per configuration in the macOS Keychain, not in `localStorage`.
+- API keys are stored per configuration in the platform credential store—macOS Keychain or Windows Credential Manager—not in `localStorage`.
 - Generated audio and voice-clone samples are cached on the local machine.
 - A clone sample is sent to MiMo only when a clone generation or preview request is made.
 
@@ -124,10 +135,24 @@ Voice-clone samples are checked locally before storage or upload: they must be v
 - Rust and Cargo compatible with the Tauri toolchain (Rust 1.77.2 or newer)
 - A MiMo API key
 
+Platform-specific requirements:
+
+- **macOS:** Xcode Command Line Tools (`xcode-select --install`).
+- **Windows:** Microsoft C++ Build Tools with the **Desktop development with C++** workload, Microsoft Edge WebView2 Runtime, and the stable MSVC Rust toolchain. WebView2 is normally already installed on current Windows versions.
+
+See the official [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for installation details.
+
 ### Run the desktop app
 
 ```bash
 npm install
+npm run tauri dev
+```
+
+After installing Rust on Windows, reopen PowerShell so Cargo is added to `PATH`. If the current terminal still cannot find `cargo`, add its default directory for this session and start the app again:
+
+```powershell
+$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 npm run tauri dev
 ```
 
@@ -137,7 +162,7 @@ On first launch:
 2. Enter the API key and test the capabilities you want to use.
 3. Import a script, choose a voice mode, and generate the sentence audio.
 
-For front-end-only work, use `npm run dev`. Tauri commands and native macOS behavior require the desktop command.
+For front-end-only work, use `npm run dev`. Tauri commands and native macOS/Windows integrations require the desktop command.
 
 ## Development commands
 
@@ -162,11 +187,11 @@ React + TypeScript + Zustand
 Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
           │
           ├─ project metadata and preferences: localStorage
-          ├─ API keys: macOS Keychain
+          ├─ API keys: platform credential store
           └─ WAV files and voice samples: local cache
 ```
 
-The front end owns project and settings state. The Rust side handles HTTP requests, file I/O, audio caching, and macOS integrations. Generated audio is stored as local WAV files so it can be played, copied, revealed, or dragged into another app.
+The front end owns project and settings state. The Rust side handles HTTP requests, file I/O, audio caching, credential storage, and platform-native integrations. Generated audio is stored as local WAV files so it can be played, revealed, or dragged into another app; macOS also supports copying the file to the clipboard.
 
 ## Current MVP scope
 
