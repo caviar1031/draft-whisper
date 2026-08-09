@@ -19,11 +19,7 @@ DraftWhisper is a desktop app for creators who use AI voiceover in their videos.
 With most TTS tools, changing one line means regenerating a long recording, finding the replacement, and manually moving it back into the editing timeline. DraftWhisper treats every sentence as an independent audio clip, so the smallest script change can stay a small change.
 
 <p align="center">
-  <img src="./assets/draftwhisper-workspace.jpeg" alt="DraftWhisper English workspace with sentence-level audio cards" width="460" />
-</p>
-
-<p align="center">
-  <em>The workspace shown in English: every sentence has its own status, playback, and regeneration controls.</em>
+  <img src="./assets/draftwhisper-workspace.png" alt="DraftWhisper English workspace with sentence-level audio cards" width="460" />
 </p>
 
 ## Download

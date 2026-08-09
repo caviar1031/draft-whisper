@@ -21,11 +21,7 @@ DraftWhisper 是一款桌面配音工具，服务于正在剪视频、做教程�
 传统 TTS 工具通常把整篇稿子当成一条长音频。改动其中一句后，创作者往往要重新生成或下载整段录音，再找出替换片段，最后手动放回剪辑时间线。DraftWhisper 把每句话当作独立的音频片段，让一次小修改保持为一次小修改。
 
 <p align="center">
-  <img src="./assets/draftwhisper-workspace.jpeg" alt="DraftWhisper 英文界面中的逐句配音工作区" width="460" />
-</p>
-
-<p align="center">
-  <em>英文界面示意：每句话都有独立的状态、播放和重新生成操作。</em>
+  <img src="./assets/draftwhisper-workspace.png" alt="DraftWhisper 英文界面中的逐句配音工作区" width="460" />
 </p>
 
 ## 下载发行版
