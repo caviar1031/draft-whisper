@@ -113,6 +113,7 @@ pub enum ProviderId {
   Mimo,
   #[serde(rename = "fish-audio")]
   FishAudio,
+  Custom,
 }
 
 /// 与前端 Settings 一一对应的 TTS 调用参数。
@@ -181,8 +182,12 @@ fn validate_tts_params(params: &TtsParams) -> Result<(), String> {
   {
     return Err("Select a WAV or MP3 voice sample before generating".into());
   }
-  if params.provider == ProviderId::FishAudio && params.mode != TtsMode::Basic {
-    return Err("Fish Audio currently supports basic TTS configurations only".into());
+  if matches!(
+    params.provider,
+    ProviderId::FishAudio | ProviderId::Custom
+  ) && params.mode != TtsMode::Basic
+  {
+    return Err("This provider currently supports basic TTS configurations only".into());
   }
   if params.mode == TtsMode::Basic && params.voice.trim().is_empty() {
     return Err("Voice ID is required for basic TTS".into());
@@ -489,6 +494,11 @@ fn build_fish_tts_endpoint(base_url: &str) -> String {
   }
 }
 
+/// Return the user-provided custom endpoint without rewriting its path.
+fn custom_speech_endpoint(endpoint_url: &str) -> &str {
+  endpoint_url.trim()
+}
+
 /// 返回音频缓存目录，不存在则创建。
 ///
 /// 尝试顺序：`app_cache_dir` → `app_data_dir` → 项目本地 `.cache/audio`。
@@ -578,6 +588,7 @@ fn build_speech_body(
   match params.provider {
     ProviderId::Mimo => build_mimo_speech_body(params, text, voice_audio_data_uri),
     ProviderId::FishAudio => build_fish_speech_body(params, text),
+    ProviderId::Custom => build_custom_speech_body(params, text),
   }
 }
 
@@ -590,6 +601,24 @@ fn build_fish_speech_body(params: &TtsParams, text: &str) -> Result<Value, Strin
     "reference_id": params.voice.trim(),
     "format": "wav"
   }))
+}
+
+fn build_custom_speech_body(params: &TtsParams, text: &str) -> Result<Value, String> {
+  if params.mode != TtsMode::Basic {
+    return Err("Custom OpenAI-compatible APIs currently support basic TTS only".into());
+  }
+
+  let mut body = serde_json::json!({
+    "model": params.model.trim(),
+    "input": text,
+    "voice": params.voice.trim(),
+    "response_format": "wav"
+  });
+  let instructions = params.performance_prompt.trim();
+  if !instructions.is_empty() {
+    body["instructions"] = Value::String(instructions.to_string());
+  }
+  Ok(body)
 }
 
 fn build_mimo_speech_body(
@@ -663,6 +692,15 @@ async fn request_speech(
         .send()
         .await
     }
+    ProviderId::Custom => {
+      client
+        .post(custom_speech_endpoint(&params.base_url))
+        .bearer_auth(&params.api_key)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+    }
   }
   .map_err(|e| format!("Request failed: {e}"))?;
 
@@ -672,12 +710,15 @@ async fn request_speech(
     return Err(format!("HTTP {status}: {text}"));
   }
 
-  if params.provider == ProviderId::FishAudio {
+  if matches!(
+    params.provider,
+    ProviderId::FishAudio | ProviderId::Custom
+  ) {
     return resp
       .bytes()
       .await
       .map(|bytes| bytes.to_vec())
-      .map_err(|e| format!("Failed to read Fish Audio response: {e}"));
+      .map_err(|e| format!("Failed to read audio response: {e}"));
   }
 
   let json: Value = resp
@@ -1843,9 +1884,10 @@ mod tests {
 
   use super::{
     audio_duration_ms, audio_format, build_chat_endpoint, build_fish_tts_endpoint,
-    build_speech_body, credential_account, is_path_in_allowed_dirs, sanitize_filename,
-    validate_audio_signature, validate_project_name, validate_voice_clone_data_uri_size,
-    validate_voice_clone_duration, ProviderId, TtsMode, TtsParams, MAX_VOICE_CLONE_DATA_URI_SIZE,
+    build_speech_body, credential_account, custom_speech_endpoint, is_path_in_allowed_dirs,
+    sanitize_filename, validate_audio_signature, validate_project_name,
+    validate_voice_clone_data_uri_size, validate_voice_clone_duration, ProviderId, TtsMode,
+    TtsParams, MAX_VOICE_CLONE_DATA_URI_SIZE,
   };
 
   #[cfg(target_os = "windows")]
@@ -1890,6 +1932,14 @@ mod tests {
     assert_eq!(
       build_fish_tts_endpoint("https://proxy.example/v1/tts"),
       "https://proxy.example/v1/tts"
+    );
+  }
+
+  #[test]
+  fn preserves_custom_endpoint_paths() {
+    assert_eq!(
+      custom_speech_endpoint("  https://vendor.example/api/tts/generate?version=2  "),
+      "https://vendor.example/api/tts/generate?version=2"
     );
   }
 
@@ -2046,6 +2096,33 @@ mod tests {
     assert_eq!(body["reference_id"], params.voice);
     assert_eq!(body["format"], "wav");
     assert!(body.get("model").is_none());
+  }
+
+  #[test]
+  fn builds_custom_openai_compatible_request() {
+    let provider: ProviderId = serde_json::from_str("\"custom\"").unwrap();
+    assert_eq!(provider, ProviderId::Custom);
+
+    let mut params = params(TtsMode::Basic, "third-party-tts");
+    params.provider = ProviderId::Custom;
+    params.voice = "vendor-voice".into();
+    let body = build_speech_body(&params, "Hello", None).unwrap();
+
+    assert_eq!(body["model"], "third-party-tts");
+    assert_eq!(body["input"], "Hello");
+    assert_eq!(body["voice"], "vendor-voice");
+    assert_eq!(body["response_format"], "wav");
+    assert_eq!(body["instructions"], params.performance_prompt);
+  }
+
+  #[test]
+  fn omits_empty_custom_instructions() {
+    let mut params = params(TtsMode::Basic, "third-party-tts");
+    params.provider = ProviderId::Custom;
+    params.performance_prompt.clear();
+    let body = build_speech_body(&params, "Hello", None).unwrap();
+
+    assert!(body.get("instructions").is_none());
   }
 
   #[test]

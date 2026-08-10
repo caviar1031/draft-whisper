@@ -47,7 +47,8 @@ export function normalizeTheme(value: unknown): ThemePreference {
 function normalizeApiConfig(value: unknown): ApiConfig | null {
   if (!value || typeof value !== "object") return null
   const raw = value as Record<string, unknown>
-  const provider: ProviderId = raw.provider === "fish-audio" ? "fish-audio" : "mimo"
+  const provider: ProviderId =
+    raw.provider === "fish-audio" || raw.provider === "custom" ? raw.provider : "mimo"
   const fallback = createApiConfig(typeof raw.id === "string" ? raw.id : "", 0, provider)
   if (!fallback.id) return null
   const rawCapabilities =
@@ -67,7 +68,6 @@ function normalizeApiConfig(value: unknown): ApiConfig | null {
         typeof mapping.modelId === "string"
           ? mapping.modelId
           : PROVIDERS[provider].defaultModels[mode],
-      lastVerifiedAt: typeof mapping.lastVerifiedAt === "number" ? mapping.lastVerifiedAt : null,
     }
   }
   const voices: ApiVoice[] = Array.isArray(raw.voices)

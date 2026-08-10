@@ -3,9 +3,9 @@ import i18n from "@/i18n"
 import { countApiConfigReferences, reassignApiConfigReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { ApiConfig, LanguagePreference, ThemePreference } from "@/types"
-import { PROVIDERS, TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
+import { TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
 import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
-import { Check, ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2 } from "lucide-react"
+import { ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiConfigEditor } from "./api-config-editor"
@@ -156,9 +156,6 @@ export function SettingsPage() {
               {configs.map((config) => {
                 const expanded = expandedId === config.id
                 const enabled = TTS_MODES.filter((mode) => config.capabilities[mode].enabled)
-                const verified =
-                  enabled.length > 0 &&
-                  enabled.every((mode) => config.capabilities[mode].lastVerifiedAt)
                 return (
                   <article className="dw-api-config-card" key={config.id}>
                     <div className="dw-api-config-summary">
@@ -172,7 +169,13 @@ export function SettingsPage() {
                         <ChevronDown className={expanded ? "is-open" : undefined} size={15} />
                       </button>
                       <div className="dw-provider-icon" aria-hidden="true">
-                        <span>{config.provider === "mimo" ? "Mi" : "Fi"}</span>
+                        <span>
+                          {config.provider === "mimo"
+                            ? "Mi"
+                            : config.provider === "fish-audio"
+                              ? "Fi"
+                              : "Cu"}
+                        </span>
                       </div>
                       <div className="dw-api-config-name">
                         <div>
@@ -182,14 +185,10 @@ export function SettingsPage() {
                           )}
                         </div>
                         <span>
-                          {PROVIDERS[config.provider].name} ·{" "}
+                          {t(`settings.providers.${config.provider}`)} ·{" "}
                           {t("settings.capabilities", { count: enabled.length })}
                         </span>
                       </div>
-                      <span className={`dw-api-verify-badge${verified ? " is-verified" : ""}`}>
-                        {verified ? <Check size={11} /> : <CircleAlert size={11} />}
-                        {t(verified ? "common.verified" : "common.unverified")}
-                      </span>
                       <button
                         type="button"
                         className="dw-icon-action"

@@ -108,12 +108,13 @@ It fits especially well into workflows for:
 
 ## Current provider and voice modes
 
-The provider layer ships with editable presets for Xiaomi MiMo v2.5 and Fish Audio:
+The provider layer ships with editable presets for Xiaomi MiMo v2.5 and Fish Audio, plus a blank custom configuration for third-party OpenAI SDK-compatible speech APIs:
 
 | Provider | Protocol | Default base URL | Modes |
 | --- | --- | --- | --- |
 | Xiaomi MiMo | Chat Completions-style TTS | `https://api.xiaomimimo.com/v1` | Basic voice, voice design, voice clone |
 | Fish Audio | `/v1/tts` REST API | `https://api.fish.audio/v1/tts` | Basic voice |
+| Custom configuration | OpenAI SDK-compatible speech request | Complete endpoint supplied by user | Basic voice |
 
 Default model mappings for a new MiMo configuration:
 
@@ -127,6 +128,8 @@ See the [MiMo v2.5 speech synthesis documentation](https://mimo.mi.com/docs/zh-C
 
 Fish Audio configurations default to `s2.1-pro-free` and include editable example voice IDs. See the [Fish Audio quick start](https://docs.fish.audio/developer-guide/getting-started/quickstart). Provider presets populate the base URL, models, capabilities, and voices, while keeping every value editable.
 
+Custom configurations do not assume an OpenAI account or endpoint. Enter the third-party service's complete speech endpoint, API key, model ID, and voice IDs; DraftWhisper uses the endpoint unchanged, sends the standard speech request with Bearer authentication, and stores the returned WAV bytes locally.
+
 Voice-clone samples are checked locally before storage or upload: they must be valid WAV or MP3 files, shorter than 30 seconds, and under MiMo's 10 MB limit after conversion to a complete Base64 Data URI.
 
 ## Quick start
@@ -135,7 +138,7 @@ Voice-clone samples are checked locally before storage or upload: they must be v
 
 - Recent Node.js and npm
 - Rust and Cargo compatible with the Tauri toolchain (Rust 1.77.2 or newer)
-- A MiMo or Fish Audio API key
+- A MiMo, Fish Audio, or compatible third-party TTS API key
 
 Platform-specific requirements:
 
@@ -160,7 +163,7 @@ npm run tauri dev
 
 On first launch:
 
-1. Open **Settings** and add a MiMo API configuration.
+1. Open **Settings** and add a preset or custom API configuration.
 2. Enter the API key and test the capabilities you want to use.
 3. Import a script, choose a voice mode, and generate the sentence audio.
 
@@ -186,7 +189,7 @@ For front-end-only work, use `npm run dev`. Tauri commands and native macOS/Wind
 React + TypeScript + Zustand
           │ Tauri IPC
           ▼
-Rust + reqwest ──────► MiMo or Fish Audio TTS API
+Rust + reqwest ──────► MiMo, Fish Audio, or custom TTS API
           │
           ├─ project metadata and preferences: localStorage
           ├─ API keys: platform credential store
@@ -199,7 +202,7 @@ The front end owns project and settings state. The Rust side handles HTTP reques
 
 Included: script import, sentence splitting, batch generation, playback, single-sentence regeneration, five-version history, local projects, voice design, voice cloning, local caching, settings, and English/Simplified Chinese UI.
 
-Not included yet: cloud sync, waveform editing, timeline editing, subtitles, and providers beyond MiMo and Fish Audio.
+Not included yet: cloud sync, waveform editing, timeline editing, subtitles, and additional provider-specific adapters beyond MiMo and Fish Audio.
 
 ## License
 

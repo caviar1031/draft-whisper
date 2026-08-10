@@ -4,7 +4,7 @@ export interface ProviderDefinition {
   id: ProviderId
   name: string
   defaultBaseUrl: string
-  docsUrl: string
+  docsUrl?: string
   defaultModels: Record<TtsMode, string>
   supportedModes: TtsMode[]
   defaultVoices: ApiVoice[]
@@ -50,6 +50,18 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
       { id: "9a9cf47702da476aa4629e2506d4a857", name: "Energetic Male" },
     ],
   },
+  custom: {
+    id: "custom",
+    name: "Custom API",
+    defaultBaseUrl: "",
+    defaultModels: {
+      basic: "",
+      "voice-design": "",
+      "voice-clone": "",
+    },
+    supportedModes: ["basic"],
+    defaultVoices: [{ id: "", name: "" }],
+  },
 }
 
 export const TTS_MODES: TtsMode[] = ["basic", "voice-design", "voice-clone"]
@@ -61,17 +73,14 @@ export function createDefaultCapabilities(provider: ProviderId): CapabilityMappi
     basic: {
       enabled: definition.supportedModes.includes("basic"),
       modelId: models.basic,
-      lastVerifiedAt: null,
     },
     "voice-design": {
       enabled: definition.supportedModes.includes("voice-design"),
       modelId: models["voice-design"],
-      lastVerifiedAt: null,
     },
     "voice-clone": {
       enabled: definition.supportedModes.includes("voice-clone"),
       modelId: models["voice-clone"],
-      lastVerifiedAt: null,
     },
   }
 }
@@ -84,7 +93,7 @@ export function createApiConfig(
   const definition = PROVIDERS[provider]
   return {
     id,
-    name: provider === "mimo" ? "MiMo" : definition.name,
+    name: provider === "mimo" ? "MiMo" : provider === "custom" ? "Custom API" : definition.name,
     provider,
     baseUrl: definition.defaultBaseUrl,
     createdAt: now,

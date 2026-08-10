@@ -108,7 +108,7 @@ MVP 只验证一件事情：
 
 ✕ AI 智能断句
 
-✓ 多 Provider 架构（MiMo、Fish Audio）
+✓ 多 Provider 架构（MiMo、Fish Audio、第三方自定义配置）
 
 ✕ 云同步
 
@@ -288,7 +288,7 @@ audio/
 ## 6.9 设置
 
 Settings 是整个应用的设置中心。当前包含通用设置、生成设置和模型与 API 三个分区。
-Provider 使用可扩展注册结构，当前注册已完成真实适配的 MiMo 与 Fish Audio。
+Provider 使用可扩展注册结构，当前注册已完成真实适配的 MiMo、Fish Audio，以及使用 OpenAI SDK 兼容语音协议的第三方自定义配置。
 
 页面结构：
 
@@ -297,6 +297,7 @@ Provider 使用可扩展注册结构，当前注册已完成真实适配的 MiMo
 * 模型与 API：顶部添加按钮和默认折叠的配置卡片
 * 编辑弹窗包含配置名称、Provider、Base URL、API Key、可编辑音色列表、能力开关与可编辑模型 ID
 * 切换预置 Provider 时自动填充默认 Base URL、能力、模型和音色，填充值仍可修改
+* 自定义配置不预填厂商地址、模型或音色；用户自行填写第三方完整 Endpoint URL、API Key、模型 ID 与音色 ID，应用不补全或改写路径
 * 三项能力可分别发起真实合成测试；声音克隆测试支持选择或导入 WAV/MP3 样本
 * API Key 按配置 ID 隔离存储在 macOS Keychain，不进入 localStorage
 * 第一张配置自动成为默认配置；项目可以选择不同配置
@@ -312,7 +313,7 @@ Provider 使用可扩展注册结构，当前注册已完成真实适配的 MiMo
 
 ## 6.10 声音模式
 
-MiMo 支持三个 TTS 模式；Fish Audio 当前接入基础音色模式。下表是新建配置时的默认值，用户可在 Settings 中修改：
+MiMo 支持三个 TTS 模式；Fish Audio 与第三方自定义配置当前接入基础音色模式。下表是新建配置时的默认值，用户可在 Settings 中修改：
 
 | Provider | 模式 | 模型 |
 | --- | --- | --- |
@@ -320,6 +321,7 @@ MiMo 支持三个 TTS 模式；Fish Audio 当前接入基础音色模式。下�
 | MiMo | 声音设计 | `mimo-v2.5-tts-voicedesign` |
 | MiMo | 声音克隆 | `mimo-v2.5-tts-voiceclone` |
 | Fish Audio | 基础音色 | `s2.1-pro-free` |
+| 自定义配置 | 基础音色 | 用户填写 |
 
 声音设计：
 
@@ -511,7 +513,7 @@ Audio Files
 
 ## API
 
-小米 MiMo v2.5 TTS chat-completions 协议；Fish Audio `/v1/tts` REST 协议
+小米 MiMo v2.5 TTS chat-completions 协议；Fish Audio `/v1/tts` REST 协议；第三方自定义配置使用 OpenAI SDK 兼容的 `/v1/audio/speech` 协议
 
 第一版：
 

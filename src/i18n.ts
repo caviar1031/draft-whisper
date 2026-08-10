@@ -14,8 +14,6 @@ const resources = {
         test: "测试",
         testing: "测试中…",
         default: "默认",
-        unverified: "未验证",
-        verified: "已验证",
         failed: "失败",
         create: "创建",
         saving: "保存中…",
@@ -44,6 +42,11 @@ const resources = {
         expand: "展开配置",
         collapse: "折叠配置",
         capabilities: "{{count}} 项能力",
+        providers: {
+          mimo: "Xiaomi MiMo",
+          "fish-audio": "Fish Audio",
+          custom: "自定义配置",
+        },
         deleteConfirm: "删除“{{name}}”？{{references}} 个项目将迁移到其他默认配置。",
         deleteLastConfirm: "删除“{{name}}”？{{references}} 个项目将变为未配置状态。",
         editor: {
@@ -53,6 +56,7 @@ const resources = {
           namePlaceholder: "例如：MiMo 主账号",
           provider: "服务商",
           baseUrl: "Base URL",
+          endpointUrl: "Endpoint URL",
           apiKey: "API 密钥",
           apiKeyNewPlaceholder: "输入 API 密钥",
           apiKeyEditPlaceholder: "留空以保留现有密钥",
@@ -60,6 +64,7 @@ const resources = {
           hideKey: "隐藏 API 密钥",
           docs: "查看文档",
           docsOpenFailed: "无法打开文档，请检查系统默认浏览器设置后重试。",
+          customProtocolHint: "填写第三方语音接口的完整地址；请求时不会修改路径。",
           voicesTitle: "可用音色",
           voicesDesc: "填写显示名称和服务商使用的音色 ID；预设内容可以修改。",
           addVoice: "添加音色",
@@ -261,8 +266,6 @@ const resources = {
         test: "Test",
         testing: "Testing…",
         default: "Default",
-        unverified: "Unverified",
-        verified: "Verified",
         failed: "Failed",
         create: "Create",
         saving: "Saving…",
@@ -291,6 +294,11 @@ const resources = {
         expand: "Expand configuration",
         collapse: "Collapse configuration",
         capabilities: "{{count}} capabilities",
+        providers: {
+          mimo: "Xiaomi MiMo",
+          "fish-audio": "Fish Audio",
+          custom: "Custom Configuration",
+        },
         deleteConfirm: "Delete “{{name}}”? {{references}} projects will move to another default.",
         deleteLastConfirm: "Delete “{{name}}”? {{references}} projects will become unconfigured.",
         editor: {
@@ -300,6 +308,7 @@ const resources = {
           namePlaceholder: "e.g. Primary MiMo Account",
           provider: "Provider",
           baseUrl: "Base URL",
+          endpointUrl: "Endpoint URL",
           apiKey: "API Key",
           apiKeyNewPlaceholder: "Enter API key",
           apiKeyEditPlaceholder: "Leave blank to keep the existing key",
@@ -308,6 +317,8 @@ const resources = {
           docs: "View Documentation",
           docsOpenFailed:
             "Could not open the documentation. Check your default browser and try again.",
+          customProtocolHint:
+            "Enter the complete third-party speech endpoint; its path is unchanged.",
           voicesTitle: "Available Voices",
           voicesDesc:
             "Enter a display name and the provider voice ID. Preset values remain editable.",

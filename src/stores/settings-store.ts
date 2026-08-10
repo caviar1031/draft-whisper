@@ -1,5 +1,5 @@
 import { deleteApiKey, loadApiKey, migrateLegacyApiKey, saveApiKey } from "@/services/tts"
-import type { ApiConfig, LanguagePreference, Settings, ThemePreference, TtsMode } from "@/types"
+import type { ApiConfig, LanguagePreference, Settings, ThemePreference } from "@/types"
 import { createApiConfig } from "@/utils/provider-catalog"
 import {
   LEGACY_API_CONFIG_ID,
@@ -22,7 +22,6 @@ interface SettingsState extends PersistedSettings {
   saveApiConfig: (config: ApiConfig, apiKey?: string) => Promise<void>
   deleteApiConfig: (configId: string) => Promise<string | null>
   setDefaultApiConfig: (configId: string) => void
-  setCapabilityVerified: (configId: string, mode: TtsMode, verifiedAt: number | null) => void
   loadAllApiKeys: () => Promise<void>
 }
 
@@ -103,22 +102,6 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
-      setCapabilityVerified: (configId, mode, verifiedAt) => {
-        set((state) => ({
-          apiConfigs: state.apiConfigs.map((config) =>
-            config.id === configId
-              ? {
-                  ...config,
-                  capabilities: {
-                    ...config.capabilities,
-                    [mode]: { ...config.capabilities[mode], lastVerifiedAt: verifiedAt },
-                  },
-                }
-              : config,
-          ),
-        }))
-      },
-
       loadAllApiKeys: async () => {
         let configs = get().apiConfigs
         let migratedKey: string | null = null
@@ -154,7 +137,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "dw-settings",
-      version: 5,
+      version: 6,
       migrate: migratePersistedSettings,
       partialize: (state) => ({
         language: state.language,

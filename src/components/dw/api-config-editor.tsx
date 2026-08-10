@@ -60,20 +60,13 @@ export function ApiConfigEditor({
 
   const effectiveApiKey = apiKey.trim() || (providerChanged ? "" : existingApiKey)
   const provider = PROVIDERS[draft.provider]
+  const providerLabel = t(`settings.providers.${draft.provider}`)
   const enabledCount = useMemo(
     () => TTS_MODES.filter((mode) => draft.capabilities[mode].enabled).length,
     [draft.capabilities],
   )
 
-  const invalidateAllTests = () => {
-    setTests(IDLE_TESTS)
-    setDraft((current) => ({
-      ...current,
-      capabilities: Object.fromEntries(
-        TTS_MODES.map((mode) => [mode, { ...current.capabilities[mode], lastVerifiedAt: null }]),
-      ) as ApiConfig["capabilities"],
-    }))
-  }
+  const invalidateAllTests = () => setTests(IDLE_TESTS)
 
   const updateCapability = (
     mode: TtsMode,
@@ -83,7 +76,7 @@ export function ApiConfigEditor({
       ...current,
       capabilities: {
         ...current.capabilities,
-        [mode]: { ...current.capabilities[mode], ...updates, lastVerifiedAt: null },
+        [mode]: { ...current.capabilities[mode], ...updates },
       },
     }))
     setTests((current) => ({ ...current, [mode]: { state: "idle" } }))
@@ -156,13 +149,6 @@ export function ApiConfigEditor({
       return
     }
 
-    setDraft((current) => ({
-      ...current,
-      capabilities: {
-        ...current.capabilities,
-        [mode]: { ...current.capabilities[mode], lastVerifiedAt: null },
-      },
-    }))
     setTests((current) => ({ ...current, [mode]: { state: "testing" } }))
     try {
       await testTts({
@@ -176,14 +162,6 @@ export function ApiConfigEditor({
         voiceClonePath: mode === "voice-clone" ? cloneSamplePath : null,
         performancePrompt: "",
       })
-      const verifiedAt = Date.now()
-      setDraft((current) => ({
-        ...current,
-        capabilities: {
-          ...current.capabilities,
-          [mode]: { ...current.capabilities[mode], lastVerifiedAt: verifiedAt },
-        },
-      }))
       setTests((current) => ({ ...current, [mode]: { state: "success" } }))
     } catch (error) {
       setTests((current) => ({
@@ -232,6 +210,7 @@ export function ApiConfigEditor({
   }
 
   const handleOpenDocs = async () => {
+    if (!provider.docsUrl) return
     setDocsError(null)
     try {
       await openUrl(provider.docsUrl)
@@ -281,7 +260,7 @@ export function ApiConfigEditor({
             <h2 id="api-editor-title">
               {t(isNew ? "settings.editor.addTitle" : "settings.editor.editTitle")}
             </h2>
-            <p>{provider.name}</p>
+            <p>{providerLabel}</p>
           </div>
           <button
             type="button"
@@ -313,7 +292,7 @@ export function ApiConfigEditor({
                 ariaLabel={t("settings.editor.provider")}
                 options={Object.values(PROVIDERS).map((definition) => ({
                   value: definition.id,
-                  label: definition.name,
+                  label: t(`settings.providers.${definition.id}`),
                 }))}
                 onValueChange={handleProviderChange}
               />
@@ -321,7 +300,11 @@ export function ApiConfigEditor({
           </div>
 
           <label className="dw-settings-label">
-            {t("settings.editor.baseUrl")}
+            {t(
+              draft.provider === "custom"
+                ? "settings.editor.endpointUrl"
+                : "settings.editor.baseUrl",
+            )}
             <input
               className="dw-settings-input"
               type="url"
@@ -331,20 +314,27 @@ export function ApiConfigEditor({
                 invalidateAllTests()
               }}
             />
+            {draft.provider === "custom" && (
+              <span className="dw-settings-field-hint">
+                {t("settings.editor.customProtocolHint")}
+              </span>
+            )}
           </label>
 
           <div className="dw-field-label-row">
             <label className="dw-settings-label" htmlFor="api-editor-key">
               {t("settings.editor.apiKey")}
             </label>
-            <button
-              type="button"
-              className="dw-settings-doc-link"
-              onClick={() => void handleOpenDocs()}
-            >
-              {t("settings.editor.docs")}
-              <ExternalLink size={11} strokeWidth={2} />
-            </button>
+            {provider.docsUrl && (
+              <button
+                type="button"
+                className="dw-settings-doc-link"
+                onClick={() => void handleOpenDocs()}
+              >
+                {t("settings.editor.docs")}
+                <ExternalLink size={11} strokeWidth={2} />
+              </button>
+            )}
           </div>
           {docsError && (
             <div className="dw-settings-inline-error" role="alert">
@@ -455,11 +445,6 @@ export function ApiConfigEditor({
                         </span>
                       )}
                     </label>
-                    {mapping.lastVerifiedAt && (
-                      <span className="dw-verified-time">
-                        <Check size={11} /> {new Date(mapping.lastVerifiedAt).toLocaleString()}
-                      </span>
-                    )}
                   </div>
                   {mapping.enabled && (
                     <>

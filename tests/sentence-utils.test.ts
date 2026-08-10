@@ -73,6 +73,23 @@ test("uses Fish Audio as an editable provider preset", () => {
   assert.equal(resolveConfigVoice(config, "custom-reference"), "custom-reference")
 })
 
+test("creates a blank custom OpenAI-compatible configuration", () => {
+  const config = createApiConfig("custom", 0, "custom")
+  assert.equal(config.name, "Custom API")
+  assert.equal(config.baseUrl, "")
+  assert.equal(config.capabilities.basic.enabled, true)
+  assert.equal(config.capabilities.basic.modelId, "")
+  assert.equal(config.capabilities["voice-design"].enabled, false)
+  assert.equal(config.capabilities["voice-clone"].enabled, false)
+  assert.deepEqual(config.voices, [{ id: "", name: "" }])
+
+  config.name = "Third-party TTS"
+  config.baseUrl = "https://tts.example.com/v1"
+  config.capabilities.basic.modelId = "vendor-tts-model"
+  config.voices = [{ id: "narrator", name: "Narrator" }]
+  assert.equal(validateApiConfig(config), null)
+})
+
 test("validates enabled capability mappings without fixing model IDs", () => {
   const config = createApiConfig("test")
   config.capabilities.basic.modelId = "vendor-custom-basic"
@@ -197,11 +214,35 @@ test("normalizes persisted Fish Audio configurations and voices", () => {
   const fish = createApiConfig("fish", 10, "fish-audio")
   fish.voices = [{ id: "custom-reference", name: "Custom Voice" }]
   fish.capabilities["voice-design"].enabled = true
+  const persistedFish = {
+    ...fish,
+    capabilities: {
+      ...fish.capabilities,
+      basic: { ...fish.capabilities.basic, lastVerifiedAt: Date.now() },
+    },
+  }
 
-  const migrated = migratePersistedSettings({ apiConfigs: [fish], defaultApiConfigId: fish.id })
+  const migrated = migratePersistedSettings({
+    apiConfigs: [persistedFish],
+    defaultApiConfigId: fish.id,
+  })
   assert.equal(migrated.apiConfigs[0].provider, "fish-audio")
   assert.deepEqual(migrated.apiConfigs[0].voices, fish.voices)
   assert.equal(migrated.apiConfigs[0].capabilities["voice-design"].enabled, false)
+  assert.equal("lastVerifiedAt" in migrated.apiConfigs[0].capabilities.basic, false)
+})
+
+test("preserves persisted custom OpenAI-compatible configurations", () => {
+  const custom = createApiConfig("custom", 10, "custom")
+  custom.baseUrl = "https://tts.example.com/v1/audio/speech"
+  custom.capabilities.basic.modelId = "vendor-model"
+  custom.voices = [{ id: "voice-id", name: "Voice" }]
+
+  const migrated = migratePersistedSettings({ apiConfigs: [custom] })
+  assert.equal(migrated.apiConfigs[0].provider, "custom")
+  assert.equal(migrated.apiConfigs[0].baseUrl, custom.baseUrl)
+  assert.equal(migrated.apiConfigs[0].capabilities.basic.modelId, "vendor-model")
+  assert.deepEqual(migrated.apiConfigs[0].voices, custom.voices)
 })
 
 test("resolves system language to a supported locale", () => {
