@@ -1,6 +1,7 @@
 import { cleanupAudioFiles, invalidateAudioUrl, revokeAllAudioUrls } from "@/services/tts"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { Project, Sentence, TtsMode } from "@/types"
+import { resolveConfigVoice } from "@/utils/provider-catalog"
 import { create } from "zustand"
 
 const STORAGE_PREFIX = "dw-project:"
@@ -60,6 +61,12 @@ const DEFAULT_PROJECT_DATA: ProjectData = {
   sentences: [],
 }
 
+function resolveVoiceForApiConfig(apiConfigId: string | null, currentVoice: string): string {
+  if (!apiConfigId) return currentVoice
+  const config = useSettingsStore.getState().apiConfigs.find((item) => item.id === apiConfigId)
+  return resolveConfigVoice(config, currentVoice)
+}
+
 /** 从 localStorage 加载指定项目的数据 */
 function loadProjectData(project: string | null): ProjectData {
   try {
@@ -76,9 +83,11 @@ function loadProjectData(project: string | null): ProjectData {
     }
 
     if (!raw) {
+      const apiConfigId = useSettingsStore.getState().defaultApiConfigId
       return {
         ...DEFAULT_PROJECT_DATA,
-        apiConfigId: useSettingsStore.getState().defaultApiConfigId,
+        apiConfigId,
+        voice: resolveVoiceForApiConfig(apiConfigId, DEFAULT_PROJECT_DATA.voice),
       }
     }
     const parsed = JSON.parse(raw) as Record<string, unknown>
@@ -88,13 +97,15 @@ function loadProjectData(project: string | null): ProjectData {
     const sentences = (state.sentences as Sentence[]) ?? []
     const mode = (state.mode as TtsMode) ?? "basic"
 
+    const apiConfigId =
+      typeof state.apiConfigId === "string"
+        ? state.apiConfigId
+        : useSettingsStore.getState().defaultApiConfigId
+    const storedVoice = (state.voice as string) ?? DEFAULT_PROJECT_DATA.voice
     return {
-      apiConfigId:
-        typeof state.apiConfigId === "string"
-          ? state.apiConfigId
-          : useSettingsStore.getState().defaultApiConfigId,
+      apiConfigId,
       mode,
-      voice: (state.voice as string) ?? "冰糖",
+      voice: resolveVoiceForApiConfig(apiConfigId, storedVoice),
       voiceDesignId: (state.voiceDesignId as string | null) ?? null,
       voiceDesignPrompt: (state.voiceDesignPrompt as string) ?? "",
       voiceCloneSampleId: (state.voiceCloneSampleId as string | null) ?? null,
@@ -103,7 +114,12 @@ function loadProjectData(project: string | null): ProjectData {
       sentences: normalizeSentences(sentences),
     }
   } catch {
-    return { ...DEFAULT_PROJECT_DATA, apiConfigId: useSettingsStore.getState().defaultApiConfigId }
+    const apiConfigId = useSettingsStore.getState().defaultApiConfigId
+    return {
+      ...DEFAULT_PROJECT_DATA,
+      apiConfigId,
+      voice: resolveVoiceForApiConfig(apiConfigId, DEFAULT_PROJECT_DATA.voice),
+    }
   }
 }
 
@@ -139,7 +155,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   sentences: [],
 
   setApiConfigId: (apiConfigId) => {
-    set({ apiConfigId })
+    set((state) => ({
+      apiConfigId,
+      voice: resolveVoiceForApiConfig(apiConfigId, state.voice),
+    }))
     saveCurrentProject(get())
   },
   setMode: (mode) => {

@@ -108,11 +108,12 @@ It fits especially well into workflows for:
 
 ## Current provider and voice modes
 
-The provider layer is designed to grow, but the current MVP ships with Xiaomi MiMo v2.5:
+The provider layer ships with editable presets for Xiaomi MiMo v2.5 and Fish Audio:
 
 | Provider | Protocol | Default base URL | Modes |
 | --- | --- | --- | --- |
 | Xiaomi MiMo | Chat Completions-style TTS | `https://api.xiaomimimo.com/v1` | Basic voice, voice design, voice clone |
+| Fish Audio | `/v1/tts` REST API | `https://api.fish.audio/v1/tts` | Basic voice |
 
 Default model mappings for a new MiMo configuration:
 
@@ -124,6 +125,8 @@ Default model mappings for a new MiMo configuration:
 
 See the [MiMo v2.5 speech synthesis documentation](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5) for API access and account details.
 
+Fish Audio configurations default to `s2.1-pro-free` and include editable example voice IDs. See the [Fish Audio quick start](https://docs.fish.audio/developer-guide/getting-started/quickstart). Provider presets populate the base URL, models, capabilities, and voices, while keeping every value editable.
+
 Voice-clone samples are checked locally before storage or upload: they must be valid WAV or MP3 files, shorter than 30 seconds, and under MiMo's 10 MB limit after conversion to a complete Base64 Data URI.
 
 ## Quick start
@@ -132,7 +135,7 @@ Voice-clone samples are checked locally before storage or upload: they must be v
 
 - Recent Node.js and npm
 - Rust and Cargo compatible with the Tauri toolchain (Rust 1.77.2 or newer)
-- A MiMo API key
+- A MiMo or Fish Audio API key
 
 Platform-specific requirements:
 
@@ -183,7 +186,7 @@ For front-end-only work, use `npm run dev`. Tauri commands and native macOS/Wind
 React + TypeScript + Zustand
           │ Tauri IPC
           ▼
-Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
+Rust + reqwest ──────► MiMo or Fish Audio TTS API
           │
           ├─ project metadata and preferences: localStorage
           ├─ API keys: platform credential store
@@ -196,7 +199,7 @@ The front end owns project and settings state. The Rust side handles HTTP reques
 
 Included: script import, sentence splitting, batch generation, playback, single-sentence regeneration, five-version history, local projects, voice design, voice cloning, local caching, settings, and English/Simplified Chinese UI.
 
-Not included yet: cloud sync, waveform editing, timeline editing, subtitles, and additional providers beyond MiMo.
+Not included yet: cloud sync, waveform editing, timeline editing, subtitles, and providers beyond MiMo and Fish Audio.
 
 ## License
 

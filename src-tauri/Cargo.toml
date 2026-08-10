@@ -31,6 +31,7 @@ tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 base64 = "0.22"
+tauri-plugin-opener = "2"
 # Windows API Key 安全存储 — 使用系统 Credential Manager
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }

@@ -2,11 +2,23 @@ import { ModalLayer } from "@/components/ui/modal-layer"
 import { Select } from "@/components/ui/select"
 import { saveVoiceSample, testTts } from "@/services/tts"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { ApiConfig, TtsMode } from "@/types"
-import { PROVIDERS, TTS_MODES } from "@/utils/provider-catalog"
+import type { ApiConfig, ProviderId, TtsMode } from "@/types"
+import { PROVIDERS, TTS_MODES, applyProviderPreset } from "@/utils/provider-catalog"
 import { validateApiConfig } from "@/utils/settings-validation"
 import { open } from "@tauri-apps/plugin-dialog"
-import { Check, CircleAlert, ExternalLink, Eye, EyeOff, RefreshCw, Upload, X } from "lucide-react"
+import { openUrl } from "@tauri-apps/plugin-opener"
+import {
+  Check,
+  CircleAlert,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -38,13 +50,15 @@ export function ApiConfigEditor({
   const addSample = useVoiceSampleStore((state) => state.addSample)
   const [draft, setDraft] = useState<ApiConfig>(() => structuredClone(config))
   const [apiKey, setApiKey] = useState("")
+  const [providerChanged, setProviderChanged] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
   const [cloneSamplePath, setCloneSamplePath] = useState("")
   const [tests, setTests] = useState<Record<TtsMode, TestStatus>>(IDLE_TESTS)
+  const [docsError, setDocsError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const effectiveApiKey = apiKey.trim() || existingApiKey
+  const effectiveApiKey = apiKey.trim() || (providerChanged ? "" : existingApiKey)
   const provider = PROVIDERS[draft.provider]
   const enabledCount = useMemo(
     () => TTS_MODES.filter((mode) => draft.capabilities[mode].enabled).length,
@@ -75,6 +89,42 @@ export function ApiConfigEditor({
     setTests((current) => ({ ...current, [mode]: { state: "idle" } }))
   }
 
+  const handleProviderChange = (providerId: ProviderId) => {
+    setDraft((current) => applyProviderPreset(current, providerId))
+    setProviderChanged(providerId !== config.provider)
+    setApiKey("")
+    setCloneSamplePath("")
+    setTests(IDLE_TESTS)
+    setDocsError(null)
+    setFormError(null)
+  }
+
+  const updateVoice = (index: number, field: "id" | "name", value: string) => {
+    setDraft((current) => ({
+      ...current,
+      voices: current.voices.map((voice, voiceIndex) =>
+        voiceIndex === index ? { ...voice, [field]: value } : voice,
+      ),
+    }))
+    invalidateAllTests()
+  }
+
+  const addVoice = () => {
+    setDraft((current) => ({
+      ...current,
+      voices: [...current.voices, { id: "", name: "" }],
+    }))
+    invalidateAllTests()
+  }
+
+  const removeVoice = (index: number) => {
+    setDraft((current) => ({
+      ...current,
+      voices: current.voices.filter((_, voiceIndex) => voiceIndex !== index),
+    }))
+    invalidateAllTests()
+  }
+
   const handleTest = async (mode: TtsMode) => {
     const mapping = draft.capabilities[mode]
     if (!effectiveApiKey) {
@@ -88,6 +138,13 @@ export function ApiConfigEditor({
       setTests((current) => ({
         ...current,
         [mode]: { state: "error", error: t("settings.errors.modelRequired") },
+      }))
+      return
+    }
+    if (mode === "basic" && !draft.voices.some((voice) => voice.id.trim())) {
+      setTests((current) => ({
+        ...current,
+        [mode]: { state: "error", error: t("settings.errors.voiceRequired") },
       }))
       return
     }
@@ -114,7 +171,7 @@ export function ApiConfigEditor({
         apiKey: effectiveApiKey,
         model: mapping.modelId.trim(),
         mode,
-        voice: "冰糖",
+        voice: draft.voices[0]?.id.trim() ?? "",
         voiceDesignPrompt: mode === "voice-design" ? "A warm, calm and natural voice." : "",
         voiceClonePath: mode === "voice-clone" ? cloneSamplePath : null,
         performancePrompt: "",
@@ -174,20 +231,41 @@ export function ApiConfigEditor({
     }
   }
 
+  const handleOpenDocs = async () => {
+    setDocsError(null)
+    try {
+      await openUrl(provider.docsUrl)
+    } catch (error) {
+      console.error("Failed to open provider documentation", error)
+      setDocsError(t("settings.editor.docsOpenFailed"))
+    }
+  }
+
   const handleSave = async () => {
     const errorKey = validateApiConfig(draft)
     if (errorKey) {
       setFormError(t(errorKey))
       return
     }
-    if (isNew && !apiKey.trim()) {
+    if ((isNew || providerChanged) && !apiKey.trim()) {
       setFormError(t("settings.errors.apiKeyRequired"))
       return
     }
     setSaving(true)
     setFormError(null)
     try {
-      await onSave({ ...draft, name: draft.name.trim(), baseUrl: draft.baseUrl.trim() }, apiKey)
+      await onSave(
+        {
+          ...draft,
+          name: draft.name.trim(),
+          baseUrl: draft.baseUrl.trim(),
+          voices: draft.voices.map((voice) => ({
+            id: voice.id.trim(),
+            name: voice.name.trim(),
+          })),
+        },
+        apiKey,
+      )
     } catch (error) {
       setFormError(error instanceof Error ? t(error.message) : String(error))
     } finally {
@@ -233,9 +311,11 @@ export function ApiConfigEditor({
               <Select
                 value={draft.provider}
                 ariaLabel={t("settings.editor.provider")}
-                options={[{ value: draft.provider, label: provider.name }]}
-                onValueChange={() => undefined}
-                disabled
+                options={Object.values(PROVIDERS).map((definition) => ({
+                  value: definition.id,
+                  label: definition.name,
+                }))}
+                onValueChange={handleProviderChange}
               />
             </div>
           </div>
@@ -257,16 +337,20 @@ export function ApiConfigEditor({
             <label className="dw-settings-label" htmlFor="api-editor-key">
               {t("settings.editor.apiKey")}
             </label>
-            <a
+            <button
+              type="button"
               className="dw-settings-doc-link"
-              href={provider.docsUrl}
-              target="_blank"
-              rel="noreferrer"
+              onClick={() => void handleOpenDocs()}
             >
               {t("settings.editor.docs")}
               <ExternalLink size={11} strokeWidth={2} />
-            </a>
+            </button>
           </div>
+          {docsError && (
+            <div className="dw-settings-inline-error" role="alert">
+              <CircleAlert size={13} /> {docsError}
+            </div>
+          )}
           <div className="dw-secret-input-wrap">
             <input
               id="api-editor-key"
@@ -293,6 +377,51 @@ export function ApiConfigEditor({
             </button>
           </div>
 
+          <div className="dw-api-editor-section-title dw-api-voices-heading">
+            <div>
+              <strong>{t("settings.editor.voicesTitle")}</strong>
+              <span>{t("settings.editor.voicesDesc")}</span>
+            </div>
+            <button type="button" className="dw-pill-btn" onClick={addVoice}>
+              <Plus size={12} /> {t("settings.editor.addVoice")}
+            </button>
+          </div>
+
+          <div className="dw-api-voice-list">
+            {draft.voices.map((voice, index) => (
+              <div
+                className="dw-api-voice-row"
+                key={
+                  // biome-ignore lint/suspicious/noArrayIndexKey: voice rows only change through explicit add/remove actions
+                  index
+                }
+              >
+                <input
+                  className="dw-settings-input"
+                  aria-label={t("settings.editor.voiceName")}
+                  placeholder={t("settings.editor.voiceName")}
+                  value={voice.name}
+                  onChange={(event) => updateVoice(index, "name", event.target.value)}
+                />
+                <input
+                  className="dw-settings-input"
+                  aria-label={t("settings.editor.voiceId")}
+                  placeholder={t("settings.editor.voiceId")}
+                  value={voice.id}
+                  onChange={(event) => updateVoice(index, "id", event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="dw-icon-action is-danger"
+                  aria-label={t("settings.editor.removeVoice")}
+                  onClick={() => removeVoice(index)}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+
           <div className="dw-api-editor-section-title">
             <strong>{t("settings.editor.capabilityTitle")}</strong>
             <span>{t("settings.editor.capabilityDesc")}</span>
@@ -302,6 +431,7 @@ export function ApiConfigEditor({
             {TTS_MODES.map((mode) => {
               const mapping = draft.capabilities[mode]
               const status = tests[mode]
+              const supported = provider.supportedModes.includes(mode)
               return (
                 <div
                   className={`dw-api-capability${mapping.enabled ? " is-enabled" : ""}`}
@@ -312,12 +442,18 @@ export function ApiConfigEditor({
                       <input
                         type="checkbox"
                         checked={mapping.enabled}
+                        disabled={!supported}
                         onChange={(event) =>
                           updateCapability(mode, { enabled: event.target.checked })
                         }
                       />
                       <span className="dw-mini-switch" />
                       <strong>{t(`settings.modes.${mode}`)}</strong>
+                      {!supported && (
+                        <span className="dw-api-unsupported">
+                          {t("settings.editor.unsupported")}
+                        </span>
+                      )}
                     </label>
                     {mapping.lastVerifiedAt && (
                       <span className="dw-verified-time">

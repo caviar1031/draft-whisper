@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { MAX_AUDIO_VERSIONS, retainRecentAudioVersions } from "../src/utils/audio-history.ts"
 import { generateSentenceId } from "../src/utils/id.ts"
-import { PROVIDERS, createApiConfig } from "../src/utils/provider-catalog.ts"
+import { PROVIDERS, createApiConfig, resolveConfigVoice } from "../src/utils/provider-catalog.ts"
 import { splitTextToSentences } from "../src/utils/sentence.ts"
 import {
   MAX_CONCURRENCY,
@@ -56,6 +56,23 @@ test("uses MiMo models as editable provider defaults", () => {
   assert.equal(config.capabilities.basic.modelId, "custom-model")
 })
 
+test("uses Fish Audio as an editable provider preset", () => {
+  const config = createApiConfig("fish", 0, "fish-audio")
+  assert.equal(config.baseUrl, "https://api.fish.audio/v1/tts")
+  assert.equal(config.capabilities.basic.modelId, "s2.1-pro-free")
+  assert.equal(config.capabilities.basic.enabled, true)
+  assert.equal(config.capabilities["voice-design"].enabled, false)
+  assert.equal(config.capabilities["voice-clone"].enabled, false)
+  assert.equal(config.voices[0].id, "ca3007f96ae7499ab87d27ea3599956a")
+
+  config.baseUrl = "https://proxy.example/v1/tts"
+  config.capabilities.basic.modelId = "s2.1-pro"
+  config.voices.push({ id: "custom-reference", name: "My Voice" })
+  assert.equal(validateApiConfig(config), null)
+  assert.equal(resolveConfigVoice(config, "冰糖"), "ca3007f96ae7499ab87d27ea3599956a")
+  assert.equal(resolveConfigVoice(config, "custom-reference"), "custom-reference")
+})
+
 test("validates enabled capability mappings without fixing model IDs", () => {
   const config = createApiConfig("test")
   config.capabilities.basic.modelId = "vendor-custom-basic"
@@ -74,6 +91,7 @@ test("blocks missing configuration, disabled capability, and missing key", () =>
   const project = {
     apiConfigId: config.id,
     mode: "basic" as const,
+    voice: "冰糖",
     voiceDesignPrompt: "",
     voiceClonePath: null,
   }
@@ -87,6 +105,12 @@ test("blocks missing configuration, disabled capability, and missing key", () =>
   assert.equal(getTtsConfigurationError(project, [config], {}), "errors.capabilityUnavailable")
   config.capabilities.basic.enabled = true
   assert.equal(getTtsConfigurationError(project, [config], {}), "errors.apiKeyMissing")
+  assert.equal(
+    getTtsConfigurationError({ ...project, voice: "removed-voice" }, [config], {
+      [config.id]: "test-key",
+    }),
+    "errors.voiceUnavailable",
+  )
 })
 
 test("blocks voice clone generation until a supported sample is selected", () => {
@@ -96,6 +120,7 @@ test("blocks voice clone generation until a supported sample is selected", () =>
       {
         apiConfigId: config.id,
         mode: "voice-clone",
+        voice: "冰糖",
         voiceDesignPrompt: "",
         voiceClonePath: null,
       },
@@ -109,6 +134,7 @@ test("blocks voice clone generation until a supported sample is selected", () =>
       {
         apiConfigId: config.id,
         mode: "voice-clone",
+        voice: "冰糖",
         voiceDesignPrompt: "",
         voiceClonePath: "/audio/sample.wav",
       },
@@ -126,6 +152,7 @@ test("requires a free-text description for voice design", () => {
       {
         apiConfigId: config.id,
         mode: "voice-design",
+        voice: "冰糖",
         voiceDesignPrompt: "   ",
         voiceClonePath: null,
       },
@@ -162,7 +189,19 @@ test("migrates legacy global API settings into the first configuration", () => {
   assert.equal(migrated.apiConfigs.length, 1)
   assert.equal(migrated.apiConfigs[0].baseUrl, "https://api.example.com/v1")
   assert.equal(migrated.defaultApiConfigId, migrated.apiConfigs[0].id)
+  assert.ok(migrated.apiConfigs[0].voices.length > 0)
   assert.equal("models" in migrated, false)
+})
+
+test("normalizes persisted Fish Audio configurations and voices", () => {
+  const fish = createApiConfig("fish", 10, "fish-audio")
+  fish.voices = [{ id: "custom-reference", name: "Custom Voice" }]
+  fish.capabilities["voice-design"].enabled = true
+
+  const migrated = migratePersistedSettings({ apiConfigs: [fish], defaultApiConfigId: fish.id })
+  assert.equal(migrated.apiConfigs[0].provider, "fish-audio")
+  assert.deepEqual(migrated.apiConfigs[0].voices, fish.voices)
+  assert.equal(migrated.apiConfigs[0].capabilities["voice-design"].enabled, false)
 })
 
 test("resolves system language to a supported locale", () => {

@@ -1,7 +1,12 @@
 import type { TtsMode } from "./project"
 
-export type ProviderId = "mimo"
+export type ProviderId = "mimo" | "fish-audio"
 export type LanguagePreference = "system" | "zh-CN" | "en"
+
+export interface ApiVoice {
+  id: string
+  name: string
+}
 
 export interface CapabilityMapping {
   enabled: boolean
@@ -18,4 +23,5 @@ export interface ApiConfig {
   baseUrl: string
   createdAt: number
   capabilities: CapabilityMappings
+  voices: ApiVoice[]
 }

@@ -1,4 +1,11 @@
-import type { ApiConfig, LanguagePreference, ProviderId, ThemePreference, TtsMode } from "@/types"
+import type {
+  ApiConfig,
+  ApiVoice,
+  LanguagePreference,
+  ProviderId,
+  ThemePreference,
+  TtsMode,
+} from "@/types"
 import { PROVIDERS, TTS_MODES, createApiConfig } from "./provider-catalog.ts"
 
 export const MIN_CONCURRENCY = 1
@@ -40,8 +47,8 @@ export function normalizeTheme(value: unknown): ThemePreference {
 function normalizeApiConfig(value: unknown): ApiConfig | null {
   if (!value || typeof value !== "object") return null
   const raw = value as Record<string, unknown>
-  const provider: ProviderId = raw.provider === "mimo" ? "mimo" : "mimo"
-  const fallback = createApiConfig(typeof raw.id === "string" ? raw.id : "", 0)
+  const provider: ProviderId = raw.provider === "fish-audio" ? "fish-audio" : "mimo"
+  const fallback = createApiConfig(typeof raw.id === "string" ? raw.id : "", 0, provider)
   if (!fallback.id) return null
   const rawCapabilities =
     raw.capabilities && typeof raw.capabilities === "object"
@@ -53,7 +60,9 @@ function normalizeApiConfig(value: unknown): ApiConfig | null {
     if (!entry || typeof entry !== "object") continue
     const mapping = entry as Record<string, unknown>
     capabilities[mode] = {
-      enabled: typeof mapping.enabled === "boolean" ? mapping.enabled : true,
+      enabled:
+        PROVIDERS[provider].supportedModes.includes(mode) &&
+        (typeof mapping.enabled === "boolean" ? mapping.enabled : true),
       modelId:
         typeof mapping.modelId === "string"
           ? mapping.modelId
@@ -61,6 +70,14 @@ function normalizeApiConfig(value: unknown): ApiConfig | null {
       lastVerifiedAt: typeof mapping.lastVerifiedAt === "number" ? mapping.lastVerifiedAt : null,
     }
   }
+  const voices: ApiVoice[] = Array.isArray(raw.voices)
+    ? raw.voices.flatMap((voice) => {
+        if (!voice || typeof voice !== "object") return []
+        const candidate = voice as Record<string, unknown>
+        if (typeof candidate.id !== "string" || typeof candidate.name !== "string") return []
+        return [{ id: candidate.id, name: candidate.name }]
+      })
+    : fallback.voices
   return {
     id: fallback.id,
     name: typeof raw.name === "string" && raw.name.trim() ? raw.name : PROVIDERS[provider].name,
@@ -68,6 +85,7 @@ function normalizeApiConfig(value: unknown): ApiConfig | null {
     baseUrl: typeof raw.baseUrl === "string" ? raw.baseUrl : PROVIDERS[provider].defaultBaseUrl,
     createdAt: typeof raw.createdAt === "number" ? raw.createdAt : 0,
     capabilities,
+    voices,
   }
 }
 
@@ -116,6 +134,14 @@ export function validateApiConfig(config: ApiConfig): string | null {
   if (enabled.length === 0) return "settings.errors.capabilityRequired"
   if (enabled.some((mode: TtsMode) => !config.capabilities[mode].modelId.trim())) {
     return "settings.errors.modelRequired"
+  }
+  if (config.capabilities.basic.enabled) {
+    if (config.voices.length === 0) return "settings.errors.voiceRequired"
+    if (config.voices.some((voice) => !voice.id.trim() || !voice.name.trim())) {
+      return "settings.errors.voiceFieldsRequired"
+    }
+    const voiceIds = config.voices.map((voice) => voice.id.trim())
+    if (new Set(voiceIds).size !== voiceIds.length) return "settings.errors.voiceIdDuplicate"
   }
   return null
 }

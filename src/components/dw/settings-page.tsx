@@ -172,7 +172,7 @@ export function SettingsPage() {
                         <ChevronDown className={expanded ? "is-open" : undefined} size={15} />
                       </button>
                       <div className="dw-provider-icon" aria-hidden="true">
-                        <span>Mi</span>
+                        <span>{config.provider === "mimo" ? "Mi" : "Fi"}</span>
                       </div>
                       <div className="dw-api-config-name">
                         <div>

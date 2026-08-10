@@ -12,7 +12,7 @@ DraftWhisper 是一款 macOS 优先的 AI 配音桌面工具（Tauri 2 + React�
 
 核心工作流：**改一句文案 → 重新生成 → 试听 → 拖进剪辑软件**。
 
-当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置中心、多套 API 配置和中英文界面。Provider 架构可扩展，但当前只实现 MiMo；不做云同步、波形、字幕。
+当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 / Fish Audio TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置中心、多套 API 配置和中英文界面。Provider 架构可扩展，当前实现 MiMo 与 Fish Audio；不做云同步、波形、字幕。
 
 ---
 
@@ -122,7 +122,7 @@ draft-whisper/
 └─────────────────────────────┘         └──────────────────────────┘
                                               │
                                               ▼
-                                     小米 MiMo v2.5 TTS API
+                                     MiMo / Fish Audio TTS API
                                      POST {baseUrl}/chat/completions
                                      (非 OpenAI /audio/speech 协议)
 ```
@@ -130,7 +130,7 @@ draft-whisper/
 要点：
 
 - **状态在前端**：Zustand store 持有 settings 与 project（见 [src/stores](src/stores)）。项目元数据和非敏感设置已持久化到 `localStorage`，API Key 写入 macOS Keychain；后端不维护数据库状态。
-- **协议**：MVP 固定使用小米 MiMo v2.5 TTS（chat-completions 风格，非 OpenAI `/audio/speech`）。详见第 10 节。
+- **协议**：按 Provider 分发协议：MiMo 使用 chat-completions 风格；Fish Audio 使用 `/v1/tts` REST 接口。详见第 10 节。
 - **音频落盘**：后端把音频写到 `audio/{sentence_id}_{timestamp_ms}.wav`；命名项目写入 `audio/projects/{project}/`。每句最多保留最近 5 个版本，替换文本、删除句子或项目时会清理不再引用的文件。返回绝对路径字符串。目录选择有三级 fallback：`app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`。
 - **播放方式**：前端通过 `tts_read_audio` 命令取回 base64 字符串，解码为字节后转 `Blob URL` 播放（无需配置 asset 协议/权限，跨平台稳定）。封装见 `src/services/tts.ts` 的 `readAudioAsUrl`。
 
@@ -238,12 +238,12 @@ fn sanitize_filename(name: &str) -> String {
 
 ```ts
 interface TtsParams {
-  provider: ProviderId       // 当前适配器；本轮为 "mimo"
-  baseUrl: string          // MiMo API 根地址
+  provider: ProviderId       // 当前适配器："mimo" | "fish-audio"
+  baseUrl: string          // 可编辑的 Provider API 根地址或完整端点
   apiKey: string           // api-key 头
   model: string            // 当前 API 配置对该能力映射的模型 ID
   mode: TtsMode            // "basic" | "voice-design" | "voice-clone"
-  voice: string            // 基础模式的预置音色名
+  voice: string            // 当前 API 配置中的音色 ID
   voiceDesignPrompt: string // 声音设计的音色描述
   voiceClonePath: string | null // 声音克隆的参考音频路径
   performancePrompt: string // 基础/克隆模式的自由文本演绎指令，可为空
@@ -369,9 +369,10 @@ interface Project {
 
 ## 10. TTS 实现要点
 
-- 协议：小米 MiMo v2.5 TTS，`POST {baseUrl}/chat/completions`（chat-completions 风格，**非** OpenAI `/audio/speech`）。文档：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
+- MiMo 协议：`POST {baseUrl}/chat/completions`（chat-completions 风格，**非** OpenAI `/audio/speech`）。文档：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
+- Fish Audio 协议：`POST {baseUrl}`（预设为 `https://api.fish.audio/v1/tts`），使用 `Authorization: Bearer`、`model` 请求头和包含 `text`、`reference_id`、`format: "wav"` 的 JSON 请求体；响应为原始 WAV 字节。文档：https://docs.fish.audio/developer-guide/getting-started/quickstart
 - 认证：`api-key: <apiKey>` 请求头（不是 `Authorization: Bearer`）。
-- Provider 目录提供新建配置的默认模型；项目运行时从能力映射解析用户可编辑的模型 ID。
+- Provider 目录提供新建配置的默认 Base URL、能力、模型和音色；所有预填内容均可编辑。项目运行时从能力映射解析模型 ID，并从当前 API 配置解析音色。
 - 请求体：`{ model, messages:[...], audio:{format:"wav", voice} }`。目标文本必须放 `role: assistant`。
 - 风格控制：基础/克隆模式的 `performancePrompt` 是用户自由输入的可选文本；声音设计模式的 `voiceDesignPrompt` 是用户输入的必填文本。二者都通过 `role: user` 发送，MiMo 不提供原生 speed 参数。
 - 声音克隆：参考音频只接受真实 WAV/MP3，以完整 Data URI 传入 `audio.voice`；Base64 Data URI 上限为 10 MB。独立试听文件存放在 `audio/voice-previews/`，不进入项目句子历史。
@@ -383,7 +384,7 @@ interface Project {
 - 缓存目录：三级 fallback `app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`。macOS sandbox 下前两个可能被 TCC 拒绝写入，dev 模式通常落到 `.cache/audio`（已加入 `.gitignore`）。
 - 重新生成 → 唯一时间戳路径；每句保留最近 5 个版本并清理淘汰文件。
 - 不在后端解析音频时长；duration 由前端 `<audio>` 元素的 `onLoadedMetadata` 提供。
-- 预置音色：`冰糖`(女,中) / `茉莉`(女,中) / `苏打`(男,中) / `白桦`(男,中) / `Mia`(女,英) / `Chloe`(女,英) / `Milo`(男,英) / `Dean`(男,英) / `mimo_default`。
+- MiMo 预置音色：`冰糖` / `茉莉` / `苏打` / `白桦` / `Mia` / `Chloe` / `Milo` / `Dean` / `mimo_default`。Fish Audio 预填官方示例 `reference_id`；用户可在每套 API 配置中增删和修改音色。
 
 ---
 

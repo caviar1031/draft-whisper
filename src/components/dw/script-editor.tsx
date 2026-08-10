@@ -1,6 +1,5 @@
 import { ModalLayer } from "@/components/ui/modal-layer"
 import { Select } from "@/components/ui/select"
-import { VOICE_OPTIONS } from "@/lib/options"
 import type { ApiConfig, TtsMode, VoiceCloneSample, VoiceDesignPreset } from "@/types"
 import { splitTextToSentences } from "@/utils/sentence"
 import { X } from "lucide-react"
@@ -197,6 +196,24 @@ export function ScriptEditor({
   )
 
   const showSplitModeToggle = mode === "import"
+  const selectedApiConfig = apiConfigs.find((config) => config.id === apiConfigId)
+  const availableModes = selectedApiConfig
+    ? MODE_OPTIONS.filter((candidate) => selectedApiConfig.capabilities[candidate].enabled)
+    : MODE_OPTIONS
+
+  const handleApiConfigChange = (value: string) => {
+    const nextConfig = apiConfigs.find((config) => config.id === value)
+    onApiConfigChange(value || null)
+    if (!nextConfig) return
+
+    if (!nextConfig.capabilities[ttsMode].enabled) {
+      const nextMode = MODE_OPTIONS.find((candidate) => nextConfig.capabilities[candidate].enabled)
+      if (nextMode) onModeChange(nextMode)
+    }
+    if (!nextConfig.voices.some((option) => option.id === voice)) {
+      onVoiceChange(nextConfig.voices[0]?.id ?? "")
+    }
+  }
 
   return (
     <ModalLayer onClose={onClose} closeOnBackdrop>
@@ -331,7 +348,7 @@ export function ScriptEditor({
                     { value: "", label: t("editor.selectApiConfig") },
                     ...apiConfigs.map((config) => ({ value: config.id, label: config.name })),
                   ]}
-                  onValueChange={(value) => onApiConfigChange(value || null)}
+                  onValueChange={handleApiConfigChange}
                 />
               </div>
             </div>
@@ -343,7 +360,7 @@ export function ScriptEditor({
                 <Select
                   value={ttsMode}
                   ariaLabel={t("editor.ttsMode")}
-                  options={MODE_OPTIONS.map((option) => ({
+                  options={availableModes.map((option) => ({
                     value: option,
                     label: t(`settings.modes.${option}`),
                   }))}
@@ -367,9 +384,9 @@ export function ScriptEditor({
                   <Select
                     value={voice}
                     ariaLabel={t("editor.voice")}
-                    options={VOICE_OPTIONS.map((option) => ({
-                      value: option.value,
-                      label: `${option.label}${option.desc ? ` (${option.desc})` : ""}`,
+                    options={(selectedApiConfig?.voices ?? []).map((option) => ({
+                      value: option.id,
+                      label: option.name,
                     }))}
                     onValueChange={onVoiceChange}
                   />

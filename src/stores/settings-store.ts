@@ -154,7 +154,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "dw-settings",
-      version: 4,
+      version: 5,
       migrate: migratePersistedSettings,
       partialize: (state) => ({
         language: state.language,

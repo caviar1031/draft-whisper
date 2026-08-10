@@ -269,6 +269,7 @@ function App() {
     {
       apiConfigId: projectApiConfigId,
       mode: projectMode,
+      voice: projectVoice,
       voiceDesignPrompt: effectiveVoiceDesignPrompt,
       voiceClonePath: effectiveVoiceClonePath,
     },
