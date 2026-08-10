@@ -439,6 +439,8 @@
   .dw-title-left {
     display: flex;
     align-items: center;
+    align-self: stretch;
+    flex: 1;
     gap: 12px;
     min-width: 0;
   }
@@ -448,6 +450,7 @@
     align-items: center;
     gap: 6px;
     min-width: 0;
+    pointer-events: none;
   }
 
   .dw-app-icon {
