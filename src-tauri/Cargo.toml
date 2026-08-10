@@ -52,4 +52,4 @@ objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 # macOS 动态毛玻璃 (Vibrancy) — Tauri 2 直接在 setup 中应用
-window-vibrancy = "0.5"
+window-vibrancy = "0.6"
