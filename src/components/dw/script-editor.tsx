@@ -1,3 +1,4 @@
+import { ModalLayer } from "@/components/ui/modal-layer"
 import { Select } from "@/components/ui/select"
 import { VOICE_OPTIONS } from "@/lib/options"
 import type { ApiConfig, TtsMode, VoiceCloneSample, VoiceDesignPreset } from "@/types"
@@ -191,29 +192,22 @@ export function ScriptEditor({
         e.preventDefault()
         handleSave()
       }
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onClose()
-      }
     },
-    [handleSave, onClose],
+    [handleSave],
   )
 
   const showSplitModeToggle = mode === "import"
 
   return (
-    <>
-      <button
-        type="button"
-        className="dw-dim-overlay"
-        style={{ top: 0 }}
-        onClick={onClose}
-        aria-label={t("common.close")}
-      />
-      <div className="dw-script-editor" onKeyDown={handleKeyDown}>
+    <ModalLayer onClose={onClose} closeOnBackdrop>
+      <ModalLayer.Panel
+        className="dw-script-editor"
+        aria-labelledby="script-editor-title"
+        onKeyDown={handleKeyDown}
+      >
         {/* Header */}
         <div className="dw-editor-header">
-          <span className="dw-settings-title">
+          <span id="script-editor-title" className="dw-settings-title">
             {t(mode === "import" ? "editor.importTitle" : "editor.editTitle")}
           </span>
           <button
@@ -491,7 +485,7 @@ export function ScriptEditor({
             )}
           </div>
         </div>
-      </div>
-    </>
+      </ModalLayer.Panel>
+    </ModalLayer>
   )
 }

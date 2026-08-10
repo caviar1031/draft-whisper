@@ -1,6 +1,7 @@
+import { ModalLayer } from "@/components/ui/modal-layer"
 import { splitTextToSentences } from "@/utils/sentence"
 import { FileText, X } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 interface ImportDialogProps {
@@ -13,10 +14,6 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
   const [text, setText] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
 
   const sentenceCount = text.trim() ? splitTextToSentences(text).length : 0
 
@@ -39,26 +36,22 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
         e.preventDefault()
         handleImport()
       }
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onClose()
-      }
     },
-    [handleImport, onClose],
+    [handleImport],
   )
 
   return (
-    <>
-      <button
-        type="button"
-        className="dw-dim-overlay"
-        style={{ top: 0 }}
-        onClick={onClose}
-        aria-label={t("common.close")}
-      />
-      <div className="dw-import-dialog" onKeyDown={handleKeyDown}>
+    <ModalLayer onClose={onClose} closeOnBackdrop>
+      <ModalLayer.Panel
+        className="dw-import-dialog"
+        aria-labelledby="import-dialog-title"
+        onKeyDown={handleKeyDown}
+        initialFocus={textareaRef}
+      >
         <div className="dw-import-header">
-          <span className="dw-settings-title">{t("editor.importTitle")}</span>
+          <span id="import-dialog-title" className="dw-settings-title">
+            {t("editor.importTitle")}
+          </span>
           <button
             type="button"
             className="dw-settings-close"
@@ -112,7 +105,7 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
             </button>
           </div>
         </div>
-      </div>
-    </>
+      </ModalLayer.Panel>
+    </ModalLayer>
   )
 }

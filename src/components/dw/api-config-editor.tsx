@@ -1,3 +1,4 @@
+import { ModalLayer } from "@/components/ui/modal-layer"
 import { Select } from "@/components/ui/select"
 import { saveVoiceSample, testTts } from "@/services/tts"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
@@ -195,8 +196,8 @@ export function ApiConfigEditor({
   }
 
   return (
-    <div className="dw-dim-overlay" role="presentation">
-      <dialog className="dw-api-editor" open aria-labelledby="api-editor-title">
+    <ModalLayer onClose={onCancel}>
+      <ModalLayer.Panel className="dw-api-editor" aria-labelledby="api-editor-title">
         <header className="dw-api-editor-header">
           <div>
             <h2 id="api-editor-title">
@@ -415,7 +416,7 @@ export function ApiConfigEditor({
             </button>
           </div>
         </footer>
-      </dialog>
-    </div>
+      </ModalLayer.Panel>
+    </ModalLayer>
   )
 }

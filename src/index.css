@@ -2217,7 +2217,7 @@
   }
 
   .dw-custom-select-positioner {
-    z-index: 200;
+    z-index: 1100;
     outline: none;
   }
 
@@ -2444,7 +2444,7 @@
 
   /* ===== Import dialog ===== */
   .dw-import-dialog {
-    position: absolute;
+    position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -2523,7 +2523,7 @@
 
   /* ===== Project config card ===== */
   .dw-project-config-card {
-    position: absolute;
+    position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -2760,20 +2760,18 @@
     color: var(--text-600);
   }
 
-  .dw-dim-overlay {
-    position: absolute;
+  .dw-modal-layer-backdrop {
+    position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    border: none;
-    cursor: pointer;
-    z-index: 19;
+    z-index: 1000;
   }
 
   /* ===== Script Editor (unified Import + Edit) ===== */
   .dw-script-editor {
-    position: absolute;
+    position: fixed;
     top: 24px;
     bottom: 24px;
     left: 12px;
@@ -3231,7 +3229,7 @@
   }
 
   .dw-api-editor {
-    position: absolute;
+    position: fixed;
     inset: 14px;
     z-index: 110;
     display: flex;
@@ -3609,6 +3607,10 @@
     max-height: 320px;
     margin-bottom: 0;
     resize: vertical;
+  }
+
+  .dw-modal-layer-panel {
+    z-index: 1001;
   }
 
   .dw-resource-file-path,
