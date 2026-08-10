@@ -1,7 +1,7 @@
 {
   "name": "draft-whisper",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,7 @@
     "test": "npm run test:frontend && npm run test:rust",
     "test:frontend": "node --test tests/*.test.ts",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "release:check": "node scripts/validate-release-version.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

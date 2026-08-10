@@ -162,8 +162,8 @@ export function cleanupAudioFiles(paths: string[]): void {
 }
 
 /**
- * 将音频文件复制到 macOS 系统剪贴板（文件引用）。
- * 用户随后可以在 Finder / 剪映 / Premiere 等应用中 Cmd+V 粘贴文件。
+ * 将音频文件复制到 macOS / Windows 系统剪贴板（文件引用）。
+ * 用户随后可以在 Finder、文件资源管理器或剪辑软件中粘贴文件。
  *
  * 后端: invoke("tts_copy_to_clipboard", { path })
  */
@@ -181,7 +181,7 @@ export async function showInFinder(path: string): Promise<void> {
 }
 
 /**
- * 发起 macOS 原生文件拖拽（将音频文件拖入剪映/Premiere 等剪辑软件）。
+ * 发起 macOS / Windows 原生文件拖拽（将音频文件拖入剪映/Premiere 等剪辑软件）。
  *
  * 后端: invoke("tts_drag_file", { path, window })
  */
@@ -212,7 +212,7 @@ export async function deleteVoiceSample(path: string): Promise<void> {
 }
 
 /**
- * 将 API Key 存入 macOS Keychain。
+ * 将 API Key 存入当前系统的安全凭据存储。
  *
  * 后端: invoke("save_api_key", { apiKey })
  */
@@ -221,7 +221,7 @@ export async function saveApiKey(configId: string, apiKey: string): Promise<void
 }
 
 /**
- * 从 macOS Keychain 读取 API Key。
+ * 从当前系统的安全凭据存储读取 API Key。
  *
  * 后端: invoke("load_api_key") → string | null
  */
@@ -230,7 +230,7 @@ export async function loadApiKey(configId: string): Promise<string | null> {
 }
 
 /**
- * 从 macOS Keychain 删除 API Key。
+ * 从当前系统的安全凭据存储删除 API Key。
  *
  * 后端: invoke("delete_api_key")
  */

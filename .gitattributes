@@ -1,0 +1,20 @@
+* text=auto
+.gitattributes text eol=lf
+
+# Keep source and configuration files consistent across macOS and Windows checkouts.
+*.css text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Preserve native Windows script line endings when these files are added later.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

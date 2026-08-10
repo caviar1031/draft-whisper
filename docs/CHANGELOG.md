@@ -13,6 +13,7 @@ All notable changes to DraftWhisper will be documented in this file.
 - release 构建使用编译期调试条件，避免 `open_devtools` 阻断生产编译
 
 ### Added
+- macOS 与 Windows 跨平台 CI/CD：原生检查、桌面构建及双平台安装包发布
 - 每句最多保留最近 5 个音频版本，淘汰、重写和删除时自动清理缓存
 - 项目删除能力，同时删除项目元数据和缓存音频
 - 前端任务调度/Keychain 保存测试与 Rust 端点/路径测试

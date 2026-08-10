@@ -1,82 +1,145 @@
-[English](README.md) · [简体中文](README.zh-CN.md)
+[简体中文](README.zh-CN.md) · English
 
-# DraftWhisper
+<p align="center">
+  <img src="./src-tauri/icons/icon.png" alt="DraftWhisper app icon" width="96" />
+</p>
 
-DraftWhisper is a AI voice-over workspace for creators who need to revise one
-sentence, regenerate it, listen immediately, download files and drop the result into an editor.
+<h1 align="center">DraftWhisper</h1>
 
-```text
-Edit one sentence → Regenerate → Listen → Drag into your video editor
-```
+<p align="center">
+  A sentence-level AI voiceover workspace for creators.
+</p>
 
-It turns a script into independently managed WAV clips instead of treating the whole script as
-one long TTS job. The current MVP uses Xiaomi MiMo v2.5 TTS and keeps projects, settings, and
-generated audio local to the machine.
+<p align="center">
+  <strong>Edit one sentence → Regenerate → Listen → Drag into your editor</strong>
+</p>
 
-## Features
+DraftWhisper is a desktop app for creators who use AI voiceover in their videos. It is designed around a simple fact: a script is rarely final when the edit is already underway.
 
-### Sentence-level workflow
+With most TTS tools, changing one line means regenerating a long recording, finding the replacement, and manually moving it back into the editing timeline. DraftWhisper treats every sentence as an independent audio clip, so the smallest script change can stay a small change.
 
-- Paste a script and preview automatic sentence splitting, or enter one sentence per line.
-- Generate all sentences with a configurable worker pool (1–16 concurrent requests).
-- Play, edit, regenerate, retry failed sentences, and see readable per-sentence errors.
-- Editing a sentence automatically clears its old audio and starts a new generation.
-- Keep and switch between the five most recent audio versions for each sentence.
+<p align="center">
+  <img src="./assets/draftwhisper-workspace.png" alt="DraftWhisper English workspace with sentence-level audio cards" width="460" />
+</p>
 
-### Voice generation
+## Download
 
-- MiMo basic voices, including Chinese and English presets.
-- Voice design from a text description, with reusable saved voice-design presets.
-- Voice cloning from WAV or MP3 samples, with reusable local sample management.
-- Optional free-text performance direction for basic and clone modes.
-- Independent voice previews that do not become part of a sentence's audio history.
-- Per-capability model IDs and real synthesis tests in Settings.
+Download the latest published desktop build from [GitHub Releases](https://github.com/caviar1031/draft-whisper/releases/latest).
 
-### Local editing workflow
+The currently published `v0.1.0` release contains an Apple Silicon DMG. Releases built by the new cross-platform pipeline will add macOS Intel packages and Windows x64 NSIS and MSI installers.
 
-- Local projects with project-specific scripts, voice settings, and cached audio.
-- Native macOS file drag into apps such as CapCut/Jianying, Premiere, DaVinci Resolve, and Final
-  Cut Pro.
-- Copy an audio file to the macOS clipboard or reveal it in Finder.
-- Automatic cleanup of evicted versions and unused cached audio.
-- Light, dark, and system themes; English and Simplified Chinese UI.
+1. Open the latest release and expand **Assets**.
+2. For releases produced by the cross-platform pipeline, choose the package for your platform:
+   - **macOS Apple Silicon:** download the `.dmg` asset whose name contains `aarch64`.
+   - **macOS Intel:** download the `.dmg` asset whose name contains `x86_64`.
+   - **Windows x64:** download the `-setup.exe` NSIS installer, or the `.msi` installer for managed deployment.
+3. On macOS, open the `.dmg` and drag DraftWhisper into **Applications**. On Windows, run the downloaded installer.
+4. Launch DraftWhisper. Release packages are currently unsigned and macOS builds are not notarized. On macOS, use **System Settings → Privacy & Security → Open Anyway** if the system blocks the app. On Windows, review the Microsoft Defender SmartScreen prompt before choosing **More info → Run anyway**.
 
-## Supported provider
+## Platform support
 
-The provider registry is designed to be extensible, but the current implementation includes only
-Xiaomi MiMo.
+| Capability          | macOS                                          | Windows                                                     |
+| ------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| Window integration  | System title bar and macOS vibrancy            | Custom Windows title bar and platform-specific transparency |
+| API key storage     | macOS Keychain                                 | Windows Credential Manager                                  |
+| Native file handoff | Native drag, Finder reveal, and clipboard copy | Native OLE/Shell drag, File Explorer reveal, and clipboard copy |
+| Automated release target | Apple Silicon and Intel DMG               | x64 NSIS setup executable and MSI installer                 |
+
+## What problem does it solve?
+
+AI voiceover is fast to create, but slow to revise. The painful moment usually happens after the first draft:
+
+1. One sentence no longer matches the cut.
+2. The creator edits the script.
+3. The whole voiceover has to be regenerated or downloaded again.
+4. The replacement clip has to be located, checked, and put back into the editor.
+
+DraftWhisper shortens that loop to one sentence. It keeps the script, voice settings, current audio, and recent versions together in a local project, then hands each finished WAV clip directly to the editing app.
+
+## The core workflow
+
+| Step | What happens |
+| --- | --- |
+| 1. Import | Paste a script or enter one line per sentence. DraftWhisper can split a script automatically. |
+| 2. Choose a voice | Use a preset, describe a new voice, or select a local voice-clone sample. |
+| 3. Generate | Create independent WAV clips with visible per-sentence progress and errors. |
+| 4. Review | Play a single sentence, edit its text, retry it, or switch among its five latest versions. |
+| 5. Hand off | Drag the clip into CapCut, Premiere, DaVinci Resolve, Final Cut Pro, or another editor. |
+
+## Why sentence-level audio matters
+
+| Traditional long-form TTS workflow | DraftWhisper workflow |
+| --- | --- |
+| Regenerate a long recording for a small text change | Regenerate only the changed sentence |
+| Search through files for the replacement | The replacement stays on the sentence card |
+| Review happens across pages, downloads, and the timeline | Play and compare versions in one workspace      |
+| Old audio is easy to overwrite or lose | Keep the five most recent versions per sentence |
+| Export, locate, and import manually | Drag the audio file directly into the editor |
+
+## What you can do
+
+- **Work sentence by sentence** — paste a script, preview automatic splitting, or enter manual lines.
+- **Generate in batches** — use configurable concurrency and see queued, generating, ready, and failed states.
+- **Revise without starting over** — edit one sentence and regenerate only that sentence.
+- **Keep useful history** — retain and switch between the five latest audio versions for each sentence.
+- **Shape the voice** — use MiMo preset voices, text-based voice design, or WAV/MP3 voice cloning.
+- **Direct the performance** — add optional free-text performance direction for basic and clone modes.
+- **Preview voices separately** — test a voice without adding the preview to a sentence's history.
+- **Move audio into the edit** — drag or copy files natively on macOS and Windows, and reveal them in Finder or File Explorer.
+- **Keep work organized locally** — store scripts, voice settings, samples, and cached audio by project.
+
+## Built for creators in the middle of an edit
+
+DraftWhisper is intentionally a focused workspace, not a general-purpose writing assistant, a timeline editor, or a web TTS dashboard. Its job is to make the repeated “change one line and keep going” moment quick and predictable.
+
+It fits especially well into workflows for:
+
+- YouTube, Bilibili, and short-form video creators
+- AI tutorial and knowledge-sharing videos
+- Product demos, explainers, and social content
+- Any edit where the script keeps changing after the first voiceover pass
+
+## Local-first storage
+
+- Project metadata and non-sensitive preferences are stored locally.
+- API keys are stored per configuration in the platform credential store—macOS Keychain or Windows Credential Manager—not in `localStorage`.
+- Generated audio and voice-clone samples are cached on the local machine.
+- A clone sample is sent to MiMo only when a clone generation or preview request is made.
+
+## Current provider and voice modes
+
+The provider layer is designed to grow, but the current MVP ships with Xiaomi MiMo v2.5:
 
 | Provider | Protocol | Default base URL | Modes |
 | --- | --- | --- | --- |
-| Xiaomi MiMo | Chat Completions-style TTS | `https://api.xiaomimimo.com/v1` | Basic, voice design, voice clone |
+| Xiaomi MiMo | Chat Completions-style TTS | `https://api.xiaomimimo.com/v1` | Basic voice, voice design, voice clone |
 
-New MiMo configurations use these default model mappings. Every model ID can be edited in
-Settings:
+Default model mappings for a new MiMo configuration:
 
-| Mode | Default model |
+| Capability | Default model |
 | --- | --- |
 | Basic voice | `mimo-v2.5-tts` |
 | Voice design | `mimo-v2.5-tts-voicedesign` |
 | Voice clone | `mimo-v2.5-tts-voiceclone` |
 
-See the [MiMo v2.5 speech synthesis documentation](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5)
-for API access and account details.
+See the [MiMo v2.5 speech synthesis documentation](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5) for API access and account details.
 
-### Voice-clone limits
-
-Before a sample is stored or sent, DraftWhisper checks the file signature and validates that it is
-a WAV or MP3 file, shorter than 30 seconds, and under MiMo's 10 MB limit after conversion to a
-complete Base64 Data URI.
+Voice-clone samples are checked locally before storage or upload: they must be valid WAV or MP3 files, shorter than 30 seconds, and under MiMo's 10 MB limit after conversion to a complete Base64 Data URI.
 
 ## Quick start
 
 ### Requirements
 
-- macOS is the primary target for the current MVP and its native drag, clipboard, Finder, and
-  Keychain integrations.
-- A recent Node.js/npm installation.
-- Rust and Cargo compatible with the project's Tauri toolchain (Rust 1.77.2 or newer).
-- A MiMo API key.
+- Recent Node.js and npm
+- Rust and Cargo compatible with the Tauri toolchain (Rust 1.77.2 or newer)
+- A MiMo API key
+
+Platform-specific requirements:
+
+- **macOS:** Xcode Command Line Tools (`xcode-select --install`).
+- **Windows:** Microsoft C++ Build Tools with the **Desktop development with C++** workload, Microsoft Edge WebView2 Runtime, and the stable MSVC Rust toolchain. WebView2 is normally already installed on current Windows versions.
+
+See the official [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for installation details.
 
 ### Run the desktop app
 
@@ -85,14 +148,20 @@ npm install
 npm run tauri dev
 ```
 
+After installing Rust on Windows, reopen PowerShell so Cargo is added to `PATH`. If the current terminal still cannot find `cargo`, add its default directory for this session and start the app again:
+
+```powershell
+$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+npm run tauri dev
+```
+
 On first launch:
 
-1. Open Settings and add a MiMo API configuration.
+1. Open **Settings** and add a MiMo API configuration.
 2. Enter the API key and test the capabilities you want to use.
-3. Paste a script, choose a voice mode, and generate the sentence audio.
+3. Import a script, choose a voice mode, and generate the sentence audio.
 
-For front-end-only work, use `npm run dev`. Tauri commands and native macOS behavior require the
-desktop command.
+For front-end-only work, use `npm run dev`. Tauri commands and native macOS/Windows integrations require the desktop command.
 
 ## Development commands
 
@@ -108,51 +177,26 @@ desktop command.
 | `npm test` | Run front-end and Rust tests |
 | `cargo check --manifest-path src-tauri/Cargo.toml` | Check the Rust backend |
 
-## Architecture and storage
+## Architecture
 
 ```text
 React + TypeScript + Zustand
           │ Tauri IPC
           ▼
-Rust + reqwest ──────► MiMo v2.5 TTS API
+Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
           │
-          ├─ Project metadata and preferences: localStorage
-          ├─ API keys: macOS Keychain
-          └─ WAV files and voice samples: local audio cache
+          ├─ project metadata and preferences: localStorage
+          ├─ API keys: platform credential store
+          └─ WAV files and voice samples: local cache
 ```
 
-- The front end owns project and settings state; the Rust side handles HTTP, file I/O, audio
-  caching, and macOS integrations.
-- API keys are stored per API configuration in the macOS Keychain and are not persisted in
-  `localStorage`.
-- Generated audio is written locally. The app tries its OS cache/data directory first and falls
-  back to `.cache/audio` during development when necessary.
-- Voice-clone samples are copied into the local voice-sample cache and sent to MiMo only when a
-  clone generation or preview request is made.
+The front end owns project and settings state. The Rust side handles HTTP requests, file I/O, audio caching, credential storage, and platform-native integrations. Generated audio is stored as local WAV files so it can be played, copied, revealed, or dragged into another app.
 
-## Project structure
+## Current MVP scope
 
-```text
-draft-whisper/
-├── docs/                 # Product requirements and project documents
-├── src/                  # React front end
-│   ├── components/dw/    # DraftWhisper UI
-│   ├── hooks/            # Generation and playback hooks
-│   ├── services/         # Tauri IPC service wrappers
-│   ├── stores/           # Zustand stores
-│   ├── types/            # TypeScript domain types
-│   └── utils/            # Sentence, ID, cache, and configuration helpers
-├── src-tauri/            # Rust/Tauri backend
-│   ├── src/lib.rs        # Tauri setup and command registration
-│   └── src/tts.rs        # MiMo requests, audio cache, and native actions
-├── tests/                # Front-end and Rust-facing tests
-├── package.json
-└── biome.json
-```
+Included: script import, sentence splitting, batch generation, playback, single-sentence regeneration, five-version history, local projects, voice design, voice cloning, local caching, settings, and English/Simplified Chinese UI.
 
-## Current scope
-
-Native file drag, clipboard, Finder, and Keychain behavior ismacOS-specific; macOS remains the primary supported platform while the provider and desktop architecture evolve.
+Not included yet: cloud sync, waveform editing, timeline editing, subtitles, and additional providers beyond MiMo.
 
 ## License
 
