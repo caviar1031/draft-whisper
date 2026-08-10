@@ -1,3 +1,4 @@
+import { Select } from "@/components/ui/select"
 import i18n from "@/i18n"
 import { countApiConfigReferences, reassignApiConfigReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
@@ -5,7 +6,7 @@ import type { ApiConfig, LanguagePreference, ThemePreference } from "@/types"
 import { PROVIDERS, TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
 import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
 import { Check, ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2 } from "lucide-react"
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiConfigEditor } from "./api-config-editor"
 import { VoiceLibrarySection } from "./voice-library-section"
@@ -72,30 +73,32 @@ export function SettingsPage() {
             <div>
               <strong>{t("settings.language")}</strong>
             </div>
-            <SettingsSelect
+            <Select
               value={settings.language}
               ariaLabel={t("settings.language")}
+              className="is-compact"
               options={[
                 { value: "system", label: t("settings.languageSystem") },
                 { value: "zh-CN", label: t("settings.languageChinese") },
                 { value: "en", label: t("settings.languageEnglish") },
               ]}
-              onChange={handleLanguageChange}
+              onValueChange={handleLanguageChange}
             />
           </div>
           <div className="dw-preference-row">
             <div>
               <strong>{t("settings.theme")}</strong>
             </div>
-            <SettingsSelect
+            <Select
               value={settings.theme}
               ariaLabel={t("settings.theme")}
+              className="is-compact"
               options={[
                 { value: "system", label: t("settings.themeSystem") },
                 { value: "light", label: t("settings.themeLight") },
                 { value: "dark", label: t("settings.themeDark") },
               ]}
-              onChange={handleThemeChange}
+              onValueChange={handleThemeChange}
             />
           </div>
         </SettingsSection>
@@ -268,164 +271,5 @@ function SettingsSection({
       </div>
       <div className="dw-preference-card">{children}</div>
     </section>
-  )
-}
-
-interface SettingsSelectOption<Value extends string> {
-  value: Value
-  label: string
-}
-
-function SettingsSelect<Value extends string>({
-  value,
-  options,
-  ariaLabel,
-  onChange,
-}: {
-  value: Value
-  options: SettingsSelectOption<Value>[]
-  ariaLabel: string
-  onChange: (value: Value) => void
-}) {
-  const listboxId = useId()
-  const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const selectedIndex = Math.max(
-    0,
-    options.findIndex((option) => option.value === value),
-  )
-  const [open, setOpen] = useState(false)
-  const [highlightedIndex, setHighlightedIndex] = useState(selectedIndex)
-  const [placement, setPlacement] = useState<"down" | "up">("down")
-  const selectedOption = options[selectedIndex]
-
-  useEffect(() => {
-    if (!open) return
-
-    const updatePlacement = () => {
-      const trigger = triggerRef.current
-      if (!trigger) return
-      const triggerRect = trigger.getBoundingClientRect()
-      const boundary = trigger.closest(".dw-settings-content")?.getBoundingClientRect()
-      const boundaryTop = boundary?.top ?? 0
-      const boundaryBottom = boundary?.bottom ?? window.innerHeight
-      const menuHeight = options.length * 34 + 10
-      const spaceBelow = boundaryBottom - triggerRect.bottom
-      const spaceAbove = triggerRect.top - boundaryTop
-      setPlacement(spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow ? "up" : "down")
-    }
-
-    updatePlacement()
-    window.addEventListener("resize", updatePlacement)
-    return () => window.removeEventListener("resize", updatePlacement)
-  }, [open, options.length])
-
-  useEffect(() => {
-    if (!open) return
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false)
-        triggerRef.current?.focus()
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown)
-    document.addEventListener("keydown", handleKeyDown)
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown)
-      document.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [open])
-
-  const openMenu = () => {
-    setHighlightedIndex(selectedIndex)
-    setOpen((current) => !current)
-  }
-
-  const selectOption = (option: SettingsSelectOption<Value>) => {
-    onChange(option.value)
-    setOpen(false)
-    triggerRef.current?.focus()
-  }
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault()
-      const direction = event.key === "ArrowDown" ? 1 : -1
-      if (!open) {
-        setHighlightedIndex(selectedIndex)
-        setOpen(true)
-        return
-      }
-      setHighlightedIndex((current) => (current + direction + options.length) % options.length)
-      return
-    }
-
-    if (event.key === "Home" || event.key === "End") {
-      event.preventDefault()
-      setOpen(true)
-      setHighlightedIndex(event.key === "Home" ? 0 : options.length - 1)
-      return
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault()
-      if (!open) {
-        setHighlightedIndex(selectedIndex)
-        setOpen(true)
-      } else {
-        selectOption(options[highlightedIndex])
-      }
-    }
-  }
-
-  return (
-    <div className={`dw-settings-select-wrap${open ? " is-open" : ""}`} ref={rootRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="dw-settings-select-control"
-        aria-label={ariaLabel}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={listboxId}
-        onClick={openMenu}
-        onKeyDown={handleKeyDown}
-      >
-        <span>{selectedOption.label}</span>
-        <ChevronDown size={15} aria-hidden="true" />
-      </button>
-      {open && (
-        <div
-          id={listboxId}
-          className={`dw-settings-select-menu is-${placement}`}
-          role="menu"
-          tabIndex={-1}
-          aria-label={ariaLabel}
-        >
-          {options.map((option, index) => (
-            <button
-              key={option.value}
-              id={`${listboxId}-option-${index}`}
-              type="button"
-              className={`dw-settings-select-option${
-                index === highlightedIndex ? " is-highlighted" : ""
-              }`}
-              onClick={() => selectOption(option)}
-              onMouseEnter={() => setHighlightedIndex(index)}
-            >
-              <span>{option.label}</span>
-              {option.value === value && <Check size={14} aria-hidden="true" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }

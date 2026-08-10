@@ -1,3 +1,4 @@
+import { Select } from "@/components/ui/select"
 import {
   cleanupAudioFiles,
   deleteVoiceSample,
@@ -523,21 +524,21 @@ function VoiceDesignEditor({
           aria-labelledby="voice-preview-section-title"
         >
           <h3 id="voice-preview-section-title">{t("voiceLibrary.design.previewSectionTitle")}</h3>
-          <label className="dw-settings-label">
+          <div className="dw-settings-label">
             {t("editor.apiConfig")}
-            <select
-              className="dw-settings-select"
+            <Select
               value={draft.previewApiConfigId ?? ""}
-              onChange={(event) => update({ previewApiConfigId: event.target.value || null }, true)}
-            >
-              <option value="">{t("editor.selectApiConfig")}</option>
-              {settings.apiConfigs.map((config) => (
-                <option key={config.id} value={config.id}>
-                  {config.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              ariaLabel={t("editor.apiConfig")}
+              options={[
+                { value: "", label: t("editor.selectApiConfig") },
+                ...settings.apiConfigs.map((config) => ({
+                  value: config.id,
+                  label: config.name,
+                })),
+              ]}
+              onValueChange={(value) => update({ previewApiConfigId: value || null }, true)}
+            />
+          </div>
           <label className="dw-settings-label">
             {t("voiceLibrary.previewText")}
             <textarea

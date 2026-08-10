@@ -1,3 +1,4 @@
+import { Select } from "@/components/ui/select"
 import { saveVoiceSample, testTts } from "@/services/tts"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
 import type { ApiConfig, TtsMode } from "@/types"
@@ -226,12 +227,16 @@ export function ApiConfigEditor({
                 }
               />
             </label>
-            <label className="dw-settings-label">
+            <div className="dw-settings-label">
               {t("settings.editor.provider")}
-              <select className="dw-settings-select" value={draft.provider} disabled>
-                <option value="mimo">{provider.name}</option>
-              </select>
-            </label>
+              <Select
+                value={draft.provider}
+                ariaLabel={t("settings.editor.provider")}
+                options={[{ value: draft.provider, label: provider.name }]}
+                onValueChange={() => undefined}
+                disabled
+              />
+            </div>
           </div>
 
           <label className="dw-settings-label">
@@ -348,18 +353,19 @@ export function ApiConfigEditor({
                       </div>
                       {mode === "voice-clone" && (
                         <div className="dw-clone-test-row">
-                          <select
-                            className="dw-settings-select"
+                          <Select
                             value={cloneSamplePath}
-                            onChange={(event) => setCloneSamplePath(event.target.value)}
-                          >
-                            <option value="">{t("settings.editor.selectSample")}</option>
-                            {samples.map((sample) => (
-                              <option key={sample.id} value={sample.filePath}>
-                                {sample.name}
-                              </option>
-                            ))}
-                          </select>
+                            ariaLabel={t("settings.editor.selectSample")}
+                            className="is-flexible"
+                            options={[
+                              { value: "", label: t("settings.editor.selectSample") },
+                              ...samples.map((sample) => ({
+                                value: sample.filePath,
+                                label: sample.name,
+                              })),
+                            ]}
+                            onValueChange={setCloneSamplePath}
+                          />
                           <button
                             type="button"
                             className="dw-pill-btn"

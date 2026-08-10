@@ -1,3 +1,4 @@
+import { Select } from "@/components/ui/select"
 import {
   cleanupAudioFiles,
   deleteVoiceSample,
@@ -313,26 +314,24 @@ export function VoiceSampleSelector({
 
   return (
     <div className="dw-settings-field">
-      <label className="dw-settings-label">
+      <div className="dw-settings-label">
         {t("samples.title")}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <select
-            className="dw-settings-select"
-            style={{ flex: 1 }}
+          <Select
+            className="is-flexible"
             value={selectedPath ?? ""}
-            onChange={(e) => onSelect(e.target.value || null)}
-          >
-            <option value="">
-              {samples.length === 0 ? t("samples.empty") : t("samples.select")}
-            </option>
-            {samples
-              .filter((sample) => isSupportedSamplePath(sample.filePath))
-              .map((s) => (
-                <option key={s.id} value={s.filePath}>
-                  {s.name}
-                </option>
-              ))}
-          </select>
+            ariaLabel={t("samples.title")}
+            options={[
+              {
+                value: "",
+                label: samples.length === 0 ? t("samples.empty") : t("samples.select"),
+              },
+              ...samples
+                .filter((sample) => isSupportedSamplePath(sample.filePath))
+                .map((sample) => ({ value: sample.filePath, label: sample.name })),
+            ]}
+            onValueChange={(value) => onSelect(value || null)}
+          />
           <button type="button" className="dw-pill-btn" onClick={handleAdd}>
             <Plus size={14} strokeWidth={2} />
             {t("samples.add")}
@@ -348,7 +347,7 @@ export function VoiceSampleSelector({
             </button>
           )}
         </div>
-      </label>
+      </div>
 
       {/* 新增样本：名称输入 */}
       {adding && (

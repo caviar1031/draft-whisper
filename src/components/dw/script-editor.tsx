@@ -1,3 +1,4 @@
+import { Select } from "@/components/ui/select"
 import { VOICE_OPTIONS } from "@/lib/options"
 import type { ApiConfig, TtsMode, VoiceCloneSample, VoiceDesignPreset } from "@/types"
 import { splitTextToSentences } from "@/utils/sentence"
@@ -327,39 +328,34 @@ export function ScriptEditor({
         {activeTab === "voice" && (
           <div className="dw-voice-tab">
             <div className="dw-settings-field">
-              <label className="dw-settings-label">
+              <div className="dw-settings-label">
                 {t("editor.apiConfig")}
-                <select
-                  className="dw-settings-select"
+                <Select
                   value={apiConfigId ?? ""}
-                  onChange={(event) => onApiConfigChange(event.target.value || null)}
-                >
-                  <option value="">{t("editor.selectApiConfig")}</option>
-                  {apiConfigs.map((config) => (
-                    <option key={config.id} value={config.id}>
-                      {config.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  ariaLabel={t("editor.apiConfig")}
+                  options={[
+                    { value: "", label: t("editor.selectApiConfig") },
+                    ...apiConfigs.map((config) => ({ value: config.id, label: config.name })),
+                  ]}
+                  onValueChange={(value) => onApiConfigChange(value || null)}
+                />
+              </div>
             </div>
 
             {/* 模式选择 */}
             <div className="dw-settings-field">
-              <label className="dw-settings-label">
+              <div className="dw-settings-label">
                 {t("editor.ttsMode")}
-                <select
-                  className="dw-settings-select"
+                <Select
                   value={ttsMode}
-                  onChange={(e) => onModeChange(e.target.value as TtsMode)}
-                >
-                  {MODE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {t(`settings.modes.${option}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  ariaLabel={t("editor.ttsMode")}
+                  options={MODE_OPTIONS.map((option) => ({
+                    value: option,
+                    label: t(`settings.modes.${option}`),
+                  }))}
+                  onValueChange={onModeChange}
+                />
+              </div>
             </div>
 
             <div className="dw-settings-field">
@@ -372,42 +368,36 @@ export function ScriptEditor({
             {/* Basic TTS: 音色 */}
             {ttsMode === "basic" && (
               <div className="dw-settings-field">
-                <label className="dw-settings-label">
+                <div className="dw-settings-label">
                   {t("editor.voice")}
-                  <select
-                    className="dw-settings-select"
+                  <Select
                     value={voice}
-                    onChange={(e) => onVoiceChange(e.target.value)}
-                  >
-                    {VOICE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                        {opt.desc ? ` (${opt.desc})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    ariaLabel={t("editor.voice")}
+                    options={VOICE_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: `${option.label}${option.desc ? ` (${option.desc})` : ""}`,
+                    }))}
+                    onValueChange={onVoiceChange}
+                  />
+                </div>
               </div>
             )}
 
             {/* Voice Design: 文本描述 */}
             {ttsMode === "voice-design" && (
               <div className="dw-settings-field">
-                <label className="dw-settings-label">
+                <div className="dw-settings-label">
                   {t("editor.voiceDesign")}
-                  <select
-                    className="dw-settings-select"
+                  <Select
                     value={voiceDesignId ?? ""}
-                    onChange={(event) => onVoiceDesignIdChange(event.target.value || null)}
-                  >
-                    <option value="">{t("editor.selectVoiceDesign")}</option>
-                    {voiceDesigns.map((design) => (
-                      <option key={design.id} value={design.id}>
-                        {design.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    ariaLabel={t("editor.voiceDesign")}
+                    options={[
+                      { value: "", label: t("editor.selectVoiceDesign") },
+                      ...voiceDesigns.map((design) => ({ value: design.id, label: design.name })),
+                    ]}
+                    onValueChange={(value) => onVoiceDesignIdChange(value || null)}
+                  />
+                </div>
                 <label className="dw-settings-label">
                   {t("editor.voiceDescription")}
                   <textarea
@@ -431,23 +421,20 @@ export function ScriptEditor({
             {ttsMode === "voice-clone" && (
               <>
                 <div className="dw-settings-field">
-                  <label className="dw-settings-label">
+                  <div className="dw-settings-label">
                     {t("editor.voiceCloneSample")}
-                    <select
-                      className="dw-settings-select"
+                    <Select
                       value={voiceCloneSampleId ?? ""}
-                      onChange={(event) => onVoiceCloneSampleIdChange(event.target.value || null)}
-                    >
-                      <option value="">{t("editor.selectVoiceCloneSample")}</option>
-                      {voiceSamples
-                        .filter((sample) => sample.durationMs !== null)
-                        .map((sample) => (
-                          <option key={sample.id} value={sample.id}>
-                            {sample.name}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
+                      ariaLabel={t("editor.voiceCloneSample")}
+                      options={[
+                        { value: "", label: t("editor.selectVoiceCloneSample") },
+                        ...voiceSamples
+                          .filter((sample) => sample.durationMs !== null)
+                          .map((sample) => ({ value: sample.id, label: sample.name })),
+                      ]}
+                      onValueChange={(value) => onVoiceCloneSampleIdChange(value || null)}
+                    />
+                  </div>
                   {voiceClonePath && <div className="dw-editing-hint">{voiceClonePath}</div>}
                 </div>
                 <div className="dw-settings-field">
