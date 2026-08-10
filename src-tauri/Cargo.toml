@@ -44,7 +44,7 @@ windows = { version = "0.61.3", features = [
   "Win32_System_SystemServices",
   "Win32_UI_Shell",
 ] }
-windows-core = "0.61.2"
+windows-core = "0.62.2"
 
 # macOS 原生文件拖拽 — 用于将音频文件拖入剪映/Premiere 等剪辑软件
 [target.'cfg(target_os = "macos")'.dependencies]
