@@ -39,42 +39,79 @@ interface ScriptEditorProps {
 
 const MODE_OPTIONS: TtsMode[] = ["basic", "voice-design", "voice-clone"]
 
-/** 测量纯文本在给定宽度下按 word-wrap 规则所需的视觉行数 */
-function measureVisualLines(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-  lineHeight: number,
-): number {
-  if (text.length === 0) return 1
+function measureLineTops(textarea: HTMLTextAreaElement, text: string): number[] {
+  const styles = getComputedStyle(textarea)
+  const paddingTop = Number.parseFloat(styles.paddingTop) || 0
+  const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0
+  const paddingRight = Number.parseFloat(styles.paddingRight) || 0
+  const lineHeight = Number.parseFloat(styles.lineHeight) || 21
+  const contentWidth = textarea.clientWidth - paddingLeft - paddingRight
 
-  let totalHeight = 0
-  const tokens = text.match(/\S+\s*/g) ?? [text]
-  let lineWidth = 0
+  if (contentWidth <= 0) return []
 
-  for (const token of tokens) {
-    const tokenWidth = ctx.measureText(token).width
-    if (lineWidth > 0 && lineWidth + tokenWidth > maxWidth) {
-      totalHeight += lineHeight
-      lineWidth = 0
-    }
-    if (tokenWidth > maxWidth) {
-      let charLine = 0
-      for (const ch of token) {
-        const cw = ctx.measureText(ch).width
-        if (charLine > 0 && charLine + cw > maxWidth) {
-          totalHeight += lineHeight
-          charLine = 0
-        }
-        charLine += cw
-      }
-      lineWidth += charLine
-    } else {
-      lineWidth += tokenWidth
-    }
+  // A DOM mirror follows the browser's wrapping rules more closely than canvas text metrics.
+  const mirror = document.createElement("div")
+  Object.assign(mirror.style, {
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
+    visibility: "hidden",
+    pointerEvents: "none",
+    contain: "layout style",
+    boxSizing: "content-box",
+    width: `${contentWidth}px`,
+    height: "auto",
+    minHeight: "0",
+    margin: "0",
+    padding: "0",
+    border: "0",
+    overflow: "visible",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "break-word",
+    wordBreak: "normal",
+    font: styles.font,
+    fontFamily: styles.fontFamily,
+    fontSize: styles.fontSize,
+    fontStyle: styles.fontStyle,
+    fontWeight: styles.fontWeight,
+    fontVariant: styles.fontVariant,
+    fontStretch: styles.fontStretch,
+    lineHeight: `${lineHeight}px`,
+    letterSpacing: styles.letterSpacing,
+    wordSpacing: styles.wordSpacing,
+    textIndent: styles.textIndent,
+    textTransform: styles.textTransform,
+    textAlign: styles.textAlign,
+    direction: styles.direction,
+    tabSize: styles.tabSize,
+  })
+
+  for (const line of text.split("\n")) {
+    const row = document.createElement("div")
+    Object.assign(row.style, {
+      display: "block",
+      boxSizing: "border-box",
+      width: "100%",
+      minHeight: `${lineHeight}px`,
+      margin: "0",
+      padding: "0",
+      border: "0",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "break-word",
+      wordBreak: "normal",
+    })
+    row.textContent = line.length > 0 ? line : "\u200b"
+    mirror.appendChild(row)
   }
 
-  return totalHeight / lineHeight + 1
+  document.body.appendChild(mirror)
+  const mirrorTop = mirror.getBoundingClientRect().top
+  const tops = Array.from(mirror.children, (row) => {
+    return paddingTop + row.getBoundingClientRect().top - mirrorTop
+  })
+  mirror.remove()
+
+  return tops
 }
 
 export function ScriptEditor({
@@ -107,14 +144,20 @@ export function ScriptEditor({
   const [text, setText] = useState(initialText)
   const [splitMode, setSplitMode] = useState<SplitMode>(mode === "edit" ? "manual" : "auto")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [textareaElement, setTextareaElement] = useState<HTMLTextAreaElement | null>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  const handleTextareaRef = useCallback((element: HTMLTextAreaElement | null) => {
+    textareaRef.current = element
+    setTextareaElement(element)
+  }, [])
+
   useEffect(() => {
     if (activeTab === "script") {
-      textareaRef.current?.focus()
+      textareaElement?.focus()
     }
-  }, [activeTab])
+  }, [activeTab, textareaElement])
 
   // ---- 自动拆分预览 ----
   const autoPreview = useMemo(() => {
@@ -139,40 +182,47 @@ export function ScriptEditor({
       return
     }
 
-    const ta = textareaRef.current
+    const ta = textareaElement
     if (!ta) {
       setLineTops([])
       return
     }
 
-    const cs = getComputedStyle(ta)
-    const font = cs.font
-    const lineHeight = Number.parseFloat(cs.lineHeight) || 21
-    const padTop = Number.parseFloat(cs.paddingTop) || 0
-    const padLeft = Number.parseFloat(cs.paddingLeft) || 0
-    const padRight = Number.parseFloat(cs.paddingRight) || 0
-    const contentWidth = ta.clientWidth - padLeft - padRight
-
-    const canvas = document.createElement("canvas")
-    const ctx = canvas.getContext("2d")
-    if (!ctx) {
-      setLineTops([])
-      return
-    }
-    ctx.font = font
-
-    const currentLines = text.split("\n")
-    const tops: number[] = []
-    let currentTop = padTop
-
-    for (const line of currentLines) {
-      tops.push(currentTop)
-      const visLines = measureVisualLines(ctx, line, contentWidth, lineHeight)
-      currentTop += visLines * lineHeight
+    let active = true
+    let firstFrame = 0
+    let secondFrame = 0
+    const updateLineTops = () => {
+      if (!active) return
+      const nextLineTops = measureLineTops(ta, text)
+      if (nextLineTops.length === text.split("\n").length) {
+        setLineTops(nextLineTops)
+      }
     }
 
-    setLineTops(tops)
-  }, [text, splitMode, activeTab])
+    updateLineTops()
+
+    // Dialog portals may not have their final width during the first layout effect in WebKit.
+    firstFrame = requestAnimationFrame(() => {
+      updateLineTops()
+      secondFrame = requestAnimationFrame(updateLineTops)
+    })
+
+    const resizeObserver = new ResizeObserver(updateLineTops)
+    resizeObserver.observe(ta)
+    if (containerRef.current) resizeObserver.observe(containerRef.current)
+    window.addEventListener("resize", updateLineTops)
+    document.fonts.addEventListener("loadingdone", updateLineTops)
+    void document.fonts.ready.then(updateLineTops)
+
+    return () => {
+      active = false
+      cancelAnimationFrame(firstFrame)
+      cancelAnimationFrame(secondFrame)
+      resizeObserver.disconnect()
+      window.removeEventListener("resize", updateLineTops)
+      document.fonts.removeEventListener("loadingdone", updateLineTops)
+    }
+  }, [text, splitMode, activeTab, textareaElement])
 
   // ---- 行号同步滚动 ----
   const handleScroll = useCallback(() => {
@@ -281,7 +331,7 @@ export function ScriptEditor({
 
             {splitMode === "auto" ? (
               <textarea
-                ref={textareaRef}
+                ref={handleTextareaRef}
                 className="dw-editor-textarea"
                 placeholder={t("editor.scriptPlaceholder")}
                 value={text}
@@ -289,26 +339,28 @@ export function ScriptEditor({
               />
             ) : (
               <div className="dw-editor-container" ref={containerRef}>
-                <div className="dw-line-numbers" ref={lineNumRef}>
-                  {lines.map((_, i) => (
-                    <div
-                      key={
-                        // biome-ignore lint/suspicious/noArrayIndexKey: decorative line numbers never reorder
-                        i
-                      }
-                      className="dw-line-num"
-                      style={
-                        lineTops.length > 0
-                          ? { position: "absolute", top: `${lineTops[i]}px` }
-                          : undefined
-                      }
-                    >
-                      {i + 1}
-                    </div>
-                  ))}
+                <div className="dw-line-numbers">
+                  <div className="dw-line-numbers-content" ref={lineNumRef}>
+                    {lines.map((_, i) => (
+                      <div
+                        key={
+                          // biome-ignore lint/suspicious/noArrayIndexKey: decorative line numbers never reorder
+                          i
+                        }
+                        className="dw-line-num"
+                        style={
+                          lineTops[i] === undefined
+                            ? { visibility: "hidden" }
+                            : { top: `${lineTops[i]}px` }
+                        }
+                      >
+                        {i + 1}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <textarea
-                  ref={textareaRef}
+                  ref={handleTextareaRef}
                   className="dw-editor-textarea dw-editor-textarea--manual"
                   placeholder={t("editor.manualPlaceholder")}
                   value={text}

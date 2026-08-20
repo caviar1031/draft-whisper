@@ -3013,6 +3013,12 @@
     -webkit-user-select: none;
   }
 
+  .dw-line-numbers-content {
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+  }
+
   .dw-line-num {
     position: absolute;
     height: 21px;
