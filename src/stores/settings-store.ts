@@ -1,17 +1,17 @@
-import { deleteApiKey, loadApiKey, migrateLegacyApiKey, saveApiKey } from "@/services/tts"
-import type { ApiConfig, LanguagePreference, Settings, ThemePreference } from "@/types"
+import { deleteApiKey, loadApiKey, migrateLegacyApiKey, saveApiKey } from "@/services/credentials"
+import type { ApiConfig } from "@/types/api-config"
+import type { LanguagePreference, Settings, ThemePreference } from "@/types/settings"
 import { createApiConfig } from "@/utils/provider-catalog"
 import {
   LEGACY_API_CONFIG_ID,
+  createDefaultSettings,
   migratePersistedSettings,
   normalizeConcurrency,
 } from "@/utils/settings-validation"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-type PersistedSettings = Required<Settings>
-
-interface SettingsState extends PersistedSettings {
+interface SettingsState extends Settings {
   apiKeys: Record<string, string>
   apiKeysLoaded: boolean
   apiKeyErrors: Record<string, string | null>
@@ -29,15 +29,12 @@ function nextDefault(configs: ApiConfig[]): string | null {
   return [...configs].sort((a, b) => a.createdAt - b.createdAt)[0]?.id ?? null
 }
 
+const defaultSettings = createDefaultSettings()
+
 export const useSettingsStore = create<SettingsState>()(
-  persist<SettingsState, [], [], PersistedSettings>(
+  persist<SettingsState, [], [], Settings>(
     (set, get) => ({
-      language: "system",
-      theme: "system",
-      concurrency: 1,
-      project: null,
-      apiConfigs: [],
-      defaultApiConfigId: null,
+      ...defaultSettings,
       apiKeys: {},
       apiKeysLoaded: false,
       apiKeyErrors: {},

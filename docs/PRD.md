@@ -544,21 +544,21 @@ errorMessage
 Project
 
 ```
-mode
-
 apiConfigId
 
-voiceDesignId
+mode
 
-voiceCloneSampleId
-
-voice
-
-voiceDesignPrompt
-
-voiceClonePath
-
-performancePrompt
+voiceConfigs:
+  basic:
+    voice
+    performancePrompt
+  voice-design:
+    presetId
+    prompt
+  voice-clone:
+    sampleId
+    samplePath
+    performancePrompt
 
 sentences[]（包含最近 5 个 audioHistory 版本）
 ```

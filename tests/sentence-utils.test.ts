@@ -2,10 +2,17 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { MAX_AUDIO_VERSIONS, retainRecentAudioVersions } from "../src/utils/audio-history.ts"
 import { generateSentenceId } from "../src/utils/id.ts"
+import {
+  createDefaultProject,
+  decodePersistedProject,
+  getDefaultVoice,
+  normalizeSentences,
+} from "../src/utils/project-persistence.ts"
 import { PROVIDERS, createApiConfig, resolveConfigVoice } from "../src/utils/provider-catalog.ts"
 import { splitTextToSentences } from "../src/utils/sentence.ts"
 import {
   MAX_CONCURRENCY,
+  createDefaultSettings,
   isValidHttpUrl,
   migratePersistedSettings,
   normalizeConcurrency,
@@ -308,4 +315,101 @@ test("resolves saved voice resources live while retaining legacy fallbacks", () 
     voiceDesignPrompt: "legacy design",
     voiceClonePath: "/legacy.wav",
   })
+})
+
+test("creates default settings with clean object instances", () => {
+  const settings = createDefaultSettings()
+  assert.equal(settings.language, "system")
+  assert.equal(settings.theme, "system")
+  assert.equal(settings.concurrency, 1)
+  assert.equal(settings.project, null)
+  assert.deepEqual(settings.apiConfigs, [])
+  assert.equal(settings.defaultApiConfigId, null)
+})
+
+test("resolves dynamic default voices without hardcoded values", () => {
+  const fishConfig = createApiConfig("fish-1", 0, "fish-audio")
+  assert.equal(getDefaultVoice("fish-1", [fishConfig]), "ca3007f96ae7499ab87d27ea3599956a")
+
+  const emptyConfig = createApiConfig("custom-1", 0, "custom")
+  emptyConfig.voices = []
+  assert.equal(
+    getDefaultVoice("custom-1", [emptyConfig]),
+    PROVIDERS.custom.defaultVoices[0]?.id ?? "",
+  )
+
+  const defaultProj = createDefaultProject("fish-1", [fishConfig])
+  assert.equal(defaultProj.voiceConfigs.basic.voice, "ca3007f96ae7499ab87d27ea3599956a")
+})
+
+test("migrates legacy flat project records into structured voiceConfigs", () => {
+  const legacyRaw = JSON.stringify({
+    state: {
+      apiConfigId: "cfg-1",
+      mode: "voice-design",
+      voice: "茉莉",
+      voiceDesignId: "vd-1",
+      voiceDesignPrompt: "a clear narrator",
+      voiceCloneSampleId: "vc-1",
+      voiceClonePath: "/path/to/sample.wav",
+      performancePrompt: "lively",
+      sentences: [
+        { id: "001_A_1234", text: "Sentence 1", status: "generating", audioPath: "/audio/1.wav" },
+        { id: "002_B_5678", text: "Sentence 2", status: "queued", audioPath: null },
+      ],
+    },
+  })
+
+  const decoded = decodePersistedProject(legacyRaw, null, [])
+  assert.equal(decoded.apiConfigId, "cfg-1")
+  assert.equal(decoded.mode, "voice-design")
+  assert.equal(decoded.voiceConfigs.basic.voice, "茉莉")
+  assert.equal(decoded.voiceConfigs["voice-design"].presetId, "vd-1")
+  assert.equal(decoded.voiceConfigs["voice-design"].prompt, "a clear narrator")
+  assert.equal(decoded.voiceConfigs["voice-clone"].sampleId, "vc-1")
+  assert.equal(decoded.voiceConfigs["voice-clone"].samplePath, "/path/to/sample.wav")
+  assert.equal(decoded.voiceConfigs.basic.performancePrompt, "lively")
+  assert.equal(decoded.voiceConfigs["voice-clone"].performancePrompt, "lively")
+  assert.equal(decoded.sentences[0].status, "completed")
+  assert.equal(decoded.sentences[1].status, "pending")
+})
+
+test("falls back to a default project when localStorage access fails", async () => {
+  const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage")
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem() {
+        throw new Error("storage unavailable")
+      },
+    },
+  })
+
+  try {
+    const { loadProjectFromStorage } = await import("../src/utils/project-persistence.ts")
+    const project = loadProjectFromStorage(null, null, [])
+    assert.equal(project.mode, "basic")
+    assert.deepEqual(project.sentences, [])
+  } finally {
+    if (previousDescriptor) {
+      Object.defineProperty(globalThis, "localStorage", previousDescriptor)
+    } else {
+      Object.defineProperty(globalThis, "localStorage", {
+        configurable: true,
+        value: undefined,
+      })
+    }
+  }
+})
+
+test("normalizes transient sentence statuses on reload", () => {
+  const raw = [
+    { id: "1", text: "A", status: "generating", audioPath: "/audio/1.wav" },
+    { id: "2", text: "B", status: "queued", audioPath: null },
+    { id: "3", text: "C", status: "completed", audioPath: "/audio/3.wav" },
+  ]
+  const normalized = normalizeSentences(raw)
+  assert.equal(normalized[0].status, "completed")
+  assert.equal(normalized[1].status, "pending")
+  assert.equal(normalized[2].status, "completed")
 })

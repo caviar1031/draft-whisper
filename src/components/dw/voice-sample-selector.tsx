@@ -2,10 +2,10 @@ import { Select } from "@/components/ui/select"
 import {
   cleanupAudioFiles,
   deleteVoiceSample,
-  previewVoiceClone,
   readAudioAsUrl,
   saveVoiceSample,
-} from "@/services/tts"
+} from "@/services/audio"
+import { previewVoiceClone } from "@/services/tts"
 import { clearVoiceSampleReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"

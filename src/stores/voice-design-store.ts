@@ -1,4 +1,4 @@
-import type { VoiceDesignPreset } from "@/types"
+import type { VoiceDesignPreset } from "@/types/voice-resource"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 

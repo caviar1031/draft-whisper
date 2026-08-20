@@ -3,15 +3,15 @@ import { Select } from "@/components/ui/select"
 import {
   cleanupAudioFiles,
   deleteVoiceSample,
-  previewVoice,
   readAudioAsUrl,
   saveVoiceSample,
-} from "@/services/tts"
+} from "@/services/audio"
+import { previewVoice } from "@/services/tts"
 import { clearVoiceResourceReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceDesignStore } from "@/stores/voice-design-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { VoiceDesignPreset } from "@/types"
+import type { VoiceDesignPreset } from "@/types/voice-resource"
 import { resolveCapability } from "@/utils/provider-catalog"
 import { open } from "@tauri-apps/plugin-dialog"
 import {

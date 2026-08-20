@@ -6,18 +6,13 @@ import { StatusBar, WindowShell } from "@/components/dw/window-shell"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useTtsGeneration } from "@/hooks/use-tts-generation"
 import i18n from "@/i18n"
-import {
-  cleanupAudioFiles,
-  createProject,
-  deleteProject,
-  listProjects,
-  readAudioAsUrl,
-} from "@/services/tts"
+import { cleanupAudioFiles, readAudioAsUrl } from "@/services/audio"
+import { createProject, deleteProject, listProjects } from "@/services/projects"
 import { deleteStoredProject, flushCurrentProject, useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceDesignStore } from "@/stores/voice-design-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { SentenceStatus } from "@/types"
+import type { SentenceStatus } from "@/types/sentence"
 import { generateSentenceId } from "@/utils/id"
 import { resolveCapability } from "@/utils/provider-catalog"
 import { splitTextToSentences } from "@/utils/sentence"
@@ -54,12 +49,18 @@ function App() {
 
   const projectMode = useProjectStore((s) => s.mode)
   const projectApiConfigId = useProjectStore((s) => s.apiConfigId)
-  const projectVoice = useProjectStore((s) => s.voice)
-  const projectVoiceDesignId = useProjectStore((s) => s.voiceDesignId)
-  const projectVoiceDesignPrompt = useProjectStore((s) => s.voiceDesignPrompt)
-  const projectVoiceCloneSampleId = useProjectStore((s) => s.voiceCloneSampleId)
-  const projectVoiceClonePath = useProjectStore((s) => s.voiceClonePath)
-  const projectPerformancePrompt = useProjectStore((s) => s.performancePrompt)
+  const projectVoice = useProjectStore((s) => s.voiceConfigs.basic.voice)
+  const projectVoiceDesignId = useProjectStore((s) => s.voiceConfigs["voice-design"].presetId)
+  const projectVoiceDesignPrompt = useProjectStore((s) => s.voiceConfigs["voice-design"].prompt)
+  const projectVoiceCloneSampleId = useProjectStore((s) => s.voiceConfigs["voice-clone"].sampleId)
+  const projectVoiceClonePath = useProjectStore((s) => s.voiceConfigs["voice-clone"].samplePath)
+  const projectPerformancePrompt = useProjectStore((s) =>
+    s.mode === "basic"
+      ? s.voiceConfigs.basic.performancePrompt
+      : s.mode === "voice-clone"
+        ? s.voiceConfigs["voice-clone"].performancePrompt
+        : "",
+  )
   const setProjectMode = useProjectStore((s) => s.setMode)
   const setProjectApiConfigId = useProjectStore((s) => s.setApiConfigId)
   const setProjectVoice = useProjectStore((s) => s.setVoice)

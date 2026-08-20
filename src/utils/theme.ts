@@ -1,4 +1,4 @@
-import type { ThemePreference } from "@/types"
+import type { ThemePreference } from "@/types/settings"
 
 export type ResolvedTheme = "light" | "dark"
 

@@ -1,7 +1,4 @@
-import type { TtsMode } from "./project"
-
-export type ProviderId = "mimo" | "fish-audio" | "custom"
-export type LanguagePreference = "system" | "zh-CN" | "en"
+import type { ProviderId, TtsMode } from "./tts"
 
 export interface ApiVoice {
   id: string

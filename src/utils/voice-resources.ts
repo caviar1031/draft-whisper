@@ -1,6 +1,6 @@
-import type { VoiceCloneSample, VoiceDesignPreset } from "@/types"
+import type { VoiceCloneSample, VoiceDesignPreset } from "@/types/voice-resource"
 
-interface ProjectVoiceSelection {
+export interface ProjectVoiceSelection {
   voiceDesignId: string | null
   voiceDesignPrompt: string
   voiceCloneSampleId: string | null

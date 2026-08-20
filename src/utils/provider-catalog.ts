@@ -1,4 +1,5 @@
-import type { ApiConfig, ApiVoice, CapabilityMappings, ProviderId, TtsMode } from "@/types"
+import type { ApiConfig, ApiVoice, CapabilityMappings } from "@/types/api-config"
+import type { ProviderId, TtsMode } from "@/types/tts"
 
 export interface ProviderDefinition {
   id: ProviderId

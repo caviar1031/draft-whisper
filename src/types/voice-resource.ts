@@ -23,3 +23,12 @@ export interface VoiceCloneSample {
   source: "uploaded" | "voice-design"
   designPrompt?: string
 }
+
+export interface SavedVoiceSample {
+  filePath: string
+  format: "wav" | "mp3"
+  mimeType: "audio/wav" | "audio/mpeg"
+  byteSize: number
+  encodedSize: number
+  durationMs: number
+}

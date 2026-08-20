@@ -1,7 +1,8 @@
-import type { ApiConfig, TtsMode } from "@/types"
+import type { ApiConfig } from "@/types/api-config"
+import type { TtsMode } from "@/types/tts"
 import { resolveCapability } from "./provider-catalog.ts"
 
-interface TtsConfiguration {
+export interface TtsConfiguration {
   apiConfigId: string | null
   mode: TtsMode
   voice: string

@@ -1,5 +1,5 @@
-import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/tts"
-import type { Sentence } from "@/types"
+import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/audio"
+import type { Sentence } from "@/types/sentence"
 import {
   Check,
   ChevronLeft,

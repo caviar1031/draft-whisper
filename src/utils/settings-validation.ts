@@ -1,24 +1,21 @@
-import type {
-  ApiConfig,
-  ApiVoice,
-  LanguagePreference,
-  ProviderId,
-  ThemePreference,
-  TtsMode,
-} from "@/types"
+import type { ApiConfig, ApiVoice } from "@/types/api-config"
+import type { LanguagePreference, Settings, ThemePreference } from "@/types/settings"
+import type { ProviderId, TtsMode } from "@/types/tts"
 import { PROVIDERS, TTS_MODES, createApiConfig } from "./provider-catalog.ts"
 
 export const MIN_CONCURRENCY = 1
 export const MAX_CONCURRENCY = 16
 export const LEGACY_API_CONFIG_ID = "migrated-mimo"
 
-export interface PersistedSettingsData {
-  language: LanguagePreference
-  theme: ThemePreference
-  concurrency: number
-  project: string | null
-  apiConfigs: ApiConfig[]
-  defaultApiConfigId: string | null
+export function createDefaultSettings(): Settings {
+  return {
+    language: "system",
+    theme: "system",
+    concurrency: 1,
+    project: null,
+    apiConfigs: [],
+    defaultApiConfigId: null,
+  }
 }
 
 export function normalizeConcurrency(value: unknown): number {
@@ -89,7 +86,8 @@ function normalizeApiConfig(value: unknown): ApiConfig | null {
   }
 }
 
-export function migratePersistedSettings(value: unknown): PersistedSettingsData {
+export function migratePersistedSettings(value: unknown): Settings {
+  const defaults = createDefaultSettings()
   const old = value && typeof value === "object" ? (value as Record<string, unknown>) : {}
   let apiConfigs = Array.isArray(old.apiConfigs)
     ? old.apiConfigs
@@ -113,13 +111,16 @@ export function migratePersistedSettings(value: unknown): PersistedSettingsData 
     language: normalizeLanguage(old.language),
     theme: normalizeTheme(old.theme),
     concurrency: normalizeConcurrency(old.concurrency),
-    project: typeof old.project === "string" || old.project === null ? old.project : null,
+    project:
+      typeof old.project === "string" || old.project === null ? old.project : defaults.project,
     apiConfigs,
     defaultApiConfigId,
   }
 }
 
-export function getSystemLanguage(language = navigator.language): "zh-CN" | "en" {
+export function getSystemLanguage(
+  language = typeof navigator !== "undefined" ? navigator.language : "en",
+): "zh-CN" | "en" {
   return language.toLowerCase().startsWith("zh") ? "zh-CN" : "en"
 }
 

@@ -1,4 +1,4 @@
-import type { Sentence } from "@/types"
+import type { Sentence } from "@/types/sentence"
 import { generateSentenceId } from "./id.ts"
 
 export function splitTextToSentences(text: string): Sentence[] {

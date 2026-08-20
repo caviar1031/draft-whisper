@@ -1,9 +1,11 @@
-import { cleanupAudioFiles, generateSentenceAudio, readAudioAsUrl } from "@/services/tts"
+import { cleanupAudioFiles, readAudioAsUrl } from "@/services/audio"
+import { generateSentenceAudio } from "@/services/tts"
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceDesignStore } from "@/stores/voice-design-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { SentenceStatus } from "@/types"
+import type { SentenceStatus } from "@/types/sentence"
+import type { TtsParams } from "@/types/tts"
 import { retainRecentAudioVersions } from "@/utils/audio-history"
 import { GenerationTaskRegistry } from "@/utils/generation-tasks"
 import { resolveCapability } from "@/utils/provider-catalog"
@@ -41,13 +43,27 @@ export function useTtsGeneration() {
       const apiConfig = settings.apiConfigs.find((config) => config.id === projState.apiConfigId)
       const capability = apiConfig ? resolveCapability(apiConfig, projState.mode) : null
       const voiceResources = resolveProjectVoiceResources(
-        projState,
+        {
+          voiceDesignId: projState.voiceConfigs["voice-design"].presetId,
+          voiceDesignPrompt: projState.voiceConfigs["voice-design"].prompt,
+          voiceCloneSampleId: projState.voiceConfigs["voice-clone"].sampleId,
+          voiceClonePath: projState.voiceConfigs["voice-clone"].samplePath,
+        },
         useVoiceDesignStore.getState().designs,
         useVoiceSampleStore.getState().samples,
       )
+      const performancePrompt =
+        projState.mode === "basic"
+          ? projState.voiceConfigs.basic.performancePrompt
+          : projState.mode === "voice-clone"
+            ? projState.voiceConfigs["voice-clone"].performancePrompt
+            : ""
       const resolvedProject = {
-        ...projState,
-        ...voiceResources,
+        apiConfigId: projState.apiConfigId,
+        mode: projState.mode,
+        voice: projState.voiceConfigs.basic.voice,
+        voiceDesignPrompt: voiceResources.voiceDesignPrompt,
+        voiceClonePath: voiceResources.voiceClonePath,
       }
       const configurationError = getTtsConfigurationError(
         resolvedProject,
@@ -55,16 +71,16 @@ export function useTtsGeneration() {
         settings.apiKeys,
       )
       if (configurationError || !apiConfig || !capability) return
-      const params = {
+      const params: TtsParams = {
         provider: apiConfig.provider,
         baseUrl: apiConfig.baseUrl,
-        apiKey: settings.apiKeys[apiConfig.id],
+        apiKey: settings.apiKeys[apiConfig.id] ?? "",
         model: capability.modelId,
         mode: projState.mode,
-        voice: projState.voice,
+        voice: projState.mode === "basic" ? projState.voiceConfigs.basic.voice : "",
         voiceDesignPrompt: resolvedProject.voiceDesignPrompt,
         voiceClonePath: resolvedProject.voiceClonePath,
-        performancePrompt: projState.performancePrompt,
+        performancePrompt,
       }
       const concurrency = settings.concurrency
       const currentProject = projState.currentProject
