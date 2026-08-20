@@ -47,6 +47,15 @@ const resources = {
           "fish-audio": "Fish Audio",
           custom: "自定义配置",
         },
+        providerPicker: {
+          title: "选择服务商",
+          description: "请选择要添加的语音 API 服务商。",
+          providers: {
+            mimo: "Xiaomi MiMo 语音 API",
+            "fish-audio": "Fish Audio 语音 API",
+            custom: "兼容 OpenAI 格式的第三方语音接口",
+          },
+        },
         deleteConfirm: "删除“{{name}}”？{{references}} 个项目将迁移到其他默认配置。",
         deleteLastConfirm: "删除“{{name}}”？{{references}} 个项目将变为未配置状态。",
         editor: {
@@ -298,6 +307,15 @@ const resources = {
           mimo: "Xiaomi MiMo",
           "fish-audio": "Fish Audio",
           custom: "Custom Configuration",
+        },
+        providerPicker: {
+          title: "Choose a Provider",
+          description: "Select the speech API provider you want to add.",
+          providers: {
+            mimo: "Xiaomi MiMo speech API",
+            "fish-audio": "Fish Audio speech API",
+            custom: "OpenAI-compatible third-party speech endpoint",
+          },
         },
         deleteConfirm: "Delete “{{name}}”? {{references}} projects will move to another default.",
         deleteLastConfirm: "Delete “{{name}}”? {{references}} projects will become unconfigured.",

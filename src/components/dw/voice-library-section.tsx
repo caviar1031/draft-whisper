@@ -289,7 +289,7 @@ export function VoiceLibrarySection() {
       {sampleDraft && (
         <ModalLayer onClose={() => setSampleDraft(null)}>
           <ModalLayer.Panel
-            className="dw-api-editor dw-resource-editor"
+            className="dw-api-editor dw-resource-editor dw-resource-compact-editor"
             aria-labelledby="sample-editor-title"
           >
             <header className="dw-api-editor-header">
@@ -337,7 +337,7 @@ export function VoiceLibrarySection() {
       {renameDraft && (
         <ModalLayer onClose={() => setRenameDraft(null)}>
           <ModalLayer.Panel
-            className="dw-api-editor dw-resource-editor"
+            className="dw-api-editor dw-resource-editor dw-resource-compact-editor"
             aria-labelledby="rename-sample-title"
           >
             <header className="dw-api-editor-header">

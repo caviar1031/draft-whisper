@@ -4,6 +4,7 @@ import type { ProviderId, TtsMode } from "@/types/tts"
 export interface ProviderDefinition {
   id: ProviderId
   name: string
+  shortLabel: string
   defaultBaseUrl: string
   docsUrl?: string
   defaultModels: Record<TtsMode, string>
@@ -15,6 +16,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
   mimo: {
     id: "mimo",
     name: "Xiaomi MiMo",
+    shortLabel: "Mi",
     defaultBaseUrl: "https://api.xiaomimimo.com/v1",
     docsUrl: "https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5",
     defaultModels: {
@@ -38,6 +40,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
   "fish-audio": {
     id: "fish-audio",
     name: "Fish Audio",
+    shortLabel: "Fi",
     defaultBaseUrl: "https://api.fish.audio/v1/tts",
     docsUrl: "https://docs.fish.audio/developer-guide/getting-started/quickstart",
     defaultModels: {
@@ -54,6 +57,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
   custom: {
     id: "custom",
     name: "Custom API",
+    shortLabel: "Cu",
     defaultBaseUrl: "",
     defaultModels: {
       basic: "",

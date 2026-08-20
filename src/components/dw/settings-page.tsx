@@ -1,12 +1,24 @@
+import { ModalLayer } from "@/components/ui/modal-layer"
 import { Select } from "@/components/ui/select"
 import i18n from "@/i18n"
 import { countApiConfigReferences, reassignApiConfigReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { ApiConfig } from "@/types/api-config"
 import type { LanguagePreference, ThemePreference } from "@/types/settings"
-import { TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
+import type { ProviderId } from "@/types/tts"
+import { PROVIDERS, TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
 import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
-import { ChevronDown, CircleAlert, Edit3, Minus, Plus, Star, Trash2 } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleAlert,
+  Edit3,
+  Minus,
+  Plus,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiConfigEditor } from "./api-config-editor"
@@ -26,6 +38,7 @@ export function SettingsPage() {
   const settings = useSettingsStore()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editor, setEditor] = useState<EditorState | null>(null)
+  const [providerPickerOpen, setProviderPickerOpen] = useState(false)
   const configs = useMemo(
     () => [...settings.apiConfigs].sort((a, b) => a.createdAt - b.createdAt),
     [settings.apiConfigs],
@@ -41,7 +54,15 @@ export function SettingsPage() {
   }
 
   const handleAdd = () => {
-    setEditor({ config: createApiConfig(generateApiConfigId()), isNew: true })
+    setProviderPickerOpen(true)
+  }
+
+  const handleProviderSelect = (provider: ProviderId) => {
+    setProviderPickerOpen(false)
+    setEditor({
+      config: createApiConfig(generateApiConfigId(), Date.now(), provider),
+      isNew: true,
+    })
   }
 
   const handleDelete = async (config: ApiConfig) => {
@@ -170,13 +191,7 @@ export function SettingsPage() {
                         <ChevronDown className={expanded ? "is-open" : undefined} size={15} />
                       </button>
                       <div className="dw-provider-icon" aria-hidden="true">
-                        <span>
-                          {config.provider === "mimo"
-                            ? "Mi"
-                            : config.provider === "fish-audio"
-                              ? "Fi"
-                              : "Cu"}
-                        </span>
+                        <span>{PROVIDERS[config.provider].shortLabel}</span>
                       </div>
                       <div className="dw-api-config-name">
                         <div>
@@ -236,6 +251,13 @@ export function SettingsPage() {
         </section>
       </main>
 
+      {providerPickerOpen && (
+        <ProviderPicker
+          onCancel={() => setProviderPickerOpen(false)}
+          onSelect={handleProviderSelect}
+        />
+      )}
+
       {editor && (
         <ApiConfigEditor
           config={editor.config}
@@ -249,6 +271,62 @@ export function SettingsPage() {
         />
       )}
     </div>
+  )
+}
+
+function ProviderPicker({
+  onCancel,
+  onSelect,
+}: {
+  onCancel: () => void
+  onSelect: (provider: ProviderId) => void
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <ModalLayer onClose={onCancel}>
+      <ModalLayer.Panel
+        className="dw-api-editor dw-provider-picker dw-resource-compact-editor"
+        aria-labelledby="provider-picker-title"
+      >
+        <header className="dw-api-editor-header">
+          <div>
+            <h2 id="provider-picker-title">{t("settings.providerPicker.title")}</h2>
+            <p>{t("settings.providerPicker.description")}</p>
+          </div>
+          <button
+            type="button"
+            className="dw-settings-close"
+            onClick={onCancel}
+            aria-label={t("common.close")}
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
+        </header>
+
+        <div className="dw-api-editor-body">
+          <div className="dw-provider-picker-options">
+            {Object.values(PROVIDERS).map((provider) => (
+              <button
+                type="button"
+                className="dw-provider-picker-option"
+                key={provider.id}
+                onClick={() => onSelect(provider.id)}
+              >
+                <span className="dw-provider-picker-icon" aria-hidden="true">
+                  {provider.shortLabel}
+                </span>
+                <span className="dw-provider-picker-copy">
+                  <strong>{t(`settings.providers.${provider.id}`)}</strong>
+                  <span>{t(`settings.providerPicker.providers.${provider.id}`)}</span>
+                </span>
+                <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </ModalLayer.Panel>
+    </ModalLayer>
   )
 }
 
