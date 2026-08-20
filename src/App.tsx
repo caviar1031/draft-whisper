@@ -17,6 +17,7 @@ import { generateSentenceId } from "@/utils/id"
 import { resolveCapability } from "@/utils/provider-catalog"
 import { splitTextToSentences } from "@/utils/sentence"
 import { resolveLanguage } from "@/utils/settings-validation"
+import { registerTauriListener } from "@/utils/tauri-listener"
 import { applyTheme, getThemeMediaQuery } from "@/utils/theme"
 import { getTtsConfigurationError } from "@/utils/tts-config"
 import { resolveProjectVoiceResources } from "@/utils/voice-resources"
@@ -141,23 +142,22 @@ function App() {
   // 窗口关闭前立即保存项目数据（绕过 debounce）
   useEffect(() => {
     const win = getCurrentWindow()
-    const unlisten = win.onCloseRequested(async (event) => {
-      event.preventDefault()
-      if (closingRef.current) return
-      closingRef.current = true
-      try {
-        flushCurrentProject()
-      } finally {
+    return registerTauriListener(() =>
+      win.onCloseRequested(async (event) => {
+        event.preventDefault()
+        if (closingRef.current) return
+        closingRef.current = true
         try {
-          await win.hide()
+          flushCurrentProject()
         } finally {
-          closingRef.current = false
+          try {
+            await win.hide()
+          } finally {
+            closingRef.current = false
+          }
         }
-      }
-    })
-    return () => {
-      void unlisten.then((fn) => fn())
-    }
+      }),
+    )
   }, [])
 
   // 预缓存已有音频的 Blob URL（启动/切换项目时），确保点击播放时瞬间返回，
