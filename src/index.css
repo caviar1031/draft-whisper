@@ -1045,6 +1045,15 @@
     color: var(--glass-orange);
   }
 
+  .dw-style-instruction-indicator {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--brand-500);
+  }
+
   /* Card actions */
   .dw-card-actions {
     position: relative;
@@ -1451,6 +1460,106 @@
 
   .dw-editing-textarea::placeholder {
     color: var(--text-300);
+  }
+
+  .dw-style-instruction-editor {
+    display: flex;
+    flex-direction: column;
+    margin-top: 8px;
+    padding-top: 4px;
+    border-top: 1px solid var(--glass-divider);
+  }
+
+  .dw-style-instruction-toggle {
+    width: 100%;
+    min-width: 0;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-500);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .dw-style-instruction-toggle:hover {
+    color: var(--text-700);
+  }
+
+  .dw-style-instruction-toggle-main {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dw-style-instruction-toggle-main > svg,
+  .dw-style-instruction-toggle > svg {
+    flex-shrink: 0;
+  }
+
+  .dw-style-instruction-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-400);
+    font-weight: 400;
+  }
+
+  .dw-style-instruction-toggle:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-style-instruction-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 3px;
+  }
+
+  .dw-style-instruction-textarea {
+    width: 100%;
+    min-height: 58px;
+    max-height: 180px;
+    padding: 9px 11px;
+    border: 1px solid var(--glass-input-border);
+    border-radius: 10px;
+    background: var(--glass-bg-input);
+    color: var(--text-800);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .dw-style-instruction-textarea::placeholder {
+    color: var(--text-300);
+  }
+
+  .dw-style-instruction-textarea:focus {
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+  }
+
+  .dw-style-instruction-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    color: var(--text-400);
+    font-size: 10px;
   }
 
   .dw-editing-hint {

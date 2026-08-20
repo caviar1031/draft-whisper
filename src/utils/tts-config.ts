@@ -1,5 +1,5 @@
 import type { ApiConfig } from "@/types/api-config"
-import type { TtsMode } from "@/types/tts"
+import type { ProviderId, TtsMode } from "@/types/tts"
 import { resolveCapability } from "./provider-catalog.ts"
 
 export interface TtsConfiguration {
@@ -8,6 +8,16 @@ export interface TtsConfiguration {
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
+}
+
+export function resolvePerformancePrompt(
+  provider: ProviderId,
+  mode: TtsMode,
+  sentenceStyleInstruction: string,
+  projectPerformancePrompt: string,
+): string {
+  if (provider === "mimo" && mode === "basic") return sentenceStyleInstruction
+  return projectPerformancePrompt
 }
 
 export function getTtsConfigurationError(

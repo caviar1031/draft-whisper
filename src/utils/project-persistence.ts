@@ -69,22 +69,26 @@ export function createDefaultProject(
 }
 
 /** 重置瞬态状态：generating/queued → 根据 audioPath 判断 */
-export function normalizeSentences(sentences: unknown): Sentence[] {
+export function normalizeSentences(sentences: unknown, legacyStyleInstruction = ""): Sentence[] {
   if (!Array.isArray(sentences)) return []
   return sentences
     .filter((s): s is Sentence => Boolean(s && typeof s === "object" && typeof s.id === "string"))
     .map((s) => {
       const audioHistory = Array.isArray(s.audioHistory) ? s.audioHistory : []
+      const styleInstruction =
+        typeof s.styleInstruction === "string" ? s.styleInstruction : legacyStyleInstruction
       if (s.status === "generating" || s.status === "queued") {
         return {
           ...s,
           audioHistory,
+          styleInstruction,
           status: s.audioPath ? "completed" : "pending",
         }
       }
       return {
         ...s,
         audioHistory,
+        styleInstruction,
       }
     })
 }
@@ -120,8 +124,6 @@ export function decodePersistedProject(
     const mode: TtsMode =
       state.mode === "voice-design" || state.mode === "voice-clone" ? state.mode : "basic"
 
-    const sentences = normalizeSentences(state.sentences)
-
     // 如果已经是新的 voiceConfigs 结构
     if (state.voiceConfigs && typeof state.voiceConfigs === "object") {
       const rawConfigs = state.voiceConfigs as Record<string, Record<string, unknown>>
@@ -132,13 +134,14 @@ export function decodePersistedProject(
 
       const storedBasicVoice = typeof baseBasic.voice === "string" ? baseBasic.voice : defaultVoice
       const voice = resolveVoiceForApiConfig(apiConfigId, storedBasicVoice, apiConfigs)
+      const legacyStyleInstruction =
+        typeof baseBasic.performancePrompt === "string" ? baseBasic.performancePrompt : ""
 
       const voiceConfigs: ProjectVoiceConfigs = {
         basic: {
           mode: "basic",
           voice,
-          performancePrompt:
-            typeof baseBasic.performancePrompt === "string" ? baseBasic.performancePrompt : "",
+          performancePrompt: legacyStyleInstruction,
         },
         "voice-design": {
           mode: "voice-design",
@@ -158,7 +161,7 @@ export function decodePersistedProject(
         apiConfigId,
         mode,
         voiceConfigs,
-        sentences,
+        sentences: normalizeSentences(state.sentences, legacyStyleInstruction),
       }
     }
 
@@ -202,7 +205,7 @@ export function decodePersistedProject(
       apiConfigId,
       mode,
       voiceConfigs,
-      sentences,
+      sentences: normalizeSentences(state.sentences, performancePrompt),
     }
   } catch {
     return defaultProject

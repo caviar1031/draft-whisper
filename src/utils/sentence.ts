@@ -12,6 +12,7 @@ export function splitTextToSentences(text: string): Sentence[] {
     .map((sentenceText, index) => ({
       id: generateSentenceId(index, sentenceText),
       text: sentenceText,
+      styleInstruction: "",
       status: "pending" as const,
       audioPath: null,
       audioHistory: [],

@@ -120,6 +120,18 @@ mod tests {
     }
 
     #[test]
+    fn builds_basic_request_with_style_instruction() {
+        let params = test_params(TtsMode::Basic, "mimo-v2.5-tts");
+        let body = build_mimo_speech_body(&params, "你终于来了", None).unwrap();
+
+        assert_eq!(body["messages"][0]["role"], "user");
+        assert_eq!(body["messages"][0]["content"], "语速稍慢，像在讲故事");
+        assert_eq!(body["messages"][1]["role"], "assistant");
+        assert_eq!(body["messages"][1]["content"], "你终于来了");
+        assert_eq!(body["audio"]["voice"], "冰糖");
+    }
+
+    #[test]
     fn builds_voice_design_request_from_the_user_description() {
         let params = test_params(TtsMode::VoiceDesign, "mimo-v2.5-tts-voicedesign");
         let body = build_mimo_speech_body(&params, "你好", None).unwrap();

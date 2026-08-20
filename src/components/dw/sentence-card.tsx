@@ -2,14 +2,17 @@ import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/a
 import type { Sentence } from "@/types/sentence"
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CirclePause,
   CirclePlay,
   Copy,
   FolderOpen,
   GripVertical,
   Pencil,
+  Plus,
   RefreshCw,
   TriangleAlert,
 } from "lucide-react"
@@ -34,9 +37,10 @@ interface SentenceCardProps {
   onRegenerate: () => void
   onRetry: () => void
   onEdit: () => void
-  onCommitEdit: (text: string) => void
+  onCommitEdit: (text: string, styleInstruction: string) => void
   onCancelEdit: () => void
   onSwitchVersion: (historyIndex: number) => void
+  styleInstructionEnabled?: boolean
   generationDisabled?: boolean
   generationDisabledReason?: string
 }
@@ -55,6 +59,7 @@ export function SentenceCard({
   onCommitEdit,
   onCancelEdit,
   onSwitchVersion,
+  styleInstructionEnabled = false,
   generationDisabled = false,
   generationDisabledReason,
 }: SentenceCardProps) {
@@ -206,6 +211,7 @@ export function SentenceCard({
         className={cardClassName}
         onCommit={onCommitEdit}
         onCancel={onCancelEdit}
+        styleInstructionEnabled={styleInstructionEnabled}
       />
     )
   }
@@ -260,6 +266,14 @@ export function SentenceCard({
         <div className="dw-sentence-meta">
           <span className={statusDotClass} />
           <span className={statusTextClass}>{statusLabel}</span>
+          {styleInstructionEnabled && (sentence.styleInstruction ?? "").trim().length > 0 && (
+            <span
+              className="dw-style-instruction-indicator"
+              title={sentence.styleInstruction ?? ""}
+            >
+              {t("sentence.styleInstruction")}
+            </span>
+          )}
           {view === "ready" && historyCount > 1 && (
             <div className="dw-version-nav">
               <button
@@ -415,29 +429,60 @@ function renderActions(
   return null
 }
 
-// 编辑态卡片 — 文本域 + 已修改徽标 + 字数提示
+// Editing card with sentence text and optional per-sentence style direction.
 interface EditingCardProps {
   sentence: Sentence
   index: number
   className: string
-  onCommit: (text: string) => void
+  onCommit: (text: string, styleInstruction: string) => void
   onCancel: () => void
+  styleInstructionEnabled: boolean
 }
 
-function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardProps) {
+function EditingCard({
+  sentence,
+  className,
+  onCommit,
+  onCancel,
+  styleInstructionEnabled,
+}: EditingCardProps) {
   const { t } = useTranslation()
   const [value, setValue] = useState(sentence.text)
+  const [styleInstruction, setStyleInstruction] = useState(sentence.styleInstruction ?? "")
+  const [styleInstructionOpen, setStyleInstructionOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const styleTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     textareaRef.current?.focus()
     textareaRef.current?.select()
   }, [])
 
+  useEffect(() => {
+    if (!styleInstructionOpen) return
+    const animationFrame = window.requestAnimationFrame(() => {
+      const textarea = styleTextareaRef.current
+      if (!textarea) return
+      textarea.focus()
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+    })
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [styleInstructionOpen])
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      onCommit(value.trim() || sentence.text)
+      onCommit(value.trim() || sentence.text, styleInstruction.trim())
+    } else if (e.key === "Escape") {
+      e.preventDefault()
+      onCancel()
+    }
+  }
+
+  const handleStyleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      onCommit(value.trim() || sentence.text, styleInstruction.trim())
     } else if (e.key === "Escape") {
       e.preventDefault()
       onCancel()
@@ -467,6 +512,54 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
           </span>
           <span>{value.length} / 500</span>
         </div>
+        {styleInstructionEnabled && (
+          <div className="dw-style-instruction-editor">
+            <button
+              type="button"
+              className="dw-style-instruction-toggle"
+              aria-expanded={styleInstructionOpen}
+              onClick={() => setStyleInstructionOpen((current) => !current)}
+            >
+              <span className="dw-style-instruction-toggle-main">
+                {styleInstruction.length > 0 ? (
+                  <Pencil size={12} strokeWidth={2} />
+                ) : (
+                  <Plus size={13} strokeWidth={2} />
+                )}
+                <span>{t("sentence.styleInstruction")}</span>
+                {!styleInstructionOpen && styleInstruction.length > 0 && (
+                  <span className="dw-style-instruction-summary">{styleInstruction}</span>
+                )}
+              </span>
+              {styleInstructionOpen ? (
+                <ChevronUp size={13} strokeWidth={2} />
+              ) : (
+                <ChevronDown size={13} strokeWidth={2} />
+              )}
+            </button>
+            {styleInstructionOpen && (
+              <div className="dw-style-instruction-content">
+                <textarea
+                  ref={styleTextareaRef}
+                  id={`style-${sentence.id}`}
+                  className="dw-style-instruction-textarea"
+                  rows={2}
+                  value={styleInstruction}
+                  aria-label={t("sentence.styleInstruction")}
+                  placeholder={t("sentence.styleInstructionPlaceholder")}
+                  onChange={(event) => setStyleInstruction(event.target.value)}
+                  onKeyDown={handleStyleKeyDown}
+                  maxLength={1024}
+                />
+                {styleInstruction.length >= 900 && (
+                  <div className="dw-style-instruction-meta">
+                    <span>{styleInstruction.length} / 1024</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

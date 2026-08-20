@@ -6,7 +6,7 @@ import { StatusBar, WindowShell } from "@/components/dw/window-shell"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useTtsGeneration } from "@/hooks/use-tts-generation"
 import i18n from "@/i18n"
-import { cleanupAudioFiles, readAudioAsUrl } from "@/services/audio"
+import { readAudioAsUrl } from "@/services/audio"
 import { createProject, deleteProject, listProjects } from "@/services/projects"
 import { deleteStoredProject, flushCurrentProject, useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
@@ -94,6 +94,10 @@ function App() {
   const effectiveVoiceClonePath = effectiveVoiceResources.voiceClonePath
   const selectedApiConfig = apiConfigs.find((config) => config.id === projectApiConfigId)
   const projectModel = resolveCapability(selectedApiConfig, projectMode)?.modelId ?? ""
+  const styleInstructionEnabled =
+    selectedApiConfig?.provider === "mimo" &&
+    projectMode === "basic" &&
+    projectVoice.trim().length > 0
 
   useEffect(() => {
     void i18n.changeLanguage(resolveLanguage(language))
@@ -302,6 +306,7 @@ function App() {
           const newSentences = lines.map((t, i) => ({
             id: generateSentenceId(i, t.trim()),
             text: t.trim(),
+            styleInstruction: "",
             status: "pending" as SentenceStatus,
             audioPath: null,
             audioHistory: [],
@@ -315,9 +320,19 @@ function App() {
             const old = sentences[i]
             const trimmed = t.trim()
             if (old && old.text === trimmed) return old
+            if (old) {
+              return {
+                ...old,
+                text: trimmed,
+                status: "pending" as SentenceStatus,
+                errorMessage: undefined,
+                duration: null,
+              }
+            }
             return {
-              id: old?.id ?? generateSentenceId(i, trimmed),
+              id: generateSentenceId(i, trimmed),
               text: trimmed,
+              styleInstruction: "",
               status: "pending" as SentenceStatus,
               audioPath: null,
               audioHistory: [],
@@ -367,19 +382,12 @@ function App() {
   }, [])
 
   const handleCommitEdit = useCallback(
-    (id: string, text: string) => {
-      const sentence = useProjectStore.getState().sentences.find((item) => item.id === id)
-      if (sentence) {
-        const oldPaths = new Set(sentence.audioHistory.map((version) => version.audioPath))
-        if (sentence.audioPath) oldPaths.add(sentence.audioPath)
-        cleanupAudioFiles([...oldPaths])
-      }
+    (id: string, text: string, styleInstruction: string) => {
       updateSentence(id, {
         text,
+        styleInstruction,
         status: "pending",
         errorMessage: undefined,
-        audioPath: null,
-        audioHistory: [],
         duration: null,
       })
       setEditingId(null)
@@ -549,9 +557,12 @@ function App() {
                   onRegenerate={() => handleRegenerateCard(sentence.id)}
                   onRetry={() => handleRegenerateCard(sentence.id)}
                   onEdit={() => handleEditCard(sentence.id)}
-                  onCommitEdit={(text) => handleCommitEdit(sentence.id, text)}
+                  onCommitEdit={(text, styleInstruction) =>
+                    handleCommitEdit(sentence.id, text, styleInstruction)
+                  }
                   onCancelEdit={handleCancelEdit}
                   onSwitchVersion={(historyIndex) => handleSwitchVersion(sentence.id, historyIndex)}
+                  styleInstructionEnabled={styleInstructionEnabled}
                   generationDisabled={Boolean(localizedTtsConfigurationError)}
                   generationDisabledReason={localizedTtsConfigurationError ?? undefined}
                 />

@@ -21,7 +21,7 @@ import {
   validateApiConfig,
 } from "../src/utils/settings-validation.ts"
 import { resolveTheme } from "../src/utils/theme.ts"
-import { getTtsConfigurationError } from "../src/utils/tts-config.ts"
+import { getTtsConfigurationError, resolvePerformancePrompt } from "../src/utils/tts-config.ts"
 import { resolveProjectVoiceResources } from "../src/utils/voice-resources.ts"
 
 test("splits Chinese and English sentence punctuation while preserving it", () => {
@@ -32,6 +32,7 @@ test("splits Chinese and English sentence punctuation while preserving it", () =
     ["今天开始。", "Are you ready?", "好！", "最后一句"],
   )
   assert.ok(sentences.every((sentence) => sentence.status === "pending"))
+  assert.ok(sentences.every((sentence) => sentence.styleInstruction === ""))
 })
 
 test("generates filesystem-safe readable sentence ids", () => {
@@ -54,6 +55,15 @@ test("retains only the five most recent audio versions", () => {
     ["/audio/2.wav", "/audio/3.wav", "/audio/4.wav", "/audio/5.wav", "/audio/6.wav"],
   )
   assert.deepEqual(result.evictedPaths, ["/audio/0.wav", "/audio/1.wav"])
+})
+
+test("uses per-sentence style instructions only for MiMo preset voices", () => {
+  assert.equal(
+    resolvePerformancePrompt("mimo", "basic", "calm and slow", "legacy"),
+    "calm and slow",
+  )
+  assert.equal(resolvePerformancePrompt("mimo", "voice-clone", "sentence", "project"), "project")
+  assert.equal(resolvePerformancePrompt("custom", "basic", "sentence", "project"), "project")
 })
 
 test("uses MiMo models as editable provider defaults", () => {
@@ -372,6 +382,7 @@ test("migrates legacy flat project records into structured voiceConfigs", () => 
   assert.equal(decoded.voiceConfigs["voice-clone"].performancePrompt, "lively")
   assert.equal(decoded.sentences[0].status, "completed")
   assert.equal(decoded.sentences[1].status, "pending")
+  assert.ok(decoded.sentences.every((sentence) => sentence.styleInstruction === "lively"))
 })
 
 test("falls back to a default project when localStorage access fails", async () => {
@@ -406,10 +417,18 @@ test("normalizes transient sentence statuses on reload", () => {
   const raw = [
     { id: "1", text: "A", status: "generating", audioPath: "/audio/1.wav" },
     { id: "2", text: "B", status: "queued", audioPath: null },
-    { id: "3", text: "C", status: "completed", audioPath: "/audio/3.wav" },
+    {
+      id: "3",
+      text: "C",
+      styleInstruction: "calm",
+      status: "completed",
+      audioPath: "/audio/3.wav",
+    },
   ]
   const normalized = normalizeSentences(raw)
   assert.equal(normalized[0].status, "completed")
   assert.equal(normalized[1].status, "pending")
   assert.equal(normalized[2].status, "completed")
+  assert.equal(normalized[0].styleInstruction, "")
+  assert.equal(normalized[2].styleInstruction, "calm")
 })

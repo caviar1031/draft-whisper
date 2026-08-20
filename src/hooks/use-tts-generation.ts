@@ -9,7 +9,7 @@ import type { TtsParams } from "@/types/tts"
 import { retainRecentAudioVersions } from "@/utils/audio-history"
 import { GenerationTaskRegistry } from "@/utils/generation-tasks"
 import { resolveCapability } from "@/utils/provider-catalog"
-import { getTtsConfigurationError } from "@/utils/tts-config"
+import { getTtsConfigurationError, resolvePerformancePrompt } from "@/utils/tts-config"
 import { resolveProjectVoiceResources } from "@/utils/voice-resources"
 import { useCallback, useRef } from "react"
 
@@ -110,7 +110,21 @@ export function useTtsGeneration() {
           if (!sentence) continue
           updateSentence(id, { status: "generating" as SentenceStatus })
           try {
-            const result = await generateSentenceAudio(id, sentence.text, params, currentProject)
+            const sentenceParams = {
+              ...params,
+              performancePrompt: resolvePerformancePrompt(
+                apiConfig.provider,
+                projState.mode,
+                sentence.styleInstruction ?? "",
+                params.performancePrompt,
+              ),
+            }
+            const result = await generateSentenceAudio(
+              id,
+              sentence.text,
+              sentenceParams,
+              currentProject,
+            )
             let preloadError: unknown = null
             try {
               // Finish preparing the Blob URL before exposing the sentence as
