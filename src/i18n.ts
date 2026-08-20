@@ -206,7 +206,6 @@ const resources = {
         failed: "失败",
         editHint: "按 Enter 确认 · Esc 取消",
         generating: "生成中…",
-        changed: "已修改",
       },
       samples: {
         title: "声音样本",
@@ -471,7 +470,6 @@ const resources = {
         failed: "Failed",
         editHint: "Press Enter to confirm · Esc to cancel",
         generating: "Generating…",
-        changed: "Changed",
       },
       samples: {
         title: "Voice Sample",

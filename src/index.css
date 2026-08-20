@@ -1163,6 +1163,10 @@
     align-items: flex-start;
   }
 
+  .dw-sentence-card.is-editing .dw-drag-handle {
+    align-self: center;
+  }
+
   /* ===== Waveform (CSS-only) ===== */
   .dw-waveform {
     display: inline-flex;
@@ -1458,6 +1462,13 @@
     justify-content: space-between;
   }
 
+  .dw-editing-hint-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
   /* ===== Voice Sample Selector ===== */
   .dw-sample-add-row {
     display: flex;
@@ -1541,20 +1552,6 @@
     display: flex;
     align-items: flex-start;
     gap: 5px;
-  }
-
-  .dw-changed-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    height: 18px;
-    padding: 0 7px;
-    border-radius: 9px;
-    background: var(--glass-orange-tint);
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--glass-orange);
-    white-space: nowrap;
   }
 
   .dw-sentence-num {

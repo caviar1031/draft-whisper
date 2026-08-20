@@ -446,25 +446,10 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
 
   return (
     <div className={className}>
-      <div className="dw-drag-handle" style={{ marginTop: 2 }}>
+      <div className="dw-drag-handle">
         <GripVertical size={16} strokeWidth={2} />
       </div>
       <div className="dw-sentence-body">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: "8px",
-            marginBottom: "8px",
-          }}
-        >
-          <span className="dw-status-text is-pending">{t("sentence.pending")}</span>
-          <span className="dw-changed-badge">
-            <Pencil size={10} strokeWidth={2.5} style={{ color: "var(--glass-orange)" }} />
-            {t("sentence.changed")}
-          </span>
-        </div>
         <textarea
           ref={textareaRef}
           className="dw-editing-textarea"
@@ -476,22 +461,12 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
           maxLength={500}
         />
         <div className="dw-editing-hint">
-          <span>{t("sentence.editHint")}</span>
+          <span className="dw-editing-hint-main">
+            <span className="dw-status-text is-pending">{t("sentence.pending")}</span>
+            <span>{t("sentence.editHint")}</span>
+          </span>
           <span>{value.length} / 500</span>
         </div>
-      </div>
-      <div className="dw-card-actions" style={{ alignSelf: "center" }}>
-        <button type="button" className="dw-action-btn" aria-label={t("sentence.play")} disabled>
-          <CirclePlay size={20} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className="dw-action-btn"
-          aria-label={t("sentence.regenerate")}
-          disabled
-        >
-          <RefreshCw size={16} strokeWidth={2} />
-        </button>
       </div>
     </div>
   )
