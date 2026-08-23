@@ -13,6 +13,7 @@ import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceDesignStore } from "@/stores/voice-design-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
 import type { SentenceStatus } from "@/types/sentence"
+import { isDirectorModeAvailable, resolveSentenceEditTarget } from "@/utils/director-mode"
 import { generateSentenceId } from "@/utils/id"
 import { resolveCapability } from "@/utils/provider-catalog"
 import { parseScriptLines } from "@/utils/script-lines"
@@ -96,10 +97,11 @@ function App() {
   const effectiveVoiceClonePath = effectiveVoiceResources.voiceClonePath
   const selectedApiConfig = apiConfigs.find((config) => config.id === projectApiConfigId)
   const projectModel = resolveCapability(selectedApiConfig, projectMode)?.modelId ?? ""
-  const styleInstructionEnabled =
-    selectedApiConfig?.provider === "mimo" &&
-    projectMode === "basic" &&
-    projectVoice.trim().length > 0
+  const directorModeAvailable = isDirectorModeAvailable(
+    selectedApiConfig?.provider,
+    projectMode,
+    projectVoice,
+  )
 
   useEffect(() => {
     void i18n.changeLanguage(resolveLanguage(language))
@@ -134,10 +136,17 @@ function App() {
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [projectConfigOpen, setProjectConfigOpen] = useState(false)
+  const [directorMode, setDirectorMode] = useState(false)
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [projects, setProjects] = useState<string[]>([])
   const [projectError, setProjectError] = useState<string | null>(null)
   const closingRef = useRef(false)
+
+  const effectiveDirectorMode = directorMode && directorModeAvailable
+
+  useEffect(() => {
+    if (!directorModeAvailable) setDirectorMode(false)
+  }, [directorModeAvailable])
 
   // 启动时加载上次选中的项目的句子
   useEffect(() => {
@@ -377,6 +386,11 @@ function App() {
     setEditingId(id)
   }, [])
 
+  const handleToggleDirectorMode = useCallback(() => {
+    if (!directorModeAvailable || editingId !== null) return
+    setDirectorMode((current) => !current)
+  }, [directorModeAvailable, editingId])
+
   const handleCommitEdit = useCallback(
     (id: string, text: string, styleInstruction: string) => {
       updateSentence(id, {
@@ -484,6 +498,12 @@ function App() {
             action={toolbarAction}
             hasContent={sentences.length > 0}
             onOpenScriptEditor={handleOpenScriptEditor}
+            directorModeEnabled={effectiveDirectorMode}
+            directorModeDisabled={!directorModeAvailable || editingId !== null}
+            directorModeDisabledReason={
+              editingId !== null ? t("app.directorModeEditing") : t("app.directorModeUnavailable")
+            }
+            onToggleDirectorMode={handleToggleDirectorMode}
             onAction={handleToolbarAction}
           />
 
@@ -558,7 +578,11 @@ function App() {
                   }
                   onCancelEdit={handleCancelEdit}
                   onSwitchVersion={(historyIndex) => handleSwitchVersion(sentence.id, historyIndex)}
-                  styleInstructionEnabled={styleInstructionEnabled}
+                  directorInstructionAvailable={directorModeAvailable}
+                  initialEditTarget={resolveSentenceEditTarget(
+                    effectiveDirectorMode,
+                    directorModeAvailable,
+                  )}
                   generationDisabled={Boolean(localizedTtsConfigurationError)}
                   generationDisabledReason={localizedTtsConfigurationError ?? undefined}
                 />

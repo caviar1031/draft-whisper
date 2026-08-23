@@ -146,6 +146,7 @@ draft-whisper/
 要点：
 
 - **状态在前端**：Zustand store 持有 settings 与 project（见 [src/stores](src/stores)）。项目元数据和非敏感设置已持久化到 `localStorage`，API Key 写入 macOS Keychain；后端不维护数据库状态。
+- **导演模式**：会话级前端 UI 状态，默认关闭且不写入项目或设置；仅在已选择音色的 MiMo 基础音色下可用。开启后打开句子编辑会默认聚焦逐句导演指令，关闭后默认聚焦并全选句子文本；切换到不支持的服务商或模式时自动关闭。
 - **协议**：按 Provider 分发协议：MiMo 使用 chat-completions 风格；Fish Audio 使用 `/v1/tts` REST 接口；自定义配置向用户填写的完整 Endpoint URL 发送 OpenAI SDK 兼容语音请求。详见第 10 节。
 - **音频落盘**：后端把音频写到 `audio/{sentence_id}_{timestamp_ms}.wav`；命名项目写入 `audio/projects/{project}/`。每句最多保留最近 5 个版本，替换文本、删除句子或项目时会清理不再引用的文件。返回绝对路径字符串。目录选择有三级 fallback：`app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`。
 - **播放方式**：前端通过 `tts_read_audio` 命令取回 base64 字符串，解码为字节后转 `Blob URL` 播放（无需配置 asset 协议/权限，跨平台稳定）。封装见 `src/services/audio.ts` 的 `readAudioAsUrl`。
@@ -383,7 +384,7 @@ interface Project {
 - 认证：MiMo 使用 `api-key: <apiKey>`；Fish Audio 与自定义配置使用 `Authorization: Bearer <apiKey>`。
 - Provider 目录为预置服务提供默认 Base URL、能力、模型和音色；自定义配置保持 Base URL、模型和音色为空，由用户填写。项目运行时从能力映射解析模型 ID，并从当前 API 配置解析音色。
 - 请求体：`{ model, messages:[...], audio:{format:"wav", voice} }`。目标文本必须放 `role: assistant`。
-- 风格控制：基础/克隆模式的 `performancePrompt` 是用户自由输入的可选文本；声音设计模式的 `voiceDesignPrompt` 是用户输入的必填文本。二者都通过 `role: user` 发送，MiMo 不提供原生 speed 参数。
+- 指令控制：MiMo 基础音色支持逐句 `styleInstruction`（界面称“导演指令”）；基础/克隆模式的项目级 `performancePrompt` 是用户自由输入的可选文本，声音设计模式的 `voiceDesignPrompt` 是用户输入的必填文本。它们都通过 `role: user` 发送，MiMo 不提供原生 speed 参数。
 - 声音克隆：参考音频只接受真实 WAV/MP3，以完整 Data URI 传入 `audio.voice`；Base64 Data URI 上限为 10 MB。独立试听文件存放在 `audio/voice-previews/`，不进入项目句子历史。
 - 声音资源库：声音设计和克隆样本分别持久化为可复用资源；项目保存资源 ID，生成时实时解析资源内容，编辑资源后所有引用项目同步生效。
 - 克隆样本保存入口和每次生成入口都会校验真实 WAV/MP3 签名、Base64 Data URI 小于 10 MB且时长小于 30 秒。

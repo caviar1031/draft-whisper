@@ -83,7 +83,7 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 - **Revise without starting over** — edit one sentence and regenerate only that sentence.
 - **Keep useful history** — retain and switch between the five latest audio versions for each sentence.
 - **Shape the voice** — use MiMo preset voices, text-based voice design, or WAV/MP3 voice cloning.
-- **Direct the performance** — add optional free-text performance direction for basic and clone modes.
+- **Direct the performance** — use the session-only Director Mode to focus sentence editing on per-sentence direction, or keep the sentence text as the default target.
 - **Preview voices separately** — test a voice without adding the preview to a sentence's history.
 - **Move audio into the edit** — drag or copy files natively on macOS and Windows, and reveal them in Finder or File Explorer.
 - **Keep work organized locally** — store scripts, voice settings, samples, and cached audio by project.

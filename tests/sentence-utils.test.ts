@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { MAX_AUDIO_VERSIONS, retainRecentAudioVersions } from "../src/utils/audio-history.ts"
+import { isDirectorModeAvailable, resolveSentenceEditTarget } from "../src/utils/director-mode.ts"
 import { generateSentenceId } from "../src/utils/id.ts"
 import {
   createDefaultProject,
@@ -63,8 +64,22 @@ test("uses per-sentence style instructions only for MiMo preset voices", () => {
     resolvePerformancePrompt("mimo", "basic", "calm and slow", "legacy"),
     "calm and slow",
   )
+  assert.equal(resolvePerformancePrompt("mimo", "basic", "", "legacy"), "")
+  assert.equal(resolvePerformancePrompt("mimo", "voice-design", "sentence", "project"), "project")
   assert.equal(resolvePerformancePrompt("mimo", "voice-clone", "sentence", "project"), "project")
+  assert.equal(resolvePerformancePrompt("fish-audio", "basic", "sentence", "project"), "project")
   assert.equal(resolvePerformancePrompt("custom", "basic", "sentence", "project"), "project")
+})
+
+test("opens sentence editing on the director instruction only when director mode is available", () => {
+  assert.equal(isDirectorModeAvailable("mimo", "basic", "冰糖"), true)
+  assert.equal(isDirectorModeAvailable("mimo", "basic", ""), false)
+  assert.equal(isDirectorModeAvailable("mimo", "voice-clone", "冰糖"), false)
+  assert.equal(isDirectorModeAvailable("custom", "basic", "narrator"), false)
+
+  assert.equal(resolveSentenceEditTarget(true, true), "style")
+  assert.equal(resolveSentenceEditTarget(false, true), "text")
+  assert.equal(resolveSentenceEditTarget(true, false), "text")
 })
 
 test("uses MiMo models as editable provider defaults", () => {

@@ -1,5 +1,6 @@
 import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/audio"
 import type { Sentence } from "@/types/sentence"
+import type { SentenceEditTarget } from "@/utils/director-mode"
 import {
   Check,
   ChevronDown,
@@ -40,7 +41,8 @@ interface SentenceCardProps {
   onCommitEdit: (text: string, styleInstruction: string) => void
   onCancelEdit: () => void
   onSwitchVersion: (historyIndex: number) => void
-  styleInstructionEnabled?: boolean
+  directorInstructionAvailable?: boolean
+  initialEditTarget?: SentenceEditTarget
   generationDisabled?: boolean
   generationDisabledReason?: string
 }
@@ -59,7 +61,8 @@ export function SentenceCard({
   onCommitEdit,
   onCancelEdit,
   onSwitchVersion,
-  styleInstructionEnabled = false,
+  directorInstructionAvailable = false,
+  initialEditTarget = "text",
   generationDisabled = false,
   generationDisabledReason,
 }: SentenceCardProps) {
@@ -211,7 +214,8 @@ export function SentenceCard({
         className={cardClassName}
         onCommit={onCommitEdit}
         onCancel={onCancelEdit}
-        styleInstructionEnabled={styleInstructionEnabled}
+        directorInstructionAvailable={directorInstructionAvailable}
+        initialEditTarget={initialEditTarget}
       />
     )
   }
@@ -266,12 +270,12 @@ export function SentenceCard({
         <div className="dw-sentence-meta">
           <span className={statusDotClass} />
           <span className={statusTextClass}>{statusLabel}</span>
-          {styleInstructionEnabled && (sentence.styleInstruction ?? "").trim().length > 0 && (
+          {directorInstructionAvailable && (sentence.styleInstruction ?? "").trim().length > 0 && (
             <span
               className="dw-style-instruction-indicator"
               title={sentence.styleInstruction ?? ""}
             >
-              {t("sentence.styleInstruction")}
+              {t("sentence.directorInstruction")}
             </span>
           )}
           {view === "ready" && historyCount > 1 && (
@@ -429,14 +433,15 @@ function renderActions(
   return null
 }
 
-// Editing card with sentence text and optional per-sentence style direction.
+// Editing card with sentence text and optional per-sentence director instruction.
 interface EditingCardProps {
   sentence: Sentence
   index: number
   className: string
   onCommit: (text: string, styleInstruction: string) => void
   onCancel: () => void
-  styleInstructionEnabled: boolean
+  directorInstructionAvailable: boolean
+  initialEditTarget: SentenceEditTarget
 }
 
 function EditingCard({
@@ -444,19 +449,21 @@ function EditingCard({
   className,
   onCommit,
   onCancel,
-  styleInstructionEnabled,
+  directorInstructionAvailable,
+  initialEditTarget,
 }: EditingCardProps) {
   const { t } = useTranslation()
   const [value, setValue] = useState(sentence.text)
   const [styleInstruction, setStyleInstruction] = useState(sentence.styleInstruction ?? "")
-  const [styleInstructionOpen, setStyleInstructionOpen] = useState(false)
+  const [styleInstructionOpen, setStyleInstructionOpen] = useState(initialEditTarget === "style")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const styleTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
+    if (initialEditTarget !== "text") return
     textareaRef.current?.focus()
     textareaRef.current?.select()
-  }, [])
+  }, [initialEditTarget])
 
   useEffect(() => {
     if (!styleInstructionOpen) return
@@ -470,16 +477,6 @@ function EditingCard({
   }, [styleInstructionOpen])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      onCommit(value.trim() || sentence.text, styleInstruction.trim())
-    } else if (e.key === "Escape") {
-      e.preventDefault()
-      onCancel()
-    }
-  }
-
-  const handleStyleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       onCommit(value.trim() || sentence.text, styleInstruction.trim())
@@ -512,7 +509,7 @@ function EditingCard({
           </span>
           <span>{value.length} / 500</span>
         </div>
-        {styleInstructionEnabled && (
+        {directorInstructionAvailable && (
           <div className="dw-style-instruction-editor">
             <button
               type="button"
@@ -526,7 +523,7 @@ function EditingCard({
                 ) : (
                   <Plus size={13} strokeWidth={2} />
                 )}
-                <span>{t("sentence.styleInstruction")}</span>
+                <span>{t("sentence.directorInstruction")}</span>
                 {!styleInstructionOpen && styleInstruction.length > 0 && (
                   <span className="dw-style-instruction-summary">{styleInstruction}</span>
                 )}
@@ -545,10 +542,10 @@ function EditingCard({
                   className="dw-style-instruction-textarea"
                   rows={2}
                   value={styleInstruction}
-                  aria-label={t("sentence.styleInstruction")}
-                  placeholder={t("sentence.styleInstructionPlaceholder")}
+                  aria-label={t("sentence.directorInstruction")}
+                  placeholder={t("sentence.directorInstructionPlaceholder")}
                   onChange={(event) => setStyleInstruction(event.target.value)}
-                  onKeyDown={handleStyleKeyDown}
+                  onKeyDown={handleKeyDown}
                   maxLength={1024}
                 />
                 {styleInstruction.length >= 900 && (
