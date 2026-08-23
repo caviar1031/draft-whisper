@@ -45,6 +45,40 @@ pub(crate) fn validate_audio_signature(format: &str, bytes: &[u8]) -> Result<(),
     }
 }
 
+pub(crate) fn validate_generated_audio(format: &str, bytes: &[u8]) -> Result<(), String> {
+    if bytes.is_empty() {
+        return Err(format!(
+            "Provider returned an empty {format} audio response"
+        ));
+    }
+    validate_audio_signature(format, bytes)
+        .map_err(|_| format!("Provider returned invalid {format} audio data"))?;
+    audio_duration_ms(format, bytes)
+        .map_err(|error| format!("Provider returned unreadable {format} audio data: {error}"))?;
+    Ok(())
+}
+
+pub(crate) fn validate_raw_audio_response(
+    format: &str,
+    content_type: Option<&str>,
+    bytes: &[u8],
+) -> Result<(), String> {
+    if let Some(content_type) = content_type {
+        let normalized = content_type
+            .split(';')
+            .next()
+            .unwrap_or(content_type)
+            .trim()
+            .to_ascii_lowercase();
+        if normalized.starts_with("text/") || normalized == "application/json" {
+            return Err(format!(
+                "Provider returned {content_type} instead of {format} audio"
+            ));
+        }
+    }
+    validate_generated_audio(format, bytes)
+}
+
 pub(crate) fn wav_duration_ms(bytes: &[u8]) -> Result<u64, String> {
     if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
         return Err("Invalid WAV header".into());
@@ -188,6 +222,12 @@ mod tests {
         assert!(validate_audio_signature("wav", b"RIFF\0\0\0\0WAVE").is_ok());
         assert!(validate_audio_signature("mp3", b"ID3\0").is_ok());
         assert!(validate_audio_signature("wav", b"not-a-wave").is_err());
+    }
+
+    #[test]
+    fn rejects_non_audio_generated_responses() {
+        assert!(validate_generated_audio("wav", b"<!DOCTYPE html>").is_err());
+        assert!(validate_raw_audio_response("mp3", Some("text/html"), b"not-audio").is_err());
     }
 
     #[test]

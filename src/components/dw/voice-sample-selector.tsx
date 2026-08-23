@@ -9,6 +9,7 @@ import { previewVoiceClone } from "@/services/tts"
 import { clearVoiceSampleReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
+import { getDefaultAudioFormat } from "@/utils/provider-catalog"
 import { open } from "@tauri-apps/plugin-dialog"
 import {
   Check,
@@ -249,6 +250,7 @@ export function VoiceSampleSelector({
         voiceDesignPrompt: "",
         voiceClonePath: selectedPath,
         performancePrompt,
+        audioFormat: getDefaultAudioFormat(apiConfig?.provider ?? "mimo"),
       })
       if (disposedRef.current || previewRequestRef.current !== requestId) {
         cleanupAudioFiles([result.audioPath])

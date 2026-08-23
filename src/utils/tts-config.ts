@@ -1,10 +1,11 @@
 import type { ApiConfig } from "@/types/api-config"
-import type { ProviderId, TtsMode } from "@/types/tts"
-import { resolveCapability } from "./provider-catalog.ts"
+import type { AudioFormat, ProviderId, TtsMode } from "@/types/tts"
+import { isAudioFormatAvailable, resolveCapability } from "./provider-catalog.ts"
 
 export interface TtsConfiguration {
   apiConfigId: string | null
   mode: TtsMode
+  outputFormat: AudioFormat
   voice: string
   voiceDesignPrompt: string
   voiceClonePath: string | null
@@ -30,6 +31,10 @@ export function getTtsConfigurationError(
   if (!config) return "errors.apiConfigMissing"
   if (!resolveCapability(config, project.mode)) return "errors.capabilityUnavailable"
   if (apiKeys && !apiKeys[config.id]) return "errors.apiKeyMissing"
+  const outputFormat = project.outputFormat ?? "wav"
+  if (!isAudioFormatAvailable(config, project.mode, outputFormat)) {
+    return "errors.audioFormatUnavailable"
+  }
   if (project.mode === "basic" && !config.voices.some((voice) => voice.id === project.voice)) {
     return "errors.voiceUnavailable"
   }

@@ -8,7 +8,13 @@ import {
   getDefaultVoice,
   normalizeSentences,
 } from "../src/utils/project-persistence.ts"
-import { PROVIDERS, createApiConfig, resolveConfigVoice } from "../src/utils/provider-catalog.ts"
+import {
+  PROVIDERS,
+  createApiConfig,
+  getAvailableAudioFormats,
+  getFormatsToTest,
+  resolveConfigVoice,
+} from "../src/utils/provider-catalog.ts"
 import { splitTextToSentences } from "../src/utils/sentence.ts"
 import {
   MAX_CONCURRENCY,
@@ -105,6 +111,40 @@ test("creates a blank custom OpenAI-compatible configuration", () => {
   config.capabilities.basic.modelId = "vendor-tts-model"
   config.voices = [{ id: "narrator", name: "Narrator" }]
   assert.equal(validateApiConfig(config), null)
+})
+
+test("uses only output formats verified for a custom model", () => {
+  const config = createApiConfig("custom", 0, "custom")
+
+  assert.deepEqual(getFormatsToTest(config.provider), ["mp3", "wav"])
+  assert.deepEqual(getAvailableAudioFormats(config, "basic"), [])
+
+  const legacyConfig = structuredClone(config)
+  Reflect.deleteProperty(legacyConfig.capabilities.basic, "formatTests")
+  assert.deepEqual(getAvailableAudioFormats(legacyConfig, "basic"), [])
+
+  config.capabilities.basic.modelId = "model-a"
+  config.baseUrl = "https://tts.example.com/v1/audio/speech"
+  config.capabilities.basic.formatTests = {
+    mp3: { supported: true, testedAt: 1, modelId: "old-model", baseUrl: config.baseUrl },
+    wav: {
+      supported: false,
+      testedAt: 1,
+      modelId: "model-a",
+      baseUrl: config.baseUrl,
+      error: "unsupported",
+    },
+  }
+
+  assert.deepEqual(getAvailableAudioFormats(config, "basic"), [])
+
+  config.capabilities.basic.formatTests.mp3 = {
+    supported: true,
+    testedAt: 2,
+    modelId: "model-a",
+    baseUrl: "https://tts.example.com/v1/audio/speech",
+  }
+  assert.deepEqual(getAvailableAudioFormats(config, "basic"), ["mp3"])
 })
 
 test("validates enabled capability mappings without fixing model IDs", () => {

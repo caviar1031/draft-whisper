@@ -7,6 +7,10 @@ import { invoke } from "@tauri-apps/api/core"
 const audioUrlCache = new Map<string, string>()
 const audioUrlRequests = new Map<string, Promise<string>>()
 
+export function getAudioMimeType(path: string): "audio/mpeg" | "audio/wav" {
+  return path.toLowerCase().endsWith(".mp3") ? "audio/mpeg" : "audio/wav"
+}
+
 /** 同步读取已经准备好的 Blob URL，播放按钮可用它保持用户手势链。 */
 export function getCachedAudioUrl(path: string): string | null {
   return audioUrlCache.get(path) ?? null
@@ -49,7 +53,7 @@ export async function readAudioAsUrl(path: string): Promise<string> {
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i)
       }
-      const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }))
+      const url = URL.createObjectURL(new Blob([bytes], { type: getAudioMimeType(path) }))
       audioUrlCache.set(path, url)
       return url
     })

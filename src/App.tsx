@@ -49,6 +49,7 @@ function App() {
   const loadProject = useProjectStore((s) => s.loadProject)
 
   const projectMode = useProjectStore((s) => s.mode)
+  const projectOutputFormat = useProjectStore((s) => s.outputFormat)
   const projectApiConfigId = useProjectStore((s) => s.apiConfigId)
   const projectVoice = useProjectStore((s) => s.voiceConfigs.basic.voice)
   const projectVoiceDesignId = useProjectStore((s) => s.voiceConfigs["voice-design"].presetId)
@@ -63,6 +64,7 @@ function App() {
         : "",
   )
   const setProjectMode = useProjectStore((s) => s.setMode)
+  const setProjectOutputFormat = useProjectStore((s) => s.setOutputFormat)
   const setProjectApiConfigId = useProjectStore((s) => s.setApiConfigId)
   const setProjectVoice = useProjectStore((s) => s.setVoice)
   const setProjectVoiceDesignId = useProjectStore((s) => s.setVoiceDesignId)
@@ -274,6 +276,7 @@ function App() {
     {
       apiConfigId: projectApiConfigId,
       mode: projectMode,
+      outputFormat: projectOutputFormat,
       voice: projectVoice,
       voiceDesignPrompt: effectiveVoiceDesignPrompt,
       voiceClonePath: effectiveVoiceClonePath,
@@ -585,6 +588,7 @@ function App() {
             mode={sentences.length > 0 ? "edit" : "import"}
             initialText={sentences.length > 0 ? sentences.map((s) => s.text).join("\n") : ""}
             ttsMode={projectMode}
+            outputFormat={projectOutputFormat}
             apiConfigId={projectApiConfigId}
             apiConfigs={apiConfigs}
             model={projectModel}
@@ -599,6 +603,7 @@ function App() {
             onSave={handleSaveScript}
             onClose={() => setScriptEditorOpen(false)}
             onModeChange={setProjectMode}
+            onOutputFormatChange={setProjectOutputFormat}
             onApiConfigChange={setProjectApiConfigId}
             onVoiceChange={setProjectVoice}
             onVoiceDesignIdChange={(id) => {

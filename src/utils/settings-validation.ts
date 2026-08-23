@@ -1,6 +1,6 @@
 import type { ApiConfig, ApiVoice } from "@/types/api-config"
 import type { LanguagePreference, Settings, ThemePreference } from "@/types/settings"
-import type { ProviderId, TtsMode } from "@/types/tts"
+import type { AudioFormatTestResults, ProviderId, TtsMode } from "@/types/tts"
 import { PROVIDERS, TTS_MODES, createApiConfig } from "./provider-catalog.ts"
 
 export const MIN_CONCURRENCY = 1
@@ -57,6 +57,30 @@ function normalizeApiConfig(value: unknown): ApiConfig | null {
     const entry = rawCapabilities[mode]
     if (!entry || typeof entry !== "object") continue
     const mapping = entry as Record<string, unknown>
+    const rawFormatTests =
+      mapping.formatTests && typeof mapping.formatTests === "object"
+        ? (mapping.formatTests as Record<string, unknown>)
+        : {}
+    const formatTests: AudioFormatTestResults = {}
+    for (const format of ["mp3", "wav"] as const) {
+      const result = rawFormatTests[format]
+      if (!result || typeof result !== "object") continue
+      const candidate = result as Record<string, unknown>
+      if (
+        typeof candidate.supported !== "boolean" ||
+        typeof candidate.modelId !== "string" ||
+        typeof candidate.baseUrl !== "string"
+      ) {
+        continue
+      }
+      formatTests[format] = {
+        supported: candidate.supported,
+        testedAt: typeof candidate.testedAt === "number" ? candidate.testedAt : 0,
+        modelId: candidate.modelId.trim(),
+        baseUrl: candidate.baseUrl.trim(),
+        ...(typeof candidate.error === "string" ? { error: candidate.error } : {}),
+      }
+    }
     capabilities[mode] = {
       enabled:
         PROVIDERS[provider].supportedModes.includes(mode) &&
@@ -65,6 +89,7 @@ function normalizeApiConfig(value: unknown): ApiConfig | null {
         typeof mapping.modelId === "string"
           ? mapping.modelId
           : PROVIDERS[provider].defaultModels[mode],
+      formatTests,
     }
   }
   const voices: ApiVoice[] = Array.isArray(raw.voices)

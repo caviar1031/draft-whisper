@@ -28,14 +28,14 @@ pub(crate) fn build_fish_speech_body(params: &TtsParams, text: &str) -> Result<V
     Ok(json!({
         "text": text,
         "reference_id": voice,
-        "format": "wav",
+        "format": params.audio_format.as_str(),
     }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tts::types::ProviderId;
+    use crate::tts::types::{AudioFormat, ProviderId};
 
     fn test_params(mode: TtsMode, model: &str) -> TtsParams {
         TtsParams {
@@ -48,6 +48,7 @@ mod tests {
             voice_design_prompt: "".into(),
             voice_clone_path: None,
             performance_prompt: "".into(),
+            audio_format: AudioFormat::Wav,
         }
     }
 

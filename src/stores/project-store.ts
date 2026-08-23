@@ -2,7 +2,7 @@ import { cleanupAudioFiles, invalidateAudioUrl, revokeAllAudioUrls } from "@/ser
 import { useSettingsStore } from "@/stores/settings-store"
 import type { Project } from "@/types/project"
 import type { Sentence } from "@/types/sentence"
-import type { TtsMode } from "@/types/tts"
+import type { AudioFormat, TtsMode } from "@/types/tts"
 import {
   PROJECT_STORAGE_PREFIX,
   createDefaultProject,
@@ -12,6 +12,7 @@ import {
   resolveVoiceForApiConfig,
   saveProjectToStorage,
 } from "@/utils/project-persistence"
+import { resolveAudioFormat } from "@/utils/provider-catalog"
 import { create } from "zustand"
 
 function audioPaths(sentences: Sentence[]): Set<string> {
@@ -33,6 +34,7 @@ export interface ProjectState extends Project {
   currentProject: string | null
   setApiConfigId: (apiConfigId: string | null) => void
   setMode: (mode: TtsMode) => void
+  setOutputFormat: (format: AudioFormat) => void
   setVoice: (voice: string) => void
   setVoiceDesignId: (id: string | null) => void
   setVoiceDesignPrompt: (prompt: string) => void
@@ -54,6 +56,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   currentProject: null,
   apiConfigId: initialDefault.apiConfigId,
   mode: initialDefault.mode,
+  outputFormat: initialDefault.outputFormat,
   voiceConfigs: initialDefault.voiceConfigs,
   sentences: initialDefault.sentences,
 
@@ -61,6 +64,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const apiConfigs = useSettingsStore.getState().apiConfigs
     set((state) => ({
       apiConfigId,
+      outputFormat: resolveAudioFormat(
+        apiConfigs.find((config) => config.id === apiConfigId),
+        state.mode,
+        state.outputFormat,
+      ),
       voiceConfigs: {
         ...state.voiceConfigs,
         basic: {
@@ -72,7 +80,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     saveCurrentProject(get())
   },
   setMode: (mode) => {
-    set({ mode })
+    const apiConfigs = useSettingsStore.getState().apiConfigs
+    set((state) => ({
+      mode,
+      outputFormat: resolveAudioFormat(
+        apiConfigs.find((config) => config.id === state.apiConfigId),
+        mode,
+        state.outputFormat,
+      ),
+    }))
+    saveCurrentProject(get())
+  },
+  setOutputFormat: (outputFormat) => {
+    set({ outputFormat })
     saveCurrentProject(get())
   },
   setVoice: (voice) => {
@@ -215,6 +235,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       currentProject: project,
       apiConfigId: data.apiConfigId,
       mode: data.mode,
+      outputFormat: data.outputFormat,
       voiceConfigs: data.voiceConfigs,
       sentences: data.sentences,
     })
@@ -225,6 +246,7 @@ function projectToSave(state: ProjectState): Project {
   return {
     apiConfigId: state.apiConfigId,
     mode: state.mode,
+    outputFormat: state.outputFormat,
     voiceConfigs: state.voiceConfigs,
     sentences: state.sentences,
   }

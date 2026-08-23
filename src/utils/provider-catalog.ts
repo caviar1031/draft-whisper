@@ -1,5 +1,7 @@
 import type { ApiConfig, ApiVoice, CapabilityMappings } from "@/types/api-config"
-import type { ProviderId, TtsMode } from "@/types/tts"
+import type { AudioFormat, ProviderId, TtsMode } from "@/types/tts"
+
+export const AUDIO_FORMATS: readonly AudioFormat[] = ["mp3", "wav"]
 
 export interface ProviderDefinition {
   id: ProviderId
@@ -78,14 +80,17 @@ export function createDefaultCapabilities(provider: ProviderId): CapabilityMappi
     basic: {
       enabled: definition.supportedModes.includes("basic"),
       modelId: models.basic,
+      formatTests: {},
     },
     "voice-design": {
       enabled: definition.supportedModes.includes("voice-design"),
       modelId: models["voice-design"],
+      formatTests: {},
     },
     "voice-clone": {
       enabled: definition.supportedModes.includes("voice-clone"),
       modelId: models["voice-clone"],
+      formatTests: {},
     },
   }
 }
@@ -125,4 +130,48 @@ export function resolveCapability(config: ApiConfig | undefined, mode: TtsMode) 
   const mapping = config.capabilities[mode]
   if (!mapping.enabled || !mapping.modelId.trim()) return null
   return mapping
+}
+
+/** Custom endpoints need format probing; built-in providers currently emit WAV. */
+export function getFormatsToTest(provider: ProviderId): readonly AudioFormat[] {
+  return provider === "custom" ? AUDIO_FORMATS : ["wav"]
+}
+
+/** Return formats that are known to be playable for this capability. */
+export function getAvailableAudioFormats(
+  config: ApiConfig | undefined,
+  mode: TtsMode,
+): AudioFormat[] {
+  if (!config) return []
+  if (config.provider !== "custom") return ["wav"]
+  const mapping = config.capabilities[mode]
+  const modelId = mapping.modelId.trim()
+  const baseUrl = config.baseUrl.trim()
+  const formatTests = mapping.formatTests ?? {}
+  return AUDIO_FORMATS.filter((format) => {
+    const result = formatTests[format]
+    return result?.supported === true && result.modelId === modelId && result.baseUrl === baseUrl
+  })
+}
+
+export function getDefaultAudioFormat(provider: ProviderId): AudioFormat {
+  return provider === "custom" ? "mp3" : "wav"
+}
+
+export function resolveAudioFormat(
+  config: ApiConfig | undefined,
+  mode: TtsMode,
+  preferred: AudioFormat,
+): AudioFormat {
+  const available = getAvailableAudioFormats(config, mode)
+  if (available.includes(preferred)) return preferred
+  return available[0] ?? getDefaultAudioFormat(config?.provider ?? "mimo")
+}
+
+export function isAudioFormatAvailable(
+  config: ApiConfig | undefined,
+  mode: TtsMode,
+  format: AudioFormat,
+): boolean {
+  return getAvailableAudioFormats(config, mode).includes(format)
 }

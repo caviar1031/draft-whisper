@@ -12,6 +12,8 @@ pub fn tts_read_audio(path: String, app: AppHandle) -> Result<String, String> {
     let safe_path = storage::is_in_audio_dir(&app, &path)?;
     let bytes = std::fs::read(&safe_path)
         .map_err(|e| format!("Failed to read audio file: {safe_path:?} -> {e}"))?;
+    let (format, _) = validation::audio_format(&safe_path)?;
+    validation::validate_generated_audio(format, &bytes)?;
     Ok(STANDARD.encode(&bytes))
 }
 

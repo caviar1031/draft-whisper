@@ -4,8 +4,13 @@ import { saveVoiceSample } from "@/services/audio"
 import { testTts } from "@/services/tts"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
 import type { ApiConfig } from "@/types/api-config"
-import type { ProviderId, TtsMode } from "@/types/tts"
-import { PROVIDERS, TTS_MODES, applyProviderPreset } from "@/utils/provider-catalog"
+import type { AudioFormat, AudioFormatTestResults, ProviderId, TtsMode } from "@/types/tts"
+import {
+  PROVIDERS,
+  TTS_MODES,
+  applyProviderPreset,
+  getFormatsToTest,
+} from "@/utils/provider-catalog"
 import { validateApiConfig } from "@/utils/settings-validation"
 import { open } from "@tauri-apps/plugin-dialog"
 import { openUrl } from "@tauri-apps/plugin-opener"
@@ -40,6 +45,17 @@ const IDLE_TESTS: Record<TtsMode, TestStatus> = {
   "voice-clone": { state: "idle" },
 }
 
+function resetFormatTests(config: ApiConfig): ApiConfig {
+  return {
+    ...config,
+    capabilities: {
+      basic: { ...config.capabilities.basic, formatTests: {} },
+      "voice-design": { ...config.capabilities["voice-design"], formatTests: {} },
+      "voice-clone": { ...config.capabilities["voice-clone"], formatTests: {} },
+    },
+  }
+}
+
 export function ApiConfigEditor({
   config,
   isNew,
@@ -68,7 +84,10 @@ export function ApiConfigEditor({
     [draft.capabilities],
   )
 
-  const invalidateAllTests = () => setTests(IDLE_TESTS)
+  const invalidateAllTests = () => {
+    setTests(IDLE_TESTS)
+    setDraft(resetFormatTests)
+  }
 
   const updateCapability = (
     mode: TtsMode,
@@ -78,7 +97,7 @@ export function ApiConfigEditor({
       ...current,
       capabilities: {
         ...current.capabilities,
-        [mode]: { ...current.capabilities[mode], ...updates },
+        [mode]: { ...current.capabilities[mode], ...updates, formatTests: {} },
       },
     }))
     setTests((current) => ({ ...current, [mode]: { state: "idle" } }))
@@ -152,19 +171,74 @@ export function ApiConfigEditor({
     }
 
     setTests((current) => ({ ...current, [mode]: { state: "testing" } }))
+    setDraft((current) => ({
+      ...current,
+      capabilities: {
+        ...current.capabilities,
+        [mode]: { ...current.capabilities[mode], formatTests: {} },
+      },
+    }))
+
+    const formats = getFormatsToTest(draft.provider)
+    const formatResults: AudioFormatTestResults = {}
+    const errors: string[] = []
     try {
-      await testTts({
-        provider: draft.provider,
-        baseUrl: draft.baseUrl,
-        apiKey: effectiveApiKey,
-        model: mapping.modelId.trim(),
-        mode,
-        voice: draft.voices[0]?.id.trim() ?? "",
-        voiceDesignPrompt: mode === "voice-design" ? "A warm, calm and natural voice." : "",
-        voiceClonePath: mode === "voice-clone" ? cloneSamplePath : null,
-        performancePrompt: "",
-      })
-      setTests((current) => ({ ...current, [mode]: { state: "success" } }))
+      for (const audioFormat of formats) {
+        try {
+          await testTts({
+            provider: draft.provider,
+            baseUrl: draft.baseUrl,
+            apiKey: effectiveApiKey,
+            model: mapping.modelId.trim(),
+            mode,
+            voice: draft.voices[0]?.id.trim() ?? "",
+            voiceDesignPrompt: mode === "voice-design" ? "A warm, calm and natural voice." : "",
+            voiceClonePath: mode === "voice-clone" ? cloneSamplePath : null,
+            performancePrompt: "",
+            audioFormat,
+          })
+          formatResults[audioFormat] = {
+            supported: true,
+            testedAt: Date.now(),
+            modelId: mapping.modelId.trim(),
+            baseUrl: draft.baseUrl.trim(),
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          formatResults[audioFormat] = {
+            supported: false,
+            testedAt: Date.now(),
+            modelId: mapping.modelId.trim(),
+            baseUrl: draft.baseUrl.trim(),
+            error: message,
+          }
+          errors.push(`${audioFormat.toUpperCase()}: ${message}`)
+        }
+        setDraft((current) => ({
+          ...current,
+          capabilities: {
+            ...current.capabilities,
+            [mode]: {
+              ...current.capabilities[mode],
+              formatTests: {
+                ...(current.capabilities[mode].formatTests ?? {}),
+                [audioFormat]: formatResults[audioFormat],
+              },
+            },
+          },
+        }))
+      }
+      const supportedCount = Object.values(formatResults).filter(
+        (result) => result?.supported,
+      ).length
+      if (supportedCount > 0) {
+        setTests((current) => ({ ...current, [mode]: { state: "success" } }))
+      } else {
+        setTests((current) => ({
+          ...current,
+          [mode]: { state: "error", error: errors.join("; ") },
+        }))
+      }
     } catch (error) {
       setTests((current) => ({
         ...current,
@@ -200,6 +274,7 @@ export function ApiConfigEditor({
         source: "uploaded",
       })
       setCloneSamplePath(stored.filePath)
+      invalidateAllTests()
     } catch (error) {
       setTests((current) => ({
         ...current,
@@ -422,6 +497,7 @@ export function ApiConfigEditor({
           <div className="dw-api-capabilities">
             {TTS_MODES.map((mode) => {
               const mapping = draft.capabilities[mode]
+              const formatTests = mapping.formatTests ?? {}
               const status = tests[mode]
               const supported = provider.supportedModes.includes(mode)
               return (
@@ -488,7 +564,10 @@ export function ApiConfigEditor({
                                 label: sample.name,
                               })),
                             ]}
-                            onValueChange={setCloneSamplePath}
+                            onValueChange={(value) => {
+                              setCloneSamplePath(value)
+                              invalidateAllTests()
+                            }}
                           />
                           <button
                             type="button"
@@ -508,6 +587,25 @@ export function ApiConfigEditor({
                         <span className="dw-test-result is-error">
                           {t("settings.editor.testFailed", { error: status.error })}
                         </span>
+                      )}
+                      {Object.keys(formatTests).length > 0 && (
+                        <div className="dw-format-test-results">
+                          {getFormatsToTest(draft.provider).map((format: AudioFormat) => {
+                            const result = formatTests[format]
+                            return (
+                              <span
+                                className={`dw-format-test-result${result?.supported ? " is-success" : result ? " is-error" : ""}`}
+                                key={format}
+                                title={result?.error}
+                              >
+                                {t(`editor.audioFormats.${format}`)}:{" "}
+                                {result?.supported
+                                  ? t("settings.editor.formatSupported")
+                                  : t("settings.editor.formatUnsupported")}
+                              </span>
+                            )
+                          })}
+                        </div>
                       )}
                     </>
                   )}

@@ -1,8 +1,8 @@
 import type { ApiConfig } from "@/types/api-config"
 import type { Project, ProjectVoiceConfigs } from "@/types/project"
 import type { Sentence } from "@/types/sentence"
-import type { TtsMode } from "@/types/tts"
-import { PROVIDERS, resolveConfigVoice } from "./provider-catalog.ts"
+import type { AudioFormat, TtsMode } from "@/types/tts"
+import { PROVIDERS, resolveAudioFormat, resolveConfigVoice } from "./provider-catalog.ts"
 
 export const PROJECT_STORAGE_PREFIX = "dw-project:"
 export const DEFAULT_PROJECT_KEY = "__default__"
@@ -63,9 +63,14 @@ export function createDefaultProject(
   return {
     apiConfigId: defaultApiConfigId,
     mode: "basic",
+    outputFormat: "wav",
     voiceConfigs: createDefaultVoiceConfigs(defaultVoice),
     sentences: [],
   }
+}
+
+function parseAudioFormat(value: unknown): AudioFormat {
+  return value === "mp3" ? "mp3" : "wav"
 }
 
 /** 重置瞬态状态：generating/queued → 根据 audioPath 判断 */
@@ -123,6 +128,11 @@ export function decodePersistedProject(
 
     const mode: TtsMode =
       state.mode === "voice-design" || state.mode === "voice-clone" ? state.mode : "basic"
+    const outputFormat = resolveAudioFormat(
+      apiConfigs.find((config) => config.id === apiConfigId),
+      mode,
+      parseAudioFormat(state.outputFormat),
+    )
 
     // 如果已经是新的 voiceConfigs 结构
     if (state.voiceConfigs && typeof state.voiceConfigs === "object") {
@@ -160,6 +170,7 @@ export function decodePersistedProject(
       return {
         apiConfigId,
         mode,
+        outputFormat,
         voiceConfigs,
         sentences: normalizeSentences(state.sentences, legacyStyleInstruction),
       }
@@ -204,6 +215,7 @@ export function decodePersistedProject(
     return {
       apiConfigId,
       mode,
+      outputFormat,
       voiceConfigs,
       sentences: normalizeSentences(state.sentences, performancePrompt),
     }

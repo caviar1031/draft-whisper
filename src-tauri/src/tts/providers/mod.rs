@@ -8,6 +8,7 @@ use std::time::Duration;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde_json::Value;
 
+use crate::audio::validation;
 use crate::tts::types::{ProviderId, TtsParams};
 
 /// 全局共享的 HTTP Client（复用连接池 + 超时配置）。
@@ -34,7 +35,7 @@ pub(crate) fn build_speech_body(
     }
 }
 
-/// Dispatch a provider-specific TTS request and return WAV audio bytes.
+/// Dispatch a provider-specific TTS request and return validated audio bytes.
 pub(crate) async fn request_speech(
     params: &TtsParams,
     text: &str,
@@ -81,11 +82,23 @@ pub(crate) async fn request_speech(
     }
 
     if matches!(params.provider, ProviderId::FishAudio | ProviderId::Custom) {
-        return resp
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned);
+        let bytes = resp
             .bytes()
             .await
             .map(|bytes| bytes.to_vec())
             .map_err(|e| format!("Failed to read audio response: {e}"));
+        let bytes = bytes?;
+        validation::validate_raw_audio_response(
+            params.audio_format.as_str(),
+            content_type.as_deref(),
+            &bytes,
+        )?;
+        return Ok(bytes);
     }
 
     let json: Value = resp
@@ -102,7 +115,9 @@ pub(crate) async fn request_speech(
         .and_then(|d| d.as_str())
         .ok_or_else(|| format!("Response missing choices[0].message.audio.data: {}", json))?;
 
-    STANDARD
+    let bytes = STANDARD
         .decode(audio_data)
-        .map_err(|e| format!("base64 decode failed: {e}"))
+        .map_err(|e| format!("base64 decode failed: {e}"))?;
+    validation::validate_generated_audio(params.audio_format.as_str(), &bytes)?;
+    Ok(bytes)
 }

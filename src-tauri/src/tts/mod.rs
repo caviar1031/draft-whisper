@@ -93,7 +93,12 @@ pub async fn tts_generate(
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    let file_name = format!("{}_{}.wav", sanitize_filename(&sentence_id), timestamp);
+    let file_name = format!(
+        "{}_{}.{}",
+        sanitize_filename(&sentence_id),
+        timestamp,
+        params.audio_format.extension()
+    );
     let file_path = audio_dir.join(&file_name);
 
     // 声音克隆模式：读取参考音频文件为 base64
@@ -146,7 +151,10 @@ pub async fn tts_preview_voice_clone(
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    let file_path = voice_previews_dir(&app)?.join(format!("clone_preview_{timestamp}.wav"));
+    let file_path = voice_previews_dir(&app)?.join(format!(
+        "clone_preview_{timestamp}.{}",
+        params.audio_format.extension()
+    ));
     std::fs::write(&file_path, &bytes)
         .map_err(|e| format!("Failed to write voice clone preview: {e}"))?;
     Ok(TtsResult {
@@ -176,7 +184,10 @@ pub async fn tts_preview_voice(
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    let file_path = voice_previews_dir(&app)?.join(format!("voice_preview_{timestamp}.wav"));
+    let file_path = voice_previews_dir(&app)?.join(format!(
+        "voice_preview_{timestamp}.{}",
+        params.audio_format.extension()
+    ));
     std::fs::write(&file_path, &bytes)
         .map_err(|e| format!("Failed to write voice preview: {e}"))?;
     Ok(TtsResult {

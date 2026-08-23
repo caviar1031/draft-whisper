@@ -61,6 +61,7 @@ export function useTtsGeneration() {
       const resolvedProject = {
         apiConfigId: projState.apiConfigId,
         mode: projState.mode,
+        outputFormat: projState.outputFormat,
         voice: projState.voiceConfigs.basic.voice,
         voiceDesignPrompt: voiceResources.voiceDesignPrompt,
         voiceClonePath: voiceResources.voiceClonePath,
@@ -81,6 +82,7 @@ export function useTtsGeneration() {
         voiceDesignPrompt: resolvedProject.voiceDesignPrompt,
         voiceClonePath: resolvedProject.voiceClonePath,
         performancePrompt,
+        audioFormat: projState.outputFormat,
       }
       const concurrency = settings.concurrency
       const currentProject = projState.currentProject
@@ -125,14 +127,16 @@ export function useTtsGeneration() {
               sentenceParams,
               currentProject,
             )
-            let preloadError: unknown = null
             try {
               // Finish preparing the Blob URL before exposing the sentence as
               // ready. This removes the first-click race between the ready UI
               // and the asynchronous tts_read_audio IPC call.
               await readAudioAsUrl(result.audioPath)
             } catch (error) {
-              preloadError = error
+              cleanupAudioFiles([result.audioPath])
+              throw new Error(
+                `Generated audio could not be prepared: ${error instanceof Error ? error.message : String(error)}`,
+              )
             }
             if (!tasks.current.isCurrent(task, useProjectStore.getState().currentProject)) {
               cleanupAudioFiles([result.audioPath])
@@ -150,7 +154,6 @@ export function useTtsGeneration() {
               audioHistory: retained,
             })
             if (evictedPaths.length > 0) cleanupAudioFiles(evictedPaths)
-            if (preloadError) console.error("Audio preload after generation failed:", preloadError)
           } catch (e) {
             console.error("TTS generate failed:", id, e)
             if (!tasks.current.isCurrent(task, useProjectStore.getState().currentProject)) continue

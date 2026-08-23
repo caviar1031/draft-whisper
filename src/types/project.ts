@@ -1,5 +1,5 @@
 import type { Sentence } from "./sentence"
-import type { TtsMode } from "./tts"
+import type { AudioFormat, TtsMode } from "./tts"
 
 export type ProjectVoiceConfig =
   | {
@@ -26,6 +26,7 @@ export type ProjectVoiceConfigs = {
 export interface Project {
   apiConfigId: string | null
   mode: TtsMode
+  outputFormat: AudioFormat
   voiceConfigs: ProjectVoiceConfigs
   sentences: Sentence[]
 }

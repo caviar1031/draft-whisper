@@ -44,7 +44,7 @@ pub(crate) fn build_mimo_speech_body(
     }));
 
     let mut audio = json!({
-        "format": "wav",
+        "format": params.audio_format.as_str(),
     });
 
     match params.mode {
@@ -74,7 +74,7 @@ pub(crate) fn build_mimo_speech_body(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tts::types::ProviderId;
+    use crate::tts::types::{AudioFormat, ProviderId};
 
     fn test_params(mode: TtsMode, model: &str) -> TtsParams {
         TtsParams {
@@ -87,6 +87,7 @@ mod tests {
             voice_design_prompt: "温柔的年轻女声".into(),
             voice_clone_path: Some("/audio/sample.wav".into()),
             performance_prompt: "语速稍慢，像在讲故事".into(),
+            audio_format: AudioFormat::Wav,
         }
     }
 

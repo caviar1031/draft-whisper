@@ -1,8 +1,9 @@
 import { ModalLayer } from "@/components/ui/modal-layer"
 import { Select } from "@/components/ui/select"
 import type { ApiConfig } from "@/types/api-config"
-import type { TtsMode } from "@/types/tts"
+import type { AudioFormat, TtsMode } from "@/types/tts"
 import type { VoiceCloneSample, VoiceDesignPreset } from "@/types/voice-resource"
+import { AUDIO_FORMATS, getAvailableAudioFormats } from "@/utils/provider-catalog"
 import { splitTextToSentences } from "@/utils/sentence"
 import { X } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
@@ -15,6 +16,7 @@ interface ScriptEditorProps {
   mode: "import" | "edit"
   initialText?: string
   ttsMode: TtsMode
+  outputFormat: AudioFormat
   apiConfigId: string | null
   apiConfigs: ApiConfig[]
   model: string
@@ -29,6 +31,7 @@ interface ScriptEditorProps {
   onSave: (text: string, splitMode: SplitMode) => void
   onClose: () => void
   onModeChange: (mode: TtsMode) => void
+  onOutputFormatChange: (format: AudioFormat) => void
   onApiConfigChange: (apiConfigId: string | null) => void
   onVoiceChange: (voice: string) => void
   onVoiceDesignIdChange: (id: string | null) => void
@@ -118,6 +121,7 @@ export function ScriptEditor({
   mode,
   initialText = "",
   ttsMode,
+  outputFormat,
   apiConfigId,
   apiConfigs,
   model,
@@ -132,6 +136,7 @@ export function ScriptEditor({
   onSave,
   onClose,
   onModeChange,
+  onOutputFormatChange,
   onApiConfigChange,
   onVoiceChange,
   onVoiceDesignIdChange,
@@ -249,9 +254,19 @@ export function ScriptEditor({
 
   const showSplitModeToggle = mode === "import"
   const selectedApiConfig = apiConfigs.find((config) => config.id === apiConfigId)
+  const availableAudioFormats = useMemo(
+    () => getAvailableAudioFormats(selectedApiConfig, ttsMode),
+    [selectedApiConfig, ttsMode],
+  )
   const availableModes = selectedApiConfig
     ? MODE_OPTIONS.filter((candidate) => selectedApiConfig.capabilities[candidate].enabled)
     : MODE_OPTIONS
+
+  useEffect(() => {
+    if (availableAudioFormats.length > 0 && !availableAudioFormats.includes(outputFormat)) {
+      onOutputFormatChange(availableAudioFormats[0])
+    }
+  }, [availableAudioFormats, onOutputFormatChange, outputFormat])
 
   const handleApiConfigChange = (value: string) => {
     const nextConfig = apiConfigs.find((config) => config.id === value)
@@ -428,6 +443,26 @@ export function ScriptEditor({
                 {t("editor.model")}
                 <input className="dw-settings-input" value={model} readOnly />
               </label>
+            </div>
+
+            <div className="dw-settings-field">
+              <div className="dw-settings-label">
+                {t("editor.outputFormat")}
+                <Select
+                  value={outputFormat}
+                  ariaLabel={t("editor.outputFormat")}
+                  options={AUDIO_FORMATS.map((format) => ({
+                    value: format,
+                    label: t(`editor.audioFormats.${format}`),
+                    disabled: !availableAudioFormats.includes(format),
+                  }))}
+                  disabled={!selectedApiConfig || availableAudioFormats.length === 0}
+                  onValueChange={onOutputFormatChange}
+                />
+              </div>
+              {selectedApiConfig?.provider === "custom" && availableAudioFormats.length === 0 && (
+                <div className="dw-editing-hint">{t("editor.outputFormatTestHint")}</div>
+              )}
             </div>
 
             {/* Basic TTS: 音色 */}

@@ -32,6 +32,10 @@ pub(crate) fn reveal_in_finder(path: &Path) -> Result<(), String> {
 
 pub(crate) fn begin_drag(path: &Path, window: &tauri::Window) -> Result<(), String> {
     let safe_path_str = path.to_string_lossy().to_string();
+    let file_extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("wav");
 
     let mtm = objc2_foundation::MainThreadMarker::new()
         .ok_or_else(|| "Native file drag must be initiated on the main thread".to_string())?;
@@ -49,7 +53,7 @@ pub(crate) fn begin_drag(path: &Path, window: &tauri::Window) -> Result<(), Stri
     //   NSView / NSWindow / NSDraggingSession 的 MainThreadOnly 约束。
     // - 调用期间 window / view 由 Tauri 持有，不会被释放。
     // - source 的生命周期由 `drag::begin_drag` 内部管理（见该函数注释）。
-    unsafe { drag::begin_drag(ns_view_ptr, mtm, &safe_path_str) };
+    unsafe { drag::begin_drag(ns_view_ptr, mtm, &safe_path_str, file_extension) };
 
     log::info!("Native file drag started: {}", safe_path_str);
     Ok(())
@@ -151,6 +155,7 @@ mod drag {
         ns_view_ptr: *mut c_void,
         mtm: MainThreadMarker,
         path_str: &str,
+        file_extension: &str,
     ) {
         // SAFETY: 调用方承诺指针有效且当前在主线程（见函数级 SAFETY 注释）。
         let view: &NSView = unsafe { &*(ns_view_ptr as *const NSView) };
@@ -169,7 +174,7 @@ mod drag {
 
         // --- Audio file icon via NSWorkspace (public API) ---
         let workspace = NSWorkspace::sharedWorkspace();
-        let ext_nsstring = NSString::from_str("wav");
+        let ext_nsstring = NSString::from_str(file_extension);
         #[allow(deprecated)]
         let drag_image = workspace.iconForFileType(&ext_nsstring);
 

@@ -18,6 +18,26 @@ pub enum ProviderId {
     Custom,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AudioFormat {
+    Mp3,
+    Wav,
+}
+
+impl AudioFormat {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Mp3 => "mp3",
+            Self::Wav => "wav",
+        }
+    }
+
+    pub(crate) const fn extension(self) -> &'static str {
+        self.as_str()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TtsParams {
@@ -30,6 +50,7 @@ pub struct TtsParams {
     pub voice_design_prompt: String,
     pub voice_clone_path: Option<String>,
     pub performance_prompt: String,
+    pub audio_format: AudioFormat,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

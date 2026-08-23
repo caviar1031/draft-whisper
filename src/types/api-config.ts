@@ -1,4 +1,4 @@
-import type { ProviderId, TtsMode } from "./tts"
+import type { AudioFormatTestResults, ProviderId, TtsMode } from "./tts"
 
 export interface ApiVoice {
   id: string
@@ -8,6 +8,7 @@ export interface ApiVoice {
 export interface CapabilityMapping {
   enabled: boolean
   modelId: string
+  formatTests: AudioFormatTestResults
 }
 
 export type CapabilityMappings = Record<TtsMode, CapabilityMapping>

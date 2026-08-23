@@ -19,7 +19,7 @@ pub(crate) fn build_custom_speech_body(params: &TtsParams, text: &str) -> Result
         "model": model,
         "input": text,
         "voice": voice,
-        "response_format": "wav",
+        "response_format": params.audio_format.as_str(),
     });
 
     if !params.performance_prompt.trim().is_empty() {
@@ -32,7 +32,7 @@ pub(crate) fn build_custom_speech_body(params: &TtsParams, text: &str) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tts::types::{ProviderId, TtsMode};
+    use crate::tts::types::{AudioFormat, ProviderId, TtsMode};
 
     fn test_params(mode: TtsMode, model: &str) -> TtsParams {
         TtsParams {
@@ -45,6 +45,7 @@ mod tests {
             voice_design_prompt: "".into(),
             voice_clone_path: None,
             performance_prompt: "speak clearly".into(),
+            audio_format: AudioFormat::Mp3,
         }
     }
 
@@ -65,7 +66,7 @@ mod tests {
         assert_eq!(body["model"], "third-party-tts");
         assert_eq!(body["input"], "Hello");
         assert_eq!(body["voice"], "vendor-voice");
-        assert_eq!(body["response_format"], "wav");
+        assert_eq!(body["response_format"], "mp3");
         assert_eq!(body["instructions"], params.performance_prompt);
     }
 

@@ -12,7 +12,7 @@ import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceDesignStore } from "@/stores/voice-design-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
 import type { VoiceDesignPreset } from "@/types/voice-resource"
-import { resolveCapability } from "@/utils/provider-catalog"
+import { getDefaultAudioFormat, resolveCapability } from "@/utils/provider-catalog"
 import { open } from "@tauri-apps/plugin-dialog"
 import {
   CheckCircle2,
@@ -434,6 +434,7 @@ function VoiceDesignEditor({
         voiceDesignPrompt: draft.prompt.trim(),
         voiceClonePath: null,
         performancePrompt: "",
+        audioFormat: getDefaultAudioFormat(config.provider),
       })
       if (draft.previewAudioPath && draft.previewAudioPath !== design.previewAudioPath) {
         cleanupAudioFiles([draft.previewAudioPath])
