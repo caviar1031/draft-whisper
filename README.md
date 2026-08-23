@@ -60,7 +60,7 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 
 | Step | What happens |
 | --- | --- |
-| 1. Import | Paste a script or enter one line per sentence. DraftWhisper can split a script automatically. |
+| 1. Import | Paste a script with one sentence per line. Blank lines are ignored. |
 | 2. Choose a voice | Use a preset, describe a new voice, or select a local voice-clone sample. |
 | 3. Generate | Create independent WAV clips with visible per-sentence progress and errors. |
 | 4. Review | Play a single sentence, edit its text, retry it, or switch among its five latest versions. |
@@ -78,7 +78,7 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 
 ## What you can do
 
-- **Work sentence by sentence** — paste a script, preview automatic splitting, or enter manual lines.
+- **Work sentence by sentence** — paste a script with one sentence per line; blank lines are ignored.
 - **Generate in batches** — use configurable concurrency and see queued, generating, ready, and failed states.
 - **Revise without starting over** — edit one sentence and regenerate only that sentence.
 - **Keep useful history** — retain and switch between the five latest audio versions for each sentence.
@@ -200,7 +200,7 @@ The front end owns project and settings state. The Rust side handles HTTP reques
 
 ## Current MVP scope
 
-Included: script import, sentence splitting, batch generation, playback, single-sentence regeneration, five-version history, local projects, voice design, voice cloning, local caching, settings, and English/Simplified Chinese UI.
+Included: line-based script import, batch generation, playback, single-sentence regeneration, five-version history, local projects, voice design, voice cloning, local caching, settings, and English/Simplified Chinese UI.
 
 Not included yet: cloud sync, waveform editing, timeline editing, subtitles, and additional provider-specific adapters beyond MiMo and Fish Audio.
 

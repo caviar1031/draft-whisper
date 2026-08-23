@@ -2563,79 +2563,6 @@
     background: var(--glass-surface-2);
   }
 
-  /* ===== Import dialog ===== */
-  .dw-import-dialog {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 380px;
-    max-height: calc(100% - 48px);
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 20px;
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    background: var(--glass-popover-bg);
-    border: 1px solid var(--glass-bg-card);
-    border-radius: 16px;
-    box-shadow: var(--glass-popover-shadow);
-    z-index: 20;
-  }
-
-  .dw-import-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-  }
-
-  .dw-import-textarea {
-    width: 100%;
-    min-height: 180px;
-    max-height: 320px;
-    padding: 12px;
-    border-radius: 12px;
-    border: 1px solid var(--glass-input-border);
-    background: var(--glass-bg-input);
-    font-family: inherit;
-    font-size: 14px;
-    line-height: 1.5;
-    color: var(--text-800);
-    resize: vertical;
-    outline: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    flex: 1;
-    margin-bottom: 16px;
-    /* 恢复文字选择 */
-    user-select: text;
-    -webkit-user-select: text;
-  }
-
-  .dw-import-textarea::placeholder {
-    color: var(--text-300);
-  }
-
-  .dw-import-textarea:focus {
-    border-color: var(--brand-500);
-    box-shadow: 0 0 0 3px var(--glass-focus-ring);
-  }
-
-  .dw-import-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .dw-import-left,
-  .dw-import-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
   .dw-import-count {
     font-size: 12px;
     color: var(--text-400);
@@ -2918,7 +2845,7 @@
     flex-shrink: 0;
   }
 
-  /* ---- Mode toggle (Auto / Manual) ---- */
+  /* ---- Editor tabs ---- */
   .dw-mode-toggle {
     display: flex;
     gap: 4px;
@@ -2954,7 +2881,7 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 
-  /* ---- Editor textarea (auto mode) ---- */
+  /* ---- Editor textarea ---- */
   .dw-editor-textarea {
     width: 100%;
     min-height: 200px;
@@ -3032,7 +2959,7 @@
     color: var(--text-400);
   }
 
-  .dw-editor-textarea--manual {
+  .dw-editor-textarea--script {
     border: none;
     border-radius: 0;
     background: transparent;
@@ -3046,63 +2973,13 @@
     padding: 12px;
   }
 
-  .dw-editor-textarea--manual::placeholder {
+  .dw-editor-textarea--script::placeholder {
     color: var(--text-300);
   }
 
-  .dw-editor-textarea--manual:focus {
+  .dw-editor-textarea--script:focus {
     box-shadow: none;
     border-color: transparent;
-  }
-
-  /* ---- Auto-split preview ---- */
-  .dw-auto-preview {
-    max-height: 200px;
-    overflow-y: auto;
-    margin-bottom: 16px;
-    padding: 12px;
-    border-radius: 12px;
-    background: var(--glass-surface);
-    border: 1px solid var(--glass-divider);
-    flex-shrink: 0;
-  }
-
-  .dw-auto-preview-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-500);
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-  }
-
-  .dw-auto-preview-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .dw-auto-preview-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 4px 0;
-  }
-
-  .dw-auto-preview-num {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-400);
-    min-width: 20px;
-    text-align: right;
-    flex-shrink: 0;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .dw-auto-preview-text {
-    font-size: 13px;
-    color: var(--text-700);
-    line-height: 1.4;
   }
 
   /* ---- Editor footer ---- */

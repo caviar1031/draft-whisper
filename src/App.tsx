@@ -15,7 +15,7 @@ import { useVoiceSampleStore } from "@/stores/voice-sample-store"
 import type { SentenceStatus } from "@/types/sentence"
 import { generateSentenceId } from "@/utils/id"
 import { resolveCapability } from "@/utils/provider-catalog"
-import { splitTextToSentences } from "@/utils/sentence"
+import { parseScriptLines } from "@/utils/script-lines"
 import { resolveLanguage } from "@/utils/settings-validation"
 import { registerTauriListener } from "@/utils/tauri-listener"
 import { applyTheme, getThemeMediaQuery } from "@/utils/theme"
@@ -292,60 +292,53 @@ function App() {
   }, [])
 
   const handleSaveScript = useCallback(
-    (text: string, splitMode: "auto" | "manual") => {
+    (text: string) => {
       setScriptEditorOpen(false)
       cancelGeneration()
       handlePause()
       setEditingId(null)
 
-      if (splitMode === "auto") {
-        const newSentences = splitTextToSentences(text)
+      const lines = parseScriptLines(text)
+      if (sentences.length === 0) {
+        // No existing content: create all sentences from non-empty lines.
+        const newSentences = lines.map((t, i) => ({
+          id: generateSentenceId(i, t),
+          text: t,
+          styleInstruction: "",
+          status: "pending" as SentenceStatus,
+          audioPath: null,
+          audioHistory: [],
+          duration: null,
+        }))
         setSentences(newSentences)
         void runGeneration(newSentences.map((s) => s.id))
       } else {
-        const lines = text.split("\n").filter((l) => l.trim().length > 0)
-        if (sentences.length === 0) {
-          // 无内容 → 新建全部句子
-          const newSentences = lines.map((t, i) => ({
-            id: generateSentenceId(i, t.trim()),
-            text: t.trim(),
+        // Existing content: compare lines by position and regenerate changed sentences.
+        const newSentences = lines.map((t, i) => {
+          const old = sentences[i]
+          if (old && old.text === t) return old
+          if (old) {
+            return {
+              ...old,
+              text: t,
+              status: "pending" as SentenceStatus,
+              errorMessage: undefined,
+              duration: null,
+            }
+          }
+          return {
+            id: generateSentenceId(i, t),
+            text: t,
             styleInstruction: "",
             status: "pending" as SentenceStatus,
             audioPath: null,
             audioHistory: [],
             duration: null,
-          }))
-          setSentences(newSentences)
-          void runGeneration(newSentences.map((s) => s.id))
-        } else {
-          // 有内容 → 按位置对比，变化的重新生成
-          const newSentences = lines.map((t, i) => {
-            const old = sentences[i]
-            const trimmed = t.trim()
-            if (old && old.text === trimmed) return old
-            if (old) {
-              return {
-                ...old,
-                text: trimmed,
-                status: "pending" as SentenceStatus,
-                errorMessage: undefined,
-                duration: null,
-              }
-            }
-            return {
-              id: generateSentenceId(i, trimmed),
-              text: trimmed,
-              styleInstruction: "",
-              status: "pending" as SentenceStatus,
-              audioPath: null,
-              audioHistory: [],
-              duration: null,
-            }
-          })
-          setSentences(newSentences)
-          const pendingIds = newSentences.filter((s) => s.status === "pending").map((s) => s.id)
-          if (pendingIds.length > 0) void runGeneration(pendingIds)
-        }
+          }
+        })
+        setSentences(newSentences)
+        const pendingIds = newSentences.filter((s) => s.status === "pending").map((s) => s.id)
+        if (pendingIds.length > 0) void runGeneration(pendingIds)
       }
     },
     [cancelGeneration, sentences, setSentences, runGeneration, handlePause],

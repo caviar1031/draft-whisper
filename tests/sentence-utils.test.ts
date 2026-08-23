@@ -15,7 +15,7 @@ import {
   getFormatsToTest,
   resolveConfigVoice,
 } from "../src/utils/provider-catalog.ts"
-import { splitTextToSentences } from "../src/utils/sentence.ts"
+import { parseScriptLines } from "../src/utils/script-lines.ts"
 import {
   MAX_CONCURRENCY,
   createDefaultSettings,
@@ -30,15 +30,10 @@ import { resolveTheme } from "../src/utils/theme.ts"
 import { getTtsConfigurationError, resolvePerformancePrompt } from "../src/utils/tts-config.ts"
 import { resolveProjectVoiceResources } from "../src/utils/voice-resources.ts"
 
-test("splits Chinese and English sentence punctuation while preserving it", () => {
-  const sentences = splitTextToSentences("今天开始。\nAre you ready? 好！最后一句")
+test("parses scripts strictly by non-empty lines", () => {
+  const lines = parseScriptLines("  今天开始。Are you ready?  \n\n  第二行！第三句？  \r\n\t")
 
-  assert.deepEqual(
-    sentences.map((sentence) => sentence.text),
-    ["今天开始。", "Are you ready?", "好！", "最后一句"],
-  )
-  assert.ok(sentences.every((sentence) => sentence.status === "pending"))
-  assert.ok(sentences.every((sentence) => sentence.styleInstruction === ""))
+  assert.deepEqual(lines, ["今天开始。Are you ready?", "第二行！第三句？"])
 })
 
 test("generates filesystem-safe readable sentence ids", () => {

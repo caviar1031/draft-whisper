@@ -4,12 +4,11 @@ import type { ApiConfig } from "@/types/api-config"
 import type { AudioFormat, TtsMode } from "@/types/tts"
 import type { VoiceCloneSample, VoiceDesignPreset } from "@/types/voice-resource"
 import { AUDIO_FORMATS, getAvailableAudioFormats } from "@/utils/provider-catalog"
-import { splitTextToSentences } from "@/utils/sentence"
+import { parseScriptLines } from "@/utils/script-lines"
 import { X } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-type SplitMode = "auto" | "manual"
 type EditorTab = "script" | "voice"
 
 interface ScriptEditorProps {
@@ -28,7 +27,7 @@ interface ScriptEditorProps {
   voiceSamples: VoiceCloneSample[]
   voiceClonePath: string | null
   performancePrompt: string
-  onSave: (text: string, splitMode: SplitMode) => void
+  onSave: (text: string) => void
   onClose: () => void
   onModeChange: (mode: TtsMode) => void
   onOutputFormatChange: (format: AudioFormat) => void
@@ -175,7 +174,6 @@ export function ScriptEditor({
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<EditorTab>("script")
   const [text, setText] = useState(initialText)
-  const [splitMode, setSplitMode] = useState<SplitMode>(mode === "edit" ? "manual" : "auto")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [textareaElement, setTextareaElement] = useState<HTMLTextAreaElement | null>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
@@ -202,25 +200,16 @@ export function ScriptEditor({
     }
   }, [activeTab, textareaElement])
 
-  // ---- 自动拆分预览 ----
-  const autoPreview = useMemo(() => {
-    if (splitMode !== "auto" || !text.trim()) return []
-    return splitTextToSentences(text)
-  }, [text, splitMode])
-
-  // ---- 手动模式行数 ----
-  const manualLineCount = useMemo(() => {
-    return text.split("\n").filter((l) => l.trim().length > 0).length
+  const sentenceCount = useMemo(() => {
+    return parseScriptLines(text).length
   }, [text])
-
-  const sentenceCount = splitMode === "auto" ? autoPreview.length : manualLineCount
   const lines = text.split("\n")
 
   // ---- 行号定位 ----
   const [lineTops, setLineTops] = useState<number[]>([])
 
   useLayoutEffect(() => {
-    if (activeTab !== "script" || splitMode !== "manual") {
+    if (activeTab !== "script") {
       setLineTops([])
       return
     }
@@ -276,7 +265,7 @@ export function ScriptEditor({
       window.removeEventListener("resize", scheduleLineMeasurement)
       document.fonts.removeEventListener("loadingdone", scheduleLineMeasurement)
     }
-  }, [splitMode, activeTab, textareaElement])
+  }, [activeTab, textareaElement])
 
   useEffect(() => {
     return () => {
@@ -295,8 +284,8 @@ export function ScriptEditor({
 
   const handleSave = useCallback(() => {
     if (!text.trim()) return
-    onSave(text, splitMode)
-  }, [text, splitMode, onSave])
+    onSave(text)
+  }, [text, onSave])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -308,7 +297,6 @@ export function ScriptEditor({
     [handleSave],
   )
 
-  const showSplitModeToggle = mode === "import"
   const selectedApiConfig = apiConfigs.find((config) => config.id === apiConfigId)
   const availableAudioFormats = useMemo(
     () => getAvailableAudioFormats(selectedApiConfig, ttsMode),
@@ -380,84 +368,37 @@ export function ScriptEditor({
 
         {/* Script Tab */}
         {activeTab === "script" && (
-          <>
-            {showSplitModeToggle && (
-              <div className="dw-mode-toggle" style={{ marginBottom: 8 }}>
-                <button
-                  type="button"
-                  className={`dw-mode-btn${splitMode === "auto" ? " is-active" : ""}`}
-                  onClick={() => setSplitMode("auto")}
-                >
-                  {t("editor.autoSplit")}
-                </button>
-                <button
-                  type="button"
-                  className={`dw-mode-btn${splitMode === "manual" ? " is-active" : ""}`}
-                  onClick={() => setSplitMode("manual")}
-                >
-                  {t("editor.manual")}
-                </button>
-              </div>
-            )}
-
-            {splitMode === "auto" ? (
-              <textarea
-                ref={handleTextareaRef}
-                className="dw-editor-textarea"
-                placeholder={t("editor.scriptPlaceholder")}
-                value={text}
-                onChange={handleTextChange}
-              />
-            ) : (
-              <div className="dw-editor-container" ref={containerRef}>
-                <div className="dw-line-numbers" aria-hidden="true">
-                  <div className="dw-line-numbers-content" ref={lineNumRef}>
-                    {lines.map((_, i) => (
-                      <div
-                        key={
-                          // biome-ignore lint/suspicious/noArrayIndexKey: decorative line numbers never reorder
-                          i
-                        }
-                        className="dw-line-num"
-                        style={
-                          lineTops[i] === undefined
-                            ? { visibility: "hidden" }
-                            : { top: `${lineTops[i]}px` }
-                        }
-                      >
-                        {i + 1}
-                      </div>
-                    ))}
+          <div className="dw-editor-container" ref={containerRef}>
+            <div className="dw-line-numbers" aria-hidden="true">
+              <div className="dw-line-numbers-content" ref={lineNumRef}>
+                {lines.map((_, i) => (
+                  <div
+                    key={
+                      // biome-ignore lint/suspicious/noArrayIndexKey: decorative line numbers never reorder
+                      i
+                    }
+                    className="dw-line-num"
+                    style={
+                      lineTops[i] === undefined
+                        ? { visibility: "hidden" }
+                        : { top: `${lineTops[i]}px` }
+                    }
+                  >
+                    {i + 1}
                   </div>
-                </div>
-                <textarea
-                  ref={handleTextareaRef}
-                  className="dw-editor-textarea dw-editor-textarea--manual"
-                  placeholder={t("editor.manualPlaceholder")}
-                  value={text}
-                  onChange={handleTextChange}
-                  onScroll={handleScroll}
-                  spellCheck={false}
-                />
+                ))}
               </div>
-            )}
-
-            {splitMode === "auto" && autoPreview.length > 0 && (
-              <div className="dw-auto-preview">
-                <div className="dw-auto-preview-label">
-                  {t("editor.preview", { count: autoPreview.length })}
-                </div>
-                <div className="dw-auto-preview-list">
-                  {autoPreview.map((s, i) => (
-                    <div key={s.id} className="dw-auto-preview-item">
-                      <span className="dw-auto-preview-num">{i + 1}</span>
-                      <span className="dw-auto-preview-text">{s.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+            </div>
+            <textarea
+              ref={handleTextareaRef}
+              className="dw-editor-textarea dw-editor-textarea--script"
+              placeholder={t("editor.linePlaceholder")}
+              value={text}
+              onChange={handleTextChange}
+              onScroll={handleScroll}
+              spellCheck={false}
+            />
+          </div>
         )}
 
         {/* Voice Tab */}

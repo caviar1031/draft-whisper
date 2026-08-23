@@ -12,7 +12,7 @@ DraftWhisper 是一款 macOS 优先的 AI 配音桌面工具（Tauri 2 + React�
 
 核心工作流：**改一句文案 → 重新生成 → 试听 → 拖进剪辑软件**。
 
-当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 / Fish Audio / 自定义 OpenAI SDK 兼容 TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置中心、多套 API 配置和中英文界面。Provider 架构可扩展，当前实现 MiMo、Fish Audio 与第三方自定义配置；不做云同步、波形、字幕。
+当前 MVP 范围：按行导入文本、调用 MiMo v2.5 / Fish Audio / 自定义 OpenAI SDK 兼容 TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置中心、多套 API 配置和中英文界面。Provider 架构可扩展，当前实现 MiMo、Fish Audio 与第三方自定义配置；不做云同步、波形、字幕。
 
 ---
 
@@ -68,7 +68,7 @@ draft-whisper/
 │   ├── services/         # 领域 Service 封装（tts, audio, projects, credentials）
 │   ├── stores/           # Zustand stores
 │   ├── types/            # TS 类型定义（tts, api-config, settings, sentence, project, voice-resource）
-│   ├── utils/            # 领域工具（切句、持久化、主题、catalog 等）
+│   ├── utils/            # 领域工具（按行解析脚本、持久化、主题、catalog 等）
 │   ├── App.tsx
 │   ├── main.tsx
 │   └── index.css
