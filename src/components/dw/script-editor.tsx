@@ -42,7 +42,49 @@ interface ScriptEditorProps {
 
 const MODE_OPTIONS: TtsMode[] = ["basic", "voice-design", "voice-clone"]
 
-function measureLineTops(textarea: HTMLTextAreaElement, text: string): number[] {
+function createLineMirror(): HTMLDivElement {
+  const mirror = document.createElement("div")
+  mirror.setAttribute("aria-hidden", "true")
+  Object.assign(mirror.style, {
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
+    visibility: "hidden",
+    pointerEvents: "none",
+    contain: "layout style",
+    boxSizing: "content-box",
+    height: "auto",
+    minHeight: "0",
+    margin: "0",
+    padding: "0",
+    border: "0",
+    overflow: "visible",
+  })
+  document.body.appendChild(mirror)
+  return mirror
+}
+
+function createMirrorRow(): HTMLDivElement {
+  const row = document.createElement("div")
+  Object.assign(row.style, {
+    display: "block",
+    boxSizing: "border-box",
+    width: "100%",
+    margin: "0",
+    padding: "0",
+    border: "0",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "break-word",
+    wordBreak: "normal",
+  })
+  return row
+}
+
+function measureLineTops(
+  textarea: HTMLTextAreaElement,
+  text: string,
+  mirror: HTMLDivElement,
+): number[] {
   const styles = getComputedStyle(textarea)
   const paddingTop = Number.parseFloat(styles.paddingTop) || 0
   const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0
@@ -52,23 +94,8 @@ function measureLineTops(textarea: HTMLTextAreaElement, text: string): number[] 
 
   if (contentWidth <= 0) return []
 
-  // A DOM mirror follows the browser's wrapping rules more closely than canvas text metrics.
-  const mirror = document.createElement("div")
   Object.assign(mirror.style, {
-    position: "fixed",
-    left: "-10000px",
-    top: "0",
-    visibility: "hidden",
-    pointerEvents: "none",
-    contain: "layout style",
-    boxSizing: "content-box",
     width: `${contentWidth}px`,
-    height: "auto",
-    minHeight: "0",
-    margin: "0",
-    padding: "0",
-    border: "0",
-    overflow: "visible",
     whiteSpace: "pre-wrap",
     overflowWrap: "break-word",
     wordBreak: "normal",
@@ -89,32 +116,33 @@ function measureLineTops(textarea: HTMLTextAreaElement, text: string): number[] 
     tabSize: styles.tabSize,
   })
 
-  for (const line of text.split("\n")) {
-    const row = document.createElement("div")
-    Object.assign(row.style, {
-      display: "block",
-      boxSizing: "border-box",
-      width: "100%",
-      minHeight: `${lineHeight}px`,
-      margin: "0",
-      padding: "0",
-      border: "0",
-      whiteSpace: "pre-wrap",
-      overflowWrap: "break-word",
-      wordBreak: "normal",
-    })
-    row.textContent = line.length > 0 ? line : "\u200b"
-    mirror.appendChild(row)
+  const lines = text.split("\n")
+  while (mirror.childElementCount < lines.length) {
+    mirror.appendChild(createMirrorRow())
+  }
+  while (mirror.childElementCount > lines.length) {
+    mirror.lastElementChild?.remove()
   }
 
-  document.body.appendChild(mirror)
+  for (const [index, line] of lines.entries()) {
+    const row = mirror.children[index] as HTMLDivElement
+    row.style.minHeight = `${lineHeight}px`
+    row.textContent = line.length > 0 ? line : "\u200b"
+  }
+
   const mirrorTop = mirror.getBoundingClientRect().top
   const tops = Array.from(mirror.children, (row) => {
     return paddingTop + row.getBoundingClientRect().top - mirrorTop
   })
-  mirror.remove()
 
   return tops
+}
+
+function lineTopsAreEqual(current: number[], next: number[]): boolean {
+  return (
+    current.length === next.length &&
+    current.every((value, index) => Math.abs(value - next[index]) < 0.1)
+  )
 }
 
 export function ScriptEditor({
@@ -152,10 +180,20 @@ export function ScriptEditor({
   const [textareaElement, setTextareaElement] = useState<HTMLTextAreaElement | null>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const lineMirrorRef = useRef<HTMLDivElement>(null)
+  const latestTextRef = useRef(text)
+  const scheduleLineMeasurementRef = useRef<() => void>(() => undefined)
 
   const handleTextareaRef = useCallback((element: HTMLTextAreaElement | null) => {
     textareaRef.current = element
     setTextareaElement(element)
+  }, [])
+
+  const handleTextChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const nextText = event.target.value
+    latestTextRef.current = nextText
+    setText(nextText)
+    scheduleLineMeasurementRef.current()
   }, [])
 
   useEffect(() => {
@@ -194,40 +232,58 @@ export function ScriptEditor({
     }
 
     let active = true
-    let firstFrame = 0
-    let secondFrame = 0
+    let scheduledFrame = 0
+    let bootstrapFrame = 0
     const updateLineTops = () => {
       if (!active) return
-      const nextLineTops = measureLineTops(ta, text)
-      if (nextLineTops.length === text.split("\n").length) {
-        setLineTops(nextLineTops)
+      const currentText = latestTextRef.current
+      const mirror = lineMirrorRef.current ?? createLineMirror()
+      lineMirrorRef.current = mirror
+      const nextLineTops = measureLineTops(ta, currentText, mirror)
+      if (nextLineTops.length === currentText.split("\n").length) {
+        setLineTops((current) => (lineTopsAreEqual(current, nextLineTops) ? current : nextLineTops))
       }
     }
+
+    const scheduleLineMeasurement = () => {
+      if (!active || scheduledFrame !== 0) return
+      scheduledFrame = requestAnimationFrame(() => {
+        scheduledFrame = 0
+        updateLineTops()
+      })
+    }
+    scheduleLineMeasurementRef.current = scheduleLineMeasurement
 
     updateLineTops()
 
     // Dialog portals may not have their final width during the first layout effect in WebKit.
-    firstFrame = requestAnimationFrame(() => {
-      updateLineTops()
-      secondFrame = requestAnimationFrame(updateLineTops)
-    })
+    scheduleLineMeasurement()
+    bootstrapFrame = requestAnimationFrame(scheduleLineMeasurement)
 
-    const resizeObserver = new ResizeObserver(updateLineTops)
+    const resizeObserver = new ResizeObserver(scheduleLineMeasurement)
     resizeObserver.observe(ta)
     if (containerRef.current) resizeObserver.observe(containerRef.current)
-    window.addEventListener("resize", updateLineTops)
-    document.fonts.addEventListener("loadingdone", updateLineTops)
-    void document.fonts.ready.then(updateLineTops)
+    window.addEventListener("resize", scheduleLineMeasurement)
+    document.fonts.addEventListener("loadingdone", scheduleLineMeasurement)
+    void document.fonts.ready.then(scheduleLineMeasurement)
 
     return () => {
       active = false
-      cancelAnimationFrame(firstFrame)
-      cancelAnimationFrame(secondFrame)
+      scheduleLineMeasurementRef.current = () => undefined
+      cancelAnimationFrame(scheduledFrame)
+      cancelAnimationFrame(bootstrapFrame)
       resizeObserver.disconnect()
-      window.removeEventListener("resize", updateLineTops)
-      document.fonts.removeEventListener("loadingdone", updateLineTops)
+      window.removeEventListener("resize", scheduleLineMeasurement)
+      document.fonts.removeEventListener("loadingdone", scheduleLineMeasurement)
     }
-  }, [text, splitMode, activeTab, textareaElement])
+  }, [splitMode, activeTab, textareaElement])
+
+  useEffect(() => {
+    return () => {
+      lineMirrorRef.current?.remove()
+      lineMirrorRef.current = null
+    }
+  }, [])
 
   // ---- 行号同步滚动 ----
   const handleScroll = useCallback(() => {
@@ -350,11 +406,11 @@ export function ScriptEditor({
                 className="dw-editor-textarea"
                 placeholder={t("editor.scriptPlaceholder")}
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={handleTextChange}
               />
             ) : (
               <div className="dw-editor-container" ref={containerRef}>
-                <div className="dw-line-numbers">
+                <div className="dw-line-numbers" aria-hidden="true">
                   <div className="dw-line-numbers-content" ref={lineNumRef}>
                     {lines.map((_, i) => (
                       <div
@@ -379,7 +435,7 @@ export function ScriptEditor({
                   className="dw-editor-textarea dw-editor-textarea--manual"
                   placeholder={t("editor.manualPlaceholder")}
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={handleTextChange}
                   onScroll={handleScroll}
                   spellCheck={false}
                 />
