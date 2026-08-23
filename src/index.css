@@ -2317,8 +2317,9 @@
 
   .dw-custom-select-trigger[data-popup-open],
   .dw-custom-select-trigger:focus-visible {
-    border-color: var(--brand-500);
-    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+    border-color: var(--glass-input-border);
+    background: var(--glass-surface-2);
+    box-shadow: none;
   }
 
   .dw-custom-select-trigger[data-disabled] {
