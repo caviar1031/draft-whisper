@@ -110,11 +110,13 @@ DraftWhisper 不是通用写作助手、时间线编辑器，也不是把所有�
 
 ## 当前支持的 Provider 与声音模式
 
-Provider 架构已经为扩展预留，但当前 MVP 只支持小米 MiMo v2.5：
+DraftWhisper 当前支持三类 Provider 配置：小米 MiMo v2.5、Fish Audio，以及兼容 OpenAI SDK 语音协议的第三方自定义接口。每套 API 配置可以独立保存 API Key、模型、音色和能力映射，并可在项目中切换使用。
 
 | Provider | 协议 | 默认 Base URL | 支持模式 |
 | --- | --- | --- | --- |
 | Xiaomi MiMo | Chat Completions 风格 TTS | `https://api.xiaomimimo.com/v1` | 基础音色、声音设计、声音克隆 |
+| Fish Audio | `/v1/tts` REST API | `https://api.fish.audio/v1/tts` | 基础音色 |
+| 自定义配置 | OpenAI SDK 兼容语音请求 | 用户填写完整 Endpoint | 基础音色 |
 
 新建 MiMo 配置时使用以下默认模型映射：
 
@@ -126,6 +128,10 @@ Provider 架构已经为扩展预留，但当前 MVP 只支持小米 MiMo v2.5�
 
 API 使用方式和账号信息请参考 [MiMo v2.5 语音合成文档](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5)。
 
+Fish Audio 配置默认使用 `s2.1-pro-free`，并提供可编辑的示例音色 ID；具体接入方式请参考 [Fish Audio 快速开始文档](https://docs.fish.audio/developer-guide/getting-started/quickstart)。预置配置会填入默认地址、模型、能力和音色，所有值都可以在设置中修改。
+
+自定义配置不会预填服务商地址、模型或音色。请填写第三方服务的完整语音 Endpoint、API Key、模型 ID 和音色 ID；DraftWhisper 会原样使用该 Endpoint，并通过 Bearer 认证发送标准语音请求。
+
 声音克隆样本在保存或发送前会进行本地校验：必须是签名有效的 WAV 或 MP3 文件，时长小于 30 秒，并且转换为完整 Base64 Data URI 后小于 MiMo 的 10 MB 限制。
 
 ## 快速开始
@@ -134,7 +140,7 @@ API 使用方式和账号信息请参考 [MiMo v2.5 语音合成文档](https://
 
 - 较新版本的 Node.js 与 npm
 - 与 Tauri 工具链兼容的 Rust 和 Cargo（Rust 1.77.2 或更高版本）
-- 一个 MiMo API Key
+- 一个 MiMo、Fish Audio 或兼容第三方 TTS API Key
 
 各平台还需要：
 
@@ -159,7 +165,7 @@ npm run tauri dev
 
 首次启动后：
 
-1. 打开 **设置**，添加一套 MiMo API 配置。
+1. 打开 **设置**，添加一套预置或自定义 API 配置。
 2. 填入 API Key，并测试准备使用的能力。
 3. 导入脚本，选择声音模式，生成逐句音频。
 
@@ -185,7 +191,7 @@ npm run tauri dev
 React + TypeScript + Zustand
           │ Tauri IPC
           ▼
-Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
+Rust + reqwest ──────► MiMo、Fish Audio 或自定义 TTS API
           │
           ├─ 项目元数据与偏好设置：localStorage
           ├─ API Key：系统凭据存储
@@ -193,12 +199,6 @@ Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
 ```
 
 前端负责项目和设置状态；Rust 负责 HTTP 请求、文件读写、音频缓存、凭据存储和各平台原生集成。生成的音频以本地 WAV 文件保存，可以播放、复制、定位或拖入其他应用。
-
-## 当前 MVP 范围
-
-已包含：按行导入文本、批量生成、播放试听、单句重新生成、最近 5 个版本、本地项目、声音设计、声音克隆、本地缓存、设置中心，以及 English / 简体中文界面。
-
-暂不包含：云同步、波形编辑、时间线编辑、字幕，以及 MiMo 之外的 Provider。
 
 ## License
 

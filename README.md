@@ -82,7 +82,7 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 - **Generate in batches** — use configurable concurrency and see queued, generating, ready, and failed states.
 - **Revise without starting over** — edit one sentence and regenerate only that sentence.
 - **Keep useful history** — retain and switch between the five latest audio versions for each sentence.
-- **Shape the voice** — use MiMo preset voices, text-based voice design, or WAV/MP3 voice cloning.
+- **Shape the voice** — use MiMo preset voices, Fish Audio voices, text-based voice design, or WAV/MP3 voice cloning.
 - **Direct the performance** — use the session-only Director Mode to focus sentence editing on per-sentence direction, or keep the sentence text as the default target.
 - **Preview voices separately** — test a voice without adding the preview to a sentence's history.
 - **Move audio into the edit** — drag or copy files natively on macOS and Windows, and reveal them in Finder or File Explorer.
@@ -197,12 +197,6 @@ Rust + reqwest ──────► MiMo, Fish Audio, or custom TTS API
 ```
 
 The front end owns project and settings state. The Rust side handles HTTP requests, file I/O, audio caching, credential storage, and platform-native integrations. Generated audio is stored as local WAV files so it can be played, copied, revealed, or dragged into another app.
-
-## Current MVP scope
-
-Included: line-based script import, batch generation, playback, single-sentence regeneration, five-version history, local projects, voice design, voice cloning, local caching, settings, and English/Simplified Chinese UI.
-
-Not included yet: cloud sync, waveform editing, timeline editing, subtitles, and additional provider-specific adapters beyond MiMo and Fish Audio.
 
 ## License
 
