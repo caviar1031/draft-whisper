@@ -15,7 +15,6 @@ import { useVoiceSampleStore } from "@/stores/voice-sample-store"
 import type { SentenceStatus } from "@/types/sentence"
 import { isDirectorModeAvailable, resolveSentenceEditTarget } from "@/utils/director-mode"
 import { generateSentenceId } from "@/utils/id"
-import { resolveCapability } from "@/utils/provider-catalog"
 import { parseScriptLines } from "@/utils/script-lines"
 import { resolveLanguage } from "@/utils/settings-validation"
 import { registerTauriListener } from "@/utils/tauri-listener"
@@ -96,7 +95,6 @@ function App() {
   const effectiveVoiceDesignPrompt = effectiveVoiceResources.voiceDesignPrompt
   const effectiveVoiceClonePath = effectiveVoiceResources.voiceClonePath
   const selectedApiConfig = apiConfigs.find((config) => config.id === projectApiConfigId)
-  const projectModel = resolveCapability(selectedApiConfig, projectMode)?.modelId ?? ""
   const directorModeAvailable = isDirectorModeAvailable(
     selectedApiConfig?.provider,
     projectMode,
@@ -608,7 +606,6 @@ function App() {
             outputFormat={projectOutputFormat}
             apiConfigId={projectApiConfigId}
             apiConfigs={apiConfigs}
-            model={projectModel}
             voice={projectVoice}
             voiceDesignId={projectVoiceDesignId}
             voiceDesigns={voiceDesigns}

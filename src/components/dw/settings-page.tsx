@@ -229,7 +229,6 @@ export function SettingsPage() {
                         {enabled.map((mode) => (
                           <div className="dw-api-mapping-row" key={mode}>
                             <span>{t(`settings.modes.${mode}`)}</span>
-                            <code>{config.capabilities[mode].modelId}</code>
                           </div>
                         ))}
                         {settings.defaultApiConfigId !== config.id && (

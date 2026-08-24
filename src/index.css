@@ -3211,22 +3211,14 @@
   }
 
   .dw-api-mapping-row {
-    display: grid;
-    grid-template-columns: 88px minmax(0, 1fr);
-    gap: 8px;
+    display: flex;
+    align-items: center;
     padding: 4px 0;
   }
 
   .dw-api-mapping-row span {
     color: var(--text-500);
     font-size: 9px;
-  }
-
-  .dw-api-mapping-row code {
-    color: var(--text-700);
-    font-size: 9px;
-    overflow-wrap: anywhere;
-    text-align: right;
   }
 
   .dw-set-default-btn {

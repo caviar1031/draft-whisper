@@ -18,7 +18,6 @@ interface ScriptEditorProps {
   outputFormat: AudioFormat
   apiConfigId: string | null
   apiConfigs: ApiConfig[]
-  model: string
   voice: string
   voiceDesignId: string | null
   voiceDesigns: VoiceDesignPreset[]
@@ -151,7 +150,6 @@ export function ScriptEditor({
   outputFormat,
   apiConfigId,
   apiConfigs,
-  model,
   voice,
   voiceDesignId,
   voiceDesigns,
@@ -433,13 +431,6 @@ export function ScriptEditor({
                   onValueChange={onModeChange}
                 />
               </div>
-            </div>
-
-            <div className="dw-settings-field">
-              <label className="dw-settings-label">
-                {t("editor.model")}
-                <input className="dw-settings-input" value={model} readOnly />
-              </label>
             </div>
 
             <div className="dw-settings-field">
