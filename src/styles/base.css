@@ -1,0 +1,35 @@
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    width: 100%;
+    height: 100%;
+    /* 透明背景 — 让 macOS vibrancy 透出桌面壁纸；shadcn preflight 默认背景需显式覆盖 */
+    background: transparent;
+    /* 圆角裁剪到窗口边界 — 让 .draftwhisper-window 的圆角生效 */
+    overflow: hidden;
+    border-radius: 16px;
+  }
+  body {
+    margin: 0;
+    /* 透明背景 — 让 macOS vibrancy (window-vibrancy) 透出桌面壁纸 */
+    background: transparent;
+    @apply text-foreground;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    /* 全局禁止文字选择 — 卡片区域需要支持原生拖拽 */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  html[data-platform="windows"],
+  html[data-platform="windows"] body {
+    border-radius: 0;
+  }
+}

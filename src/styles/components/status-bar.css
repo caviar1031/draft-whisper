@@ -1,0 +1,44 @@
+@layer components {
+  /* ===== Status Bar (28px) ===== */
+  .dw-status-bar {
+    height: 28px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-top: 1px solid var(--glass-surface);
+    border-radius: 0 0 16px 16px;
+    background: var(--glass-card-bg);
+  }
+
+  .dw-status-bar-text {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-400);
+    white-space: nowrap;
+  }
+
+  .dw-status-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dw-status-bar-project {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-400);
+  }
+
+  .dw-status-bar-project-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-600);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

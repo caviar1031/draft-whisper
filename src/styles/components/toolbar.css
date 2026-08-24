@@ -1,0 +1,190 @@
+@layer components {
+  /* ===== Toolbar (56px) ===== */
+  .dw-toolbar {
+    height: 56px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    gap: 6px;
+    border-bottom: 1px solid var(--glass-divider);
+  }
+
+  .dw-toolbar-left,
+  .dw-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .dw-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 16px;
+    border: none;
+    background: var(--glass-surface);
+    color: var(--text-800);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .dw-pill-btn:hover {
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-pill-btn:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-pill-btn.is-active {
+    background: var(--glass-blue-tint-medium);
+    color: var(--brand-500);
+  }
+
+  .dw-pill-btn:disabled {
+    opacity: 0.32;
+    pointer-events: none;
+  }
+
+  .dw-pill-select {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    width: 130px;
+    padding: 0 28px;
+    border-radius: 16px;
+    border: none;
+    background: var(--glass-surface);
+    color: var(--text-800);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s cubic-bezier(0.32, 0.72, 0, 1);
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .dw-pill-select > svg:first-child {
+    position: absolute;
+    left: 10px;
+    flex-shrink: 0;
+  }
+
+  .dw-pill-select > svg:last-child {
+    position: absolute;
+    right: 10px;
+    flex-shrink: 0;
+  }
+
+  .dw-pill-select:hover {
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-pill-select:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  /* --- Dropdown select --- */
+  .dw-select-wrapper {
+    position: relative;
+  }
+
+  .dw-select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    background: var(--glass-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    padding: 4px;
+    z-index: 50;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .dw-select-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-800);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  .dw-select-option:hover {
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-select-option.is-active {
+    color: var(--brand-500);
+    font-weight: 600;
+  }
+
+  .dw-select-desc {
+    font-size: 11px;
+    color: var(--text-500);
+    margin-left: 8px;
+  }
+
+  .dw-primary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 16px;
+    border: none;
+    background: var(--brand-500);
+    color: var(--glass-text-on-primary);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .dw-primary-btn:hover {
+    filter: brightness(1.08);
+  }
+
+  .dw-primary-btn:active {
+    filter: brightness(0.95);
+  }
+
+  .dw-primary-btn:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-primary-btn:disabled {
+    opacity: 0.32;
+    pointer-events: none;
+  }
+}

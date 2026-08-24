@@ -1,0 +1,241 @@
+:root {
+  color-scheme: light;
+
+  /* ===== Apple-inspired primitive palette (Pinguo design tokens) ===== */
+
+  /* brand */
+  --brand-50: #e8f2ff;
+  --brand-100: #cfe5ff;
+  --brand-200: #9fcbff;
+  --brand-300: #66abff;
+  --brand-400: #2e8dff;
+  --brand-500: #007aff;
+  --brand-600: #0064d6;
+  --brand-700: #004fad;
+  --brand-800: #003b82;
+  --brand-900: #00275a;
+
+  /* background */
+  --background-50: #ffffff;
+  --background-100: #f7f7fa;
+  --background-200: #f2f2f7;
+  --background-300: #e5e5ea;
+  --background-400: #d1d1d6;
+  --background-500: #aeaeb2;
+  --background-600: #8e8e93;
+  --background-700: #3a3a3c;
+  --background-800: #1c1c1e;
+  --background-900: #000000;
+
+  /* text */
+  --text-50: #f5f5f7;
+  --text-100: #e3e3e8;
+  --text-200: #c7c7cc;
+  --text-300: #aeaeb2;
+  --text-400: #8e8e93;
+  --text-500: #6e6e73;
+  --text-600: #48484a;
+  --text-700: #3c3c43;
+  --text-800: #1d1d1f;
+  --text-900: #000000;
+
+  /* icon */
+  --icon-50: #f5f5f7;
+  --icon-100: #e5e5ea;
+  --icon-200: #d1d1d6;
+  --icon-300: #c7c7cc;
+  --icon-400: #aeaeb2;
+  --icon-500: #8e8e93;
+  --icon-600: #6e6e73;
+  --icon-700: #48484a;
+  --icon-800: #2c2c2e;
+  --icon-900: #1d1d1f;
+
+  /* state */
+  --state-success: #34c759;
+  --state-success-dark: #30d158;
+  --state-success-surface: #e9f9ee;
+  --state-error: #ff3b30;
+  --state-error-dark: #ff453a;
+  --state-error-surface: #ffecea;
+  --glass-orange: #ff9500;
+
+  /* ===== semantic roles ===== */
+  --background: var(--background-50);
+  --foreground: var(--text-800);
+  --card: var(--background-50);
+  --card-foreground: var(--text-800);
+  --popover: var(--background-50);
+  --popover-foreground: var(--text-900);
+
+  --primary: var(--brand-500);
+  --primary-foreground: var(--background-50);
+  --secondary: var(--background-200);
+  --secondary-foreground: var(--text-800);
+  --muted: var(--background-200);
+  --muted-foreground: var(--text-400);
+  --accent: var(--background-100);
+  --accent-foreground: var(--text-800);
+  --destructive: var(--state-error);
+  --destructive-foreground: #ffffff;
+  --success: var(--state-success);
+  --success-foreground: #ffffff;
+  --border: var(--background-300);
+  --input: var(--background-400);
+  --ring: var(--brand-500);
+
+  --chart-1: var(--state-success);
+  --chart-2: var(--brand-500);
+  --chart-3: #ff9500;
+  --chart-4: #5856d6;
+  --chart-5: #af52de;
+
+  --sidebar: var(--background-200);
+  --sidebar-foreground: var(--text-800);
+  --sidebar-primary: var(--brand-500);
+  --sidebar-primary-foreground: var(--background-50);
+  --sidebar-accent: var(--background-300);
+  --sidebar-accent-foreground: var(--text-800);
+  --sidebar-border: var(--background-300);
+  --sidebar-ring: var(--brand-500);
+
+  --radius: 1.2rem;
+
+  /* ===== Liquid Glass structural colors ===== */
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --glass-surface: rgba(0, 0, 0, 0.04);
+  --glass-surface-hover: rgba(0, 0, 0, 0.06);
+  --glass-surface-2: rgba(0, 0, 0, 0.08);
+  --glass-surface-5: rgba(0, 0, 0, 0.05);
+  --glass-divider: rgba(0, 0, 0, 0.06);
+  --glass-divider-strong: rgba(0, 0, 0, 0.12);
+  --glass-card-bg: rgba(255, 255, 255, 0.3);
+  --glass-bg-card: rgba(255, 255, 255, 0.55);
+  --glass-bg-card-light: rgba(255, 255, 255, 0.65);
+  --glass-bg-card-hover: rgba(255, 255, 255, 0.75);
+  --glass-bg-card-subtle: rgba(255, 255, 255, 0.25);
+  --glass-bg-input: rgba(255, 255, 255, 0.6);
+  --control-interaction-bg: #eeeef0;
+  --glass-header-bg: rgba(255, 255, 255, 0.28);
+  --glass-editor-bg: rgba(250, 250, 252, 0.96);
+  --glass-select-option-bg: #ffffff;
+  --glass-overlay: rgba(0, 0, 0, 0.15);
+  --glass-focus-ring: rgba(0, 122, 255, 0.3);
+  --glass-text-on-primary: #ffffff;
+  --glass-popover-bg: rgba(255, 255, 255, 0.82);
+  --glass-popover-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  --glass-input-border: rgba(0, 0, 0, 0.1);
+  --glass-handle: rgba(0, 0, 0, 0.18);
+  --glass-handle-hover: rgba(0, 0, 0, 0.35);
+  --glass-blue-tint: rgba(0, 122, 255, 0.04);
+  --glass-blue-tint-medium: rgba(0, 122, 255, 0.1);
+  --glass-blue-tint-strong: rgba(0, 122, 255, 0.12);
+  --glass-blue-tint-glow: rgba(0, 122, 255, 0.15);
+  --glass-blue-tint-spinner: rgba(0, 122, 255, 0.2);
+  --glass-blue-tint-border: rgba(0, 122, 255, 0.25);
+  --glass-green-tint: rgba(52, 199, 89, 0.1);
+  --glass-green-tint-strong: rgba(52, 199, 89, 0.12);
+  --glass-green-strong: #248a3d;
+  --glass-red-tint-medium: rgba(255, 59, 48, 0.08);
+  --glass-orange-tint: rgba(255, 149, 0, 0.12);
+
+  /* macOS desktop wallpaper gradient */
+  --macos-bg-1: #d4dce4;
+  --macos-bg-2: #b8c9d4;
+  --macos-bg-3: #c2cdd6;
+  --macos-bg-4: #a8bcc9;
+  --macos-bg-5: #bcc8d0;
+  --macos-bg-6: #c8d0d8;
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Primitive aliases used by the original Liquid Glass component styles. */
+  --brand-400: #5eb5ff;
+  --brand-500: #0a84ff;
+  --brand-600: #66abff;
+  --brand-700: #9fcbff;
+  --background-400: #636366;
+  --text-100: #e5e5ea;
+  --text-200: #d1d1d6;
+  --text-300: #aeaeb2;
+  --text-400: #98989d;
+  --text-500: #8e8e93;
+  --text-600: #aeaeb2;
+  --text-700: #d1d1d6;
+  --text-800: #f5f5f7;
+  --text-900: #ffffff;
+  --icon-600: #aeaeb2;
+  --icon-700: #c7c7cc;
+  --icon-800: #e5e5ea;
+  --icon-900: #f5f5f7;
+  --state-success: #30d158;
+  --state-error: #ff453a;
+  --state-success-surface: rgba(48, 209, 88, 0.16);
+  --state-error-surface: rgba(255, 69, 58, 0.16);
+  --glass-green-tint: rgba(48, 209, 88, 0.14);
+  --glass-green-tint-strong: rgba(48, 209, 88, 0.2);
+  --glass-green-strong: #30d158;
+  --glass-red-tint-medium: rgba(255, 69, 58, 0.14);
+  --glass-card-bg: rgba(255, 255, 255, 0.04);
+  --glass-header-bg: rgba(28, 28, 30, 0.38);
+  --glass-editor-bg: rgba(28, 28, 30, 0.96);
+  --glass-select-option-bg: #2c2c2e;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  --macos-bg-1: #202b38;
+  --macos-bg-2: #263746;
+  --macos-bg-3: #26313d;
+  --macos-bg-4: #182431;
+  --macos-bg-5: #202d3a;
+  --macos-bg-6: #26303b;
+
+  --background: #1c1c1e;
+  --foreground: var(--text-50);
+  --card: #2c2c2e;
+  --card-foreground: var(--text-50);
+  --popover: #3a3a3c;
+  --popover-foreground: var(--text-50);
+
+  --primary: var(--brand-500);
+  --primary-foreground: #000000;
+  --secondary: #2c2c2e;
+  --secondary-foreground: var(--text-50);
+  --muted: #2c2c2e;
+  --muted-foreground: var(--text-400);
+  --accent: #3a3a3c;
+  --accent-foreground: var(--text-50);
+  --destructive: var(--state-error-dark);
+  --success: var(--state-success-dark);
+  --border: #48484a;
+  --input: #636366;
+
+  --sidebar: #2c2c2e;
+  --sidebar-foreground: var(--text-50);
+  --sidebar-accent: #48484a;
+  --sidebar-accent-foreground: var(--text-50);
+  --sidebar-border: #48484a;
+
+  --glass-bg: rgba(28, 28, 30, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-surface: rgba(255, 255, 255, 0.06);
+  --glass-surface-hover: rgba(255, 255, 255, 0.1);
+  --glass-surface-2: rgba(255, 255, 255, 0.14);
+  --glass-surface-5: rgba(255, 255, 255, 0.08);
+  --glass-divider: rgba(255, 255, 255, 0.08);
+  --glass-divider-strong: rgba(255, 255, 255, 0.16);
+  --glass-bg-card: rgba(58, 58, 60, 0.55);
+  --glass-bg-card-light: rgba(58, 58, 60, 0.65);
+  --glass-bg-card-hover: rgba(58, 58, 60, 0.75);
+  --glass-bg-card-subtle: rgba(255, 255, 255, 0.08);
+  --glass-bg-input: rgba(58, 58, 60, 0.6);
+  --control-interaction-bg: #3a3a3c;
+  --glass-popover-bg: rgba(28, 28, 30, 0.82);
+  --glass-input-border: rgba(255, 255, 255, 0.12);
+  --glass-handle: rgba(255, 255, 255, 0.2);
+  --glass-handle-hover: rgba(255, 255, 255, 0.4);
+  --glass-text-on-primary: #ffffff;
+}

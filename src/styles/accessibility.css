@@ -1,0 +1,13 @@
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .dw-sentence-card.is-playing,
+  .dw-status-dot.is-generating,
+  .dw-status-dot.is-playing,
+  .dw-waveform-bar,
+  .dw-spinner {
+    animation: none !important;
+  }
+  .dw-waveform-bar {
+    transform: scaleY(1);
+  }
+}
