@@ -440,7 +440,7 @@ export function ApiConfigEditor({
               onClick={() => setShowApiKey((visible) => !visible)}
               aria-label={t(showApiKey ? "settings.editor.hideKey" : "settings.editor.showKey")}
             >
-              {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showApiKey ? <Eye size={15} /> : <EyeOff size={15} />}
             </button>
           </div>
 

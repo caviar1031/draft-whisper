@@ -174,6 +174,7 @@
   --glass-bg-card-hover: rgba(255, 255, 255, 0.75);
   --glass-bg-card-subtle: rgba(255, 255, 255, 0.25);
   --glass-bg-input: rgba(255, 255, 255, 0.6);
+  --control-interaction-bg: #eeeef0;
   --glass-header-bg: rgba(255, 255, 255, 0.28);
   --glass-editor-bg: rgba(250, 250, 252, 0.96);
   --glass-select-option-bg: #ffffff;
@@ -288,6 +289,7 @@
   --glass-bg-card-hover: rgba(58, 58, 60, 0.75);
   --glass-bg-card-subtle: rgba(255, 255, 255, 0.08);
   --glass-bg-input: rgba(58, 58, 60, 0.6);
+  --control-interaction-bg: #3a3a3c;
   --glass-popover-bg: rgba(28, 28, 30, 0.82);
   --glass-input-border: rgba(255, 255, 255, 0.12);
   --glass-handle: rgba(255, 255, 255, 0.2);
@@ -1443,7 +1445,7 @@
     min-height: 52px;
     padding: 10px 12px;
     border-radius: 12px;
-    border: 1px solid var(--glass-blue-tint-border);
+    border: 1px solid var(--brand-500);
     background: var(--glass-bg-input);
     font-family: inherit;
     font-size: 14px;
@@ -1451,8 +1453,8 @@
     color: var(--text-800);
     resize: none;
     outline: none;
-    box-shadow: 0 0 0 3px var(--glass-focus-ring);
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    box-shadow: none;
+    transition: border-color 0.15s ease;
     /* 恢复文字选择 */
     user-select: text;
     -webkit-user-select: text;
@@ -1550,7 +1552,7 @@
 
   .dw-style-instruction-textarea:focus {
     border-color: var(--brand-500);
-    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+    box-shadow: none;
   }
 
   .dw-style-instruction-meta {
@@ -2279,7 +2281,7 @@
 
   .dw-settings-input:focus {
     border-color: var(--brand-500);
-    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+    box-shadow: none;
   }
 
   .dw-custom-select-trigger {
@@ -2312,13 +2314,13 @@
   }
 
   .dw-custom-select-trigger:hover:not([data-disabled]) {
-    background: var(--glass-surface-hover);
+    background: var(--control-interaction-bg);
   }
 
   .dw-custom-select-trigger[data-popup-open],
   .dw-custom-select-trigger:focus-visible {
     border-color: var(--glass-input-border);
-    background: var(--glass-surface-2);
+    background: var(--control-interaction-bg);
     box-shadow: none;
   }
 
@@ -2396,7 +2398,7 @@
   }
 
   .dw-custom-select-option[data-highlighted] {
-    background: var(--glass-surface-hover);
+    background: var(--control-interaction-bg);
   }
 
   .dw-custom-select-option[data-selected] {
@@ -2872,7 +2874,7 @@
   }
 
   .dw-mode-btn:hover {
-    background: var(--glass-surface-hover);
+    background: var(--control-interaction-bg);
   }
 
   .dw-mode-btn.is-active {
@@ -2918,7 +2920,7 @@
 
   .dw-editor-textarea:focus {
     border-color: var(--brand-500);
-    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+    box-shadow: none;
   }
 
   /* ---- Editor container (manual mode: line numbers + textarea) ---- */
@@ -2936,7 +2938,7 @@
 
   .dw-editor-container:focus-within {
     border-color: var(--brand-500);
-    box-shadow: 0 0 0 3px var(--glass-focus-ring);
+    box-shadow: none;
   }
 
   .dw-line-numbers {
