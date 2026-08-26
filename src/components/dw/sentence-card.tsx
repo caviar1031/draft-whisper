@@ -1,15 +1,19 @@
-import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/tts"
-import type { Sentence } from "@/types"
+import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/audio"
+import type { Sentence } from "@/types/sentence"
+import type { SentenceEditTarget } from "@/utils/director-mode"
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CirclePause,
   CirclePlay,
   Copy,
   FolderOpen,
   GripVertical,
   Pencil,
+  Plus,
   RefreshCw,
   TriangleAlert,
 } from "lucide-react"
@@ -34,9 +38,11 @@ interface SentenceCardProps {
   onRegenerate: () => void
   onRetry: () => void
   onEdit: () => void
-  onCommitEdit: (text: string) => void
+  onCommitEdit: (text: string, styleInstruction: string) => void
   onCancelEdit: () => void
   onSwitchVersion: (historyIndex: number) => void
+  directorInstructionAvailable?: boolean
+  initialEditTarget?: SentenceEditTarget
   generationDisabled?: boolean
   generationDisabledReason?: string
 }
@@ -55,6 +61,8 @@ export function SentenceCard({
   onCommitEdit,
   onCancelEdit,
   onSwitchVersion,
+  directorInstructionAvailable = false,
+  initialEditTarget = "text",
   generationDisabled = false,
   generationDisabledReason,
 }: SentenceCardProps) {
@@ -206,6 +214,8 @@ export function SentenceCard({
         className={cardClassName}
         onCommit={onCommitEdit}
         onCancel={onCancelEdit}
+        directorInstructionAvailable={directorInstructionAvailable}
+        initialEditTarget={initialEditTarget}
       />
     )
   }
@@ -260,6 +270,14 @@ export function SentenceCard({
         <div className="dw-sentence-meta">
           <span className={statusDotClass} />
           <span className={statusTextClass}>{statusLabel}</span>
+          {directorInstructionAvailable && (sentence.styleInstruction ?? "").trim().length > 0 && (
+            <span
+              className="dw-style-instruction-indicator"
+              title={sentence.styleInstruction ?? ""}
+            >
+              {t("sentence.directorInstruction")}
+            </span>
+          )}
           {view === "ready" && historyCount > 1 && (
             <div className="dw-version-nav">
               <button
@@ -415,29 +433,53 @@ function renderActions(
   return null
 }
 
-// 编辑态卡片 — 文本域 + 已修改徽标 + 字数提示
+// Editing card with sentence text and optional per-sentence director instruction.
 interface EditingCardProps {
   sentence: Sentence
   index: number
   className: string
-  onCommit: (text: string) => void
+  onCommit: (text: string, styleInstruction: string) => void
   onCancel: () => void
+  directorInstructionAvailable: boolean
+  initialEditTarget: SentenceEditTarget
 }
 
-function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardProps) {
+function EditingCard({
+  sentence,
+  className,
+  onCommit,
+  onCancel,
+  directorInstructionAvailable,
+  initialEditTarget,
+}: EditingCardProps) {
   const { t } = useTranslation()
   const [value, setValue] = useState(sentence.text)
+  const [styleInstruction, setStyleInstruction] = useState(sentence.styleInstruction ?? "")
+  const [styleInstructionOpen, setStyleInstructionOpen] = useState(initialEditTarget === "style")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const styleTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
+    if (initialEditTarget !== "text") return
     textareaRef.current?.focus()
     textareaRef.current?.select()
-  }, [])
+  }, [initialEditTarget])
+
+  useEffect(() => {
+    if (!styleInstructionOpen) return
+    const animationFrame = window.requestAnimationFrame(() => {
+      const textarea = styleTextareaRef.current
+      if (!textarea) return
+      textarea.focus()
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+    })
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [styleInstructionOpen])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      onCommit(value.trim() || sentence.text)
+      onCommit(value.trim() || sentence.text, styleInstruction.trim())
     } else if (e.key === "Escape") {
       e.preventDefault()
       onCancel()
@@ -446,25 +488,10 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
 
   return (
     <div className={className}>
-      <div className="dw-drag-handle" style={{ marginTop: 2 }}>
+      <div className="dw-drag-handle">
         <GripVertical size={16} strokeWidth={2} />
       </div>
       <div className="dw-sentence-body">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: "8px",
-            marginBottom: "8px",
-          }}
-        >
-          <span className="dw-status-text is-pending">{t("sentence.pending")}</span>
-          <span className="dw-changed-badge">
-            <Pencil size={10} strokeWidth={2.5} style={{ color: "var(--glass-orange)" }} />
-            {t("sentence.changed")}
-          </span>
-        </div>
         <textarea
           ref={textareaRef}
           className="dw-editing-textarea"
@@ -476,22 +503,60 @@ function EditingCard({ sentence, className, onCommit, onCancel }: EditingCardPro
           maxLength={500}
         />
         <div className="dw-editing-hint">
-          <span>{t("sentence.editHint")}</span>
+          <span className="dw-editing-hint-main">
+            <span className="dw-status-text is-pending">{t("sentence.pending")}</span>
+            <span>{t("sentence.editHint")}</span>
+          </span>
           <span>{value.length} / 500</span>
         </div>
-      </div>
-      <div className="dw-card-actions" style={{ alignSelf: "center" }}>
-        <button type="button" className="dw-action-btn" aria-label={t("sentence.play")} disabled>
-          <CirclePlay size={20} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className="dw-action-btn"
-          aria-label={t("sentence.regenerate")}
-          disabled
-        >
-          <RefreshCw size={16} strokeWidth={2} />
-        </button>
+        {directorInstructionAvailable && (
+          <div className="dw-style-instruction-editor">
+            <button
+              type="button"
+              className="dw-style-instruction-toggle"
+              aria-expanded={styleInstructionOpen}
+              onClick={() => setStyleInstructionOpen((current) => !current)}
+            >
+              <span className="dw-style-instruction-toggle-main">
+                {styleInstruction.length > 0 ? (
+                  <Pencil size={12} strokeWidth={2} />
+                ) : (
+                  <Plus size={13} strokeWidth={2} />
+                )}
+                <span>{t("sentence.directorInstruction")}</span>
+                {!styleInstructionOpen && styleInstruction.length > 0 && (
+                  <span className="dw-style-instruction-summary">{styleInstruction}</span>
+                )}
+              </span>
+              {styleInstructionOpen ? (
+                <ChevronUp size={13} strokeWidth={2} />
+              ) : (
+                <ChevronDown size={13} strokeWidth={2} />
+              )}
+            </button>
+            {styleInstructionOpen && (
+              <div className="dw-style-instruction-content">
+                <textarea
+                  ref={styleTextareaRef}
+                  id={`style-${sentence.id}`}
+                  className="dw-style-instruction-textarea"
+                  rows={2}
+                  value={styleInstruction}
+                  aria-label={t("sentence.directorInstruction")}
+                  placeholder={t("sentence.directorInstructionPlaceholder")}
+                  onChange={(event) => setStyleInstruction(event.target.value)}
+                  onKeyDown={handleKeyDown}
+                  maxLength={1024}
+                />
+                {styleInstruction.length >= 900 && (
+                  <div className="dw-style-instruction-meta">
+                    <span>{styleInstruction.length} / 1024</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

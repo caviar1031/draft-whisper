@@ -1,3 +1,4 @@
+import { ModalLayer } from "@/components/ui/modal-layer"
 import { Folder, FolderPlus, Trash2, TriangleAlert, X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -82,31 +83,27 @@ export function ProjectConfigCard({
         e.preventDefault()
         void handleCreate()
       }
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && isCreating) {
         e.preventDefault()
-        if (isCreating) {
-          setIsCreating(false)
-          setNewProjectName("")
-        } else {
-          onClose()
-        }
+        e.stopPropagation()
+        setIsCreating(false)
+        setNewProjectName("")
       }
     },
-    [handleCreate, isCreating, onClose],
+    [handleCreate, isCreating],
   )
 
   return (
-    <>
-      <button
-        type="button"
-        className="dw-dim-overlay"
-        style={{ top: 0 }}
-        onClick={onClose}
-        aria-label={t("common.close")}
-      />
-      <div className="dw-project-config-card" onKeyDown={handleKeyDown}>
+    <ModalLayer onClose={onClose} closeOnBackdrop>
+      <ModalLayer.Panel
+        className="dw-project-config-card"
+        aria-labelledby="project-config-title"
+        onKeyDown={handleKeyDown}
+      >
         <div className="dw-project-config-header">
-          <span className="dw-settings-title">{t("project.title")}</span>
+          <span id="project-config-title" className="dw-settings-title">
+            {t("project.title")}
+          </span>
           <button
             type="button"
             className="dw-settings-close"
@@ -225,7 +222,7 @@ export function ProjectConfigCard({
             )}
           </div>
         </div>
-      </div>
-    </>
+      </ModalLayer.Panel>
+    </ModalLayer>
   )
 }

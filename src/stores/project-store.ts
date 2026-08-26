@@ -1,15 +1,19 @@
-import { cleanupAudioFiles, invalidateAudioUrl, revokeAllAudioUrls } from "@/services/tts"
+import { cleanupAudioFiles, invalidateAudioUrl, revokeAllAudioUrls } from "@/services/audio"
 import { useSettingsStore } from "@/stores/settings-store"
-import type { Project, Sentence, TtsMode } from "@/types"
+import type { Project } from "@/types/project"
+import type { Sentence } from "@/types/sentence"
+import type { AudioFormat, TtsMode } from "@/types/tts"
+import {
+  PROJECT_STORAGE_PREFIX,
+  createDefaultProject,
+  decodePersistedProject,
+  loadProjectFromStorage,
+  projectStorageKey,
+  resolveVoiceForApiConfig,
+  saveProjectToStorage,
+} from "@/utils/project-persistence"
+import { resolveAudioFormat } from "@/utils/provider-catalog"
 import { create } from "zustand"
-
-const STORAGE_PREFIX = "dw-project:"
-const DEFAULT_KEY = "__default__"
-const LEGACY_KEY = "dw-project"
-
-function storageKey(project: string | null): string {
-  return `${STORAGE_PREFIX}${project ?? DEFAULT_KEY}`
-}
 
 function audioPaths(sentences: Sentence[]): Set<string> {
   const paths = new Set<string>()
@@ -26,91 +30,11 @@ function deleteUnreferencedAudio(previous: Sentence[], next: Sentence[]): void {
   if (removed.length > 0) cleanupAudioFiles(removed)
 }
 
-/** 重置瞬态状态：generating/queued → 根据 audioPath 判断 */
-function normalizeSentences(sentences: Sentence[]): Sentence[] {
-  return sentences.map((s) => {
-    if (s.status === "generating" || s.status === "queued") {
-      return { ...s, status: s.audioPath ? "completed" : "pending" }
-    }
-    return s
-  })
-}
-
-interface ProjectData {
-  apiConfigId: string | null
-  mode: TtsMode
-  voice: string
-  voiceDesignId: string | null
-  voiceDesignPrompt: string
-  voiceCloneSampleId: string | null
-  voiceClonePath: string | null
-  performancePrompt: string
-  sentences: Sentence[]
-}
-
-const DEFAULT_PROJECT_DATA: ProjectData = {
-  apiConfigId: null,
-  mode: "basic",
-  voice: "冰糖",
-  voiceDesignId: null,
-  voiceDesignPrompt: "",
-  voiceCloneSampleId: null,
-  voiceClonePath: null,
-  performancePrompt: "",
-  sentences: [],
-}
-
-/** 从 localStorage 加载指定项目的数据 */
-function loadProjectData(project: string | null): ProjectData {
-  try {
-    const key = storageKey(project)
-    let raw = localStorage.getItem(key)
-
-    // 迁移旧版数据
-    if (!raw && project === null) {
-      raw = localStorage.getItem(LEGACY_KEY)
-      if (raw) {
-        localStorage.setItem(key, raw)
-        localStorage.removeItem(LEGACY_KEY)
-      }
-    }
-
-    if (!raw) {
-      return {
-        ...DEFAULT_PROJECT_DATA,
-        apiConfigId: useSettingsStore.getState().defaultApiConfigId,
-      }
-    }
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-
-    // 兼容旧版 Zustand persist 格式 { state: { sentences: [...] } }
-    const state = (parsed.state as Record<string, unknown>) ?? parsed
-    const sentences = (state.sentences as Sentence[]) ?? []
-    const mode = (state.mode as TtsMode) ?? "basic"
-
-    return {
-      apiConfigId:
-        typeof state.apiConfigId === "string"
-          ? state.apiConfigId
-          : useSettingsStore.getState().defaultApiConfigId,
-      mode,
-      voice: (state.voice as string) ?? "冰糖",
-      voiceDesignId: (state.voiceDesignId as string | null) ?? null,
-      voiceDesignPrompt: (state.voiceDesignPrompt as string) ?? "",
-      voiceCloneSampleId: (state.voiceCloneSampleId as string | null) ?? null,
-      voiceClonePath: (state.voiceClonePath as string | null) ?? null,
-      performancePrompt: (state.performancePrompt as string) ?? "",
-      sentences: normalizeSentences(sentences),
-    }
-  } catch {
-    return { ...DEFAULT_PROJECT_DATA, apiConfigId: useSettingsStore.getState().defaultApiConfigId }
-  }
-}
-
-interface ProjectState extends Project {
+export interface ProjectState extends Project {
   currentProject: string | null
   setApiConfigId: (apiConfigId: string | null) => void
   setMode: (mode: TtsMode) => void
+  setOutputFormat: (format: AudioFormat) => void
   setVoice: (voice: string) => void
   setVoiceDesignId: (id: string | null) => void
   setVoiceDesignPrompt: (prompt: string) => void
@@ -126,48 +50,136 @@ interface ProjectState extends Project {
   loadProject: (project: string | null) => void
 }
 
+const initialDefault = createDefaultProject()
+
 export const useProjectStore = create<ProjectState>((set, get) => ({
   currentProject: null,
-  apiConfigId: null,
-  mode: "basic",
-  voice: "冰糖",
-  voiceDesignId: null,
-  voiceDesignPrompt: "",
-  voiceCloneSampleId: null,
-  voiceClonePath: null,
-  performancePrompt: "",
-  sentences: [],
+  apiConfigId: initialDefault.apiConfigId,
+  mode: initialDefault.mode,
+  outputFormat: initialDefault.outputFormat,
+  voiceConfigs: initialDefault.voiceConfigs,
+  sentences: initialDefault.sentences,
 
   setApiConfigId: (apiConfigId) => {
-    set({ apiConfigId })
+    const apiConfigs = useSettingsStore.getState().apiConfigs
+    set((state) => ({
+      apiConfigId,
+      outputFormat: resolveAudioFormat(
+        apiConfigs.find((config) => config.id === apiConfigId),
+        state.mode,
+        state.outputFormat,
+      ),
+      voiceConfigs: {
+        ...state.voiceConfigs,
+        basic: {
+          ...state.voiceConfigs.basic,
+          voice: resolveVoiceForApiConfig(apiConfigId, state.voiceConfigs.basic.voice, apiConfigs),
+        },
+      },
+    }))
     saveCurrentProject(get())
   },
   setMode: (mode) => {
-    set({ mode })
+    const apiConfigs = useSettingsStore.getState().apiConfigs
+    set((state) => ({
+      mode,
+      outputFormat: resolveAudioFormat(
+        apiConfigs.find((config) => config.id === state.apiConfigId),
+        mode,
+        state.outputFormat,
+      ),
+    }))
+    saveCurrentProject(get())
+  },
+  setOutputFormat: (outputFormat) => {
+    set({ outputFormat })
     saveCurrentProject(get())
   },
   setVoice: (voice) => {
-    set({ voice })
+    set((state) => ({
+      voiceConfigs: {
+        ...state.voiceConfigs,
+        basic: {
+          ...state.voiceConfigs.basic,
+          voice,
+        },
+      },
+    }))
     saveCurrentProject(get())
   },
-  setVoiceDesignId: (voiceDesignId) => {
-    set({ voiceDesignId })
+  setVoiceDesignId: (presetId) => {
+    set((state) => ({
+      voiceConfigs: {
+        ...state.voiceConfigs,
+        "voice-design": {
+          ...state.voiceConfigs["voice-design"],
+          presetId,
+        },
+      },
+    }))
     saveCurrentProject(get())
   },
-  setVoiceDesignPrompt: (voiceDesignPrompt) => {
-    set({ voiceDesignPrompt })
+  setVoiceDesignPrompt: (prompt) => {
+    set((state) => ({
+      voiceConfigs: {
+        ...state.voiceConfigs,
+        "voice-design": {
+          ...state.voiceConfigs["voice-design"],
+          prompt,
+        },
+      },
+    }))
     saveCurrentProject(get())
   },
-  setVoiceCloneSampleId: (voiceCloneSampleId) => {
-    set({ voiceCloneSampleId })
+  setVoiceCloneSampleId: (sampleId) => {
+    set((state) => ({
+      voiceConfigs: {
+        ...state.voiceConfigs,
+        "voice-clone": {
+          ...state.voiceConfigs["voice-clone"],
+          sampleId,
+        },
+      },
+    }))
     saveCurrentProject(get())
   },
-  setVoiceClonePath: (voiceClonePath) => {
-    set({ voiceClonePath })
+  setVoiceClonePath: (samplePath) => {
+    set((state) => ({
+      voiceConfigs: {
+        ...state.voiceConfigs,
+        "voice-clone": {
+          ...state.voiceConfigs["voice-clone"],
+          samplePath,
+        },
+      },
+    }))
     saveCurrentProject(get())
   },
-  setPerformancePrompt: (performancePrompt) => {
-    set({ performancePrompt })
+  setPerformancePrompt: (prompt) => {
+    set((state) => {
+      const mode = state.mode
+      if (mode === "voice-design") return state
+      if (mode === "voice-clone") {
+        return {
+          voiceConfigs: {
+            ...state.voiceConfigs,
+            "voice-clone": {
+              ...state.voiceConfigs["voice-clone"],
+              performancePrompt: prompt,
+            },
+          },
+        }
+      }
+      return {
+        voiceConfigs: {
+          ...state.voiceConfigs,
+          basic: {
+            ...state.voiceConfigs.basic,
+            performancePrompt: prompt,
+          },
+        },
+      }
+    })
     saveCurrentProject(get())
   },
   setSentences: (sentences) => {
@@ -205,7 +217,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         if (s.id !== id) return s
         const version = s.audioHistory[historyIndex]
         if (!version) return s
-        // 不 invalidate 旧 URL，因为其他版本可能还在用
         return { ...s, audioPath: version.audioPath, duration: null }
       }),
     }))
@@ -218,28 +229,26 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     // 切换项目时清理所有 Blob URL 缓存
     revokeAllAudioUrls()
     // 加载目标项目
-    const data = loadProjectData(project)
+    const { defaultApiConfigId, apiConfigs } = useSettingsStore.getState()
+    const data = loadProjectFromStorage(project, defaultApiConfigId, apiConfigs)
     set({
       currentProject: project,
       apiConfigId: data.apiConfigId,
       mode: data.mode,
-      voice: data.voice,
-      voiceDesignId: data.voiceDesignId,
-      voiceDesignPrompt: data.voiceDesignPrompt,
-      voiceCloneSampleId: data.voiceCloneSampleId,
-      voiceClonePath: data.voiceClonePath,
-      performancePrompt: data.performancePrompt,
+      outputFormat: data.outputFormat,
+      voiceConfigs: data.voiceConfigs,
       sentences: data.sentences,
     })
   },
 }))
 
-/** 辅助函数：保存当前项目的完整数据 */
-function saveProjectData(project: string | null, data: ProjectData): void {
-  try {
-    localStorage.setItem(storageKey(project), JSON.stringify(data))
-  } catch {
-    // localStorage 满或不可用时静默失败
+function projectToSave(state: ProjectState): Project {
+  return {
+    apiConfigId: state.apiConfigId,
+    mode: state.mode,
+    outputFormat: state.outputFormat,
+    voiceConfigs: state.voiceConfigs,
+    sentences: state.sentences,
   }
 }
 
@@ -248,17 +257,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 function saveCurrentProject(state: ProjectState): void {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
-    saveProjectData(state.currentProject, {
-      apiConfigId: state.apiConfigId,
-      mode: state.mode,
-      voice: state.voice,
-      voiceDesignId: state.voiceDesignId,
-      voiceDesignPrompt: state.voiceDesignPrompt,
-      voiceCloneSampleId: state.voiceCloneSampleId,
-      voiceClonePath: state.voiceClonePath,
-      performancePrompt: state.performancePrompt,
-      sentences: state.sentences,
-    })
+    saveProjectToStorage(state.currentProject, projectToSave(state))
   }, 300)
 }
 
@@ -268,17 +267,7 @@ function flushAndSave(state: ProjectState): void {
     clearTimeout(saveTimer)
     saveTimer = null
   }
-  saveProjectData(state.currentProject, {
-    apiConfigId: state.apiConfigId,
-    mode: state.mode,
-    voice: state.voice,
-    voiceDesignId: state.voiceDesignId,
-    voiceDesignPrompt: state.voiceDesignPrompt,
-    voiceCloneSampleId: state.voiceCloneSampleId,
-    voiceClonePath: state.voiceClonePath,
-    performancePrompt: state.performancePrompt,
-    sentences: state.sentences,
-  })
+  saveProjectToStorage(state.currentProject, projectToSave(state))
 }
 
 /**
@@ -291,26 +280,31 @@ export function flushCurrentProject(): void {
 
 /** 删除某个项目在 localStorage 中的元数据。 */
 export function deleteStoredProject(project: string): void {
-  localStorage.removeItem(storageKey(project))
+  if (typeof localStorage === "undefined") return
+  localStorage.removeItem(projectStorageKey(project))
 }
 
 /** 清除当前项目和所有已保存项目对已删除声音样本的引用。 */
 export function clearVoiceSampleReferences(filePath: string): void {
   const current = useProjectStore.getState()
-  if (current.voiceClonePath === filePath) current.setVoiceClonePath(null)
+  if (current.voiceConfigs["voice-clone"].samplePath === filePath) {
+    current.setVoiceClonePath(null)
+  }
+
+  if (typeof localStorage === "undefined") return
+  const { defaultApiConfigId, apiConfigs } = useSettingsStore.getState()
 
   for (let index = 0; index < localStorage.length; index++) {
     const key = localStorage.key(index)
-    if (!key?.startsWith(STORAGE_PREFIX)) continue
+    if (!key?.startsWith(PROJECT_STORAGE_PREFIX)) continue
     const raw = localStorage.getItem(key)
     if (!raw) continue
     try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      const nestedState = parsed.state as Record<string, unknown> | undefined
-      const data = nestedState ?? parsed
-      if (data.voiceClonePath !== filePath) continue
-      data.voiceClonePath = null
-      localStorage.setItem(key, JSON.stringify(parsed))
+      const decoded = decodePersistedProject(raw, defaultApiConfigId, apiConfigs)
+      if (decoded.voiceConfigs["voice-clone"].samplePath === filePath) {
+        decoded.voiceConfigs["voice-clone"].samplePath = null
+        localStorage.setItem(key, JSON.stringify(decoded))
+      }
     } catch {
       // 损坏的旧项目数据由正常加载迁移逻辑处理。
     }
@@ -323,38 +317,47 @@ export function clearVoiceResourceReferences(
   fallbackPath?: string,
 ): void {
   const current = useProjectStore.getState()
-  if (kind === "design" && current.voiceDesignId === resourceId) {
+  if (kind === "design" && current.voiceConfigs["voice-design"].presetId === resourceId) {
     current.setVoiceDesignId(null)
     current.setVoiceDesignPrompt("")
   }
   if (
     kind === "clone" &&
-    (current.voiceCloneSampleId === resourceId || current.voiceClonePath === fallbackPath)
+    (current.voiceConfigs["voice-clone"].sampleId === resourceId ||
+      current.voiceConfigs["voice-clone"].samplePath === fallbackPath)
   ) {
     current.setVoiceCloneSampleId(null)
     current.setVoiceClonePath(null)
   }
 
+  if (typeof localStorage === "undefined") return
+  const { defaultApiConfigId, apiConfigs } = useSettingsStore.getState()
+
   for (let index = 0; index < localStorage.length; index++) {
     const key = localStorage.key(index)
-    if (!key?.startsWith(STORAGE_PREFIX)) continue
+    if (!key?.startsWith(PROJECT_STORAGE_PREFIX)) continue
     const raw = localStorage.getItem(key)
     if (!raw) continue
     try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      const data = (parsed.state as Record<string, unknown>) ?? parsed
-      if (kind === "design" && data.voiceDesignId === resourceId) {
-        data.voiceDesignId = null
-        data.voiceDesignPrompt = ""
+      const decoded = decodePersistedProject(raw, defaultApiConfigId, apiConfigs)
+      let changed = false
+      if (kind === "design" && decoded.voiceConfigs["voice-design"].presetId === resourceId) {
+        decoded.voiceConfigs["voice-design"].presetId = null
+        decoded.voiceConfigs["voice-design"].prompt = ""
+        changed = true
       }
       if (
         kind === "clone" &&
-        (data.voiceCloneSampleId === resourceId || data.voiceClonePath === fallbackPath)
+        (decoded.voiceConfigs["voice-clone"].sampleId === resourceId ||
+          decoded.voiceConfigs["voice-clone"].samplePath === fallbackPath)
       ) {
-        data.voiceCloneSampleId = null
-        data.voiceClonePath = null
+        decoded.voiceConfigs["voice-clone"].sampleId = null
+        decoded.voiceConfigs["voice-clone"].samplePath = null
+        changed = true
       }
-      localStorage.setItem(key, JSON.stringify(parsed))
+      if (changed) {
+        localStorage.setItem(key, JSON.stringify(decoded))
+      }
     } catch {
       // Ignore damaged legacy entries.
     }
@@ -362,16 +365,18 @@ export function clearVoiceResourceReferences(
 }
 
 export function countApiConfigReferences(configId: string): number {
+  if (typeof localStorage === "undefined") return 0
   let count = 0
+  const { defaultApiConfigId, apiConfigs } = useSettingsStore.getState()
+
   for (let index = 0; index < localStorage.length; index++) {
     const key = localStorage.key(index)
-    if (!key?.startsWith(STORAGE_PREFIX)) continue
+    if (!key?.startsWith(PROJECT_STORAGE_PREFIX)) continue
     const raw = localStorage.getItem(key)
     if (!raw) continue
     try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      const data = (parsed.state as Record<string, unknown>) ?? parsed
-      if (data.apiConfigId === configId) count += 1
+      const decoded = decodePersistedProject(raw, defaultApiConfigId, apiConfigs)
+      if (decoded.apiConfigId === configId) count += 1
     } catch {
       // Ignore damaged legacy entries.
     }
@@ -386,17 +391,24 @@ export function reassignApiConfigReferences(
   const current = useProjectStore.getState()
   if (current.apiConfigId === deletedConfigId) current.setApiConfigId(replacementConfigId)
 
+  if (typeof localStorage === "undefined") return
+  const { defaultApiConfigId, apiConfigs } = useSettingsStore.getState()
+
   for (let index = 0; index < localStorage.length; index++) {
     const key = localStorage.key(index)
-    if (!key?.startsWith(STORAGE_PREFIX)) continue
+    if (!key?.startsWith(PROJECT_STORAGE_PREFIX)) continue
     const raw = localStorage.getItem(key)
     if (!raw) continue
     try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      const data = (parsed.state as Record<string, unknown>) ?? parsed
-      if (data.apiConfigId !== deletedConfigId) continue
-      data.apiConfigId = replacementConfigId
-      localStorage.setItem(key, JSON.stringify(parsed))
+      const decoded = decodePersistedProject(raw, defaultApiConfigId, apiConfigs)
+      if (decoded.apiConfigId !== deletedConfigId) continue
+      decoded.apiConfigId = replacementConfigId
+      decoded.voiceConfigs.basic.voice = resolveVoiceForApiConfig(
+        replacementConfigId,
+        decoded.voiceConfigs.basic.voice,
+        apiConfigs,
+      )
+      localStorage.setItem(key, JSON.stringify(decoded))
     } catch {
       // Ignore damaged legacy entries.
     }

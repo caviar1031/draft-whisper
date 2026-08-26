@@ -80,7 +80,7 @@ MVP 只验证一件事情：
 
 ✓ 导入口播稿
 
-✓ 自动切句
+✓ 按行分句
 
 ✓ 调用 TTS API
 
@@ -108,7 +108,7 @@ MVP 只验证一件事情：
 
 ✕ AI 智能断句
 
-△ 多 Provider 架构（当前仅注册 MiMo）
+✓ 多 Provider 架构（MiMo、Fish Audio、第三方自定义配置）
 
 ✕ 云同步
 
@@ -125,7 +125,7 @@ MVP 只验证一件事情：
 # 5. 用户流程
 
 ```
-导入口播稿 → 自动切句 → 自动生成全部音频 → 试听 → 修改其中一句 → 重新生成这一句 → 拖入剪辑软件 → 完成
+导入口播稿 → 按行分句 → 自动生成全部音频 → 试听 → 修改其中一句 → 重新生成这一句 → 拖入剪辑软件 → 完成
 ```
 
 ---
@@ -141,25 +141,23 @@ MVP 只验证一件事情：
 
 导入后：
 
-自动切句。
+按换行拆分为句子，忽略空行。
 
 ---
 
-## 6.2 自动切句
+## 6.2 按行分句
 
-按照：
+按照换行拆分：
 
 ```
-。
+今天我们学习 Agent。
 
-！
+它是什么？
 
-？
-
-；
+其实很简单。
 ```
 
-进行拆分。
+每一行对应一个句子，首尾空白会被去除，空行会被忽略。
 
 例如：
 
@@ -171,7 +169,7 @@ MVP 只验证一件事情：
 其实很简单。
 ```
 
-转换：
+导入结果：
 
 ```
 ① 今天我们学习 Agent。
@@ -185,7 +183,7 @@ MVP 只验证一件事情：
 
 ## 6.3 自动生成
 
-切句完成后：
+分句完成后：
 
 自动开始生成。
 
@@ -215,7 +213,15 @@ MVP 只验证一件事情：
 
 ---
 
-## 6.5 播放
+## 6.5 导演模式
+
+工具栏提供会话级的“导演模式”开关，仅在已选择音色的 MiMo 基础音色下可用。
+
+关闭时点击句子编辑按钮，默认聚焦并全选句子文本；打开时默认展开并聚焦该句的导演指令输入框，光标位于已有内容末尾。两种输入框都支持 Enter 保存、Shift+Enter 换行和 Esc 取消；一次编辑只触发一次重新生成。导演模式不写入项目或设置数据，切换到不支持的服务商或模式时自动关闭。
+
+---
+
+## 6.6 播放
 
 点击：
 
@@ -229,7 +235,7 @@ MVP 只验证一件事情：
 
 ---
 
-## 6.6 编辑
+## 6.7 编辑
 
 点击文本即可编辑。
 
@@ -247,7 +253,7 @@ MVP 只验证一件事情：
 
 ---
 
-## 6.7 拖拽
+## 6.8 拖拽
 
 每一句支持：
 
@@ -266,7 +272,7 @@ MVP 只验证一件事情：
 
 ---
 
-## 6.8 本地缓存
+## 6.9 本地缓存
 
 所有生成音频缓存到：
 
@@ -285,17 +291,19 @@ audio/
 
 ---
 
-## 6.9 设置
+## 6.10 设置
 
 Settings 是整个应用的设置中心。当前包含通用设置、生成设置和模型与 API 三个分区。
-Provider 使用可扩展注册结构，但当前只注册已完成真实适配的 MiMo。
+Provider 使用可扩展注册结构，当前注册已完成真实适配的 MiMo、Fish Audio，以及使用 OpenAI SDK 兼容语音协议的第三方自定义配置。
 
 页面结构：
 
 * 通用设置：跟随系统、简体中文、English，可立即切换并持久化
 * 生成设置：1–16 的并发生成步进器
 * 模型与 API：顶部添加按钮和默认折叠的配置卡片
-* 编辑弹窗包含配置名称、Provider、Base URL、API Key、能力开关与可编辑模型 ID
+* 编辑弹窗包含配置名称、Provider、Base URL、API Key、可编辑音色列表、能力开关与可编辑模型 ID
+* 切换预置 Provider 时自动填充默认 Base URL、能力、模型和音色，填充值仍可修改
+* 自定义配置不预填厂商地址、模型或音色；用户自行填写第三方完整 Endpoint URL、API Key、模型 ID 与音色 ID，应用不补全或改写路径
 * 三项能力可分别发起真实合成测试；声音克隆测试支持选择或导入 WAV/MP3 样本
 * API Key 按配置 ID 隔离存储在 macOS Keychain，不进入 localStorage
 * 第一张配置自动成为默认配置；项目可以选择不同配置
@@ -305,19 +313,21 @@ Provider 使用可扩展注册结构，但当前只注册已完成真实适配�
 * 克隆样本必须为签名有效的 WAV/MP3、Base64 后小于 10 MB且时长小于 30 秒
 
 用户修改 Base URL、API Key 或模型 ID 后，对应测试结果立即失效。错误显示在对应能力或编辑弹窗内。
-项目级 Voice、声音设计描述、声音克隆样本和演绎指令继续在脚本编辑器中配置。
+项目级 Voice、声音设计描述、声音克隆样本和全局演绎指令继续在脚本编辑器中配置。
 
 ---
 
-## 6.10 声音模式
+## 6.11 声音模式
 
-支持三个 MiMo v2.5 TTS 模式。下表模型是新建 MiMo 配置时的默认值，用户可在 Settings 中修改：
+MiMo 支持三个 TTS 模式；Fish Audio 与第三方自定义配置当前接入基础音色模式。下表是新建配置时的默认值，用户可在 Settings 中修改：
 
-| 模式 | 模型 |
-| --- | --- |
-| 基础音色 | `mimo-v2.5-tts` |
-| 声音设计 | `mimo-v2.5-tts-voicedesign` |
-| 声音克隆 | `mimo-v2.5-tts-voiceclone` |
+| Provider | 模式 | 模型 |
+| --- | --- | --- |
+| MiMo | 基础音色 | `mimo-v2.5-tts` |
+| MiMo | 声音设计 | `mimo-v2.5-tts-voicedesign` |
+| MiMo | 声音克隆 | `mimo-v2.5-tts-voiceclone` |
+| Fish Audio | 基础音色 | `s2.1-pro-free` |
+| 自定义配置 | 基础音色 | 用户填写 |
 
 声音设计：
 
@@ -509,11 +519,11 @@ Audio Files
 
 ## API
 
-小米 MiMo v2.5 TTS chat-completions 协议
+小米 MiMo v2.5 TTS chat-completions 协议；Fish Audio `/v1/tts` REST 协议；第三方自定义配置使用 OpenAI SDK 兼容的 `/v1/audio/speech` 协议
 
 第一版：
 
-只支持一种协议。
+支持按 Provider 分发不同协议，并允许修改兼容服务的 Base URL。
 
 ---
 
@@ -535,26 +545,28 @@ audioHistory[]
 duration
 
 errorMessage
+
+styleInstruction（逐句导演指令）
 ```
 
 Project
 
 ```
-mode
-
 apiConfigId
 
-voiceDesignId
+mode
 
-voiceCloneSampleId
-
-voice
-
-voiceDesignPrompt
-
-voiceClonePath
-
-performancePrompt
+voiceConfigs:
+  basic:
+    voice
+    performancePrompt
+  voice-design:
+    presetId
+    prompt
+  voice-clone:
+    sampleId
+    samplePath
+    performancePrompt
 
 sentences[]（包含最近 5 个 audioHistory 版本）
 ```
@@ -661,7 +673,7 @@ Conventional Commits
 
 ✓ 导入口播稿
 
-✓ 自动拆句
+✓ 按行解析脚本文本（每行一句，忽略空行）
 
 ✓ 自动生成全部配音
 

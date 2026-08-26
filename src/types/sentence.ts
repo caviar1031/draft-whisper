@@ -9,6 +9,7 @@ export interface AudioVersion {
 export interface Sentence {
   id: string
   text: string
+  styleInstruction: string
   status: SentenceStatus
   audioPath: string | null
   audioHistory: AudioVersion[]

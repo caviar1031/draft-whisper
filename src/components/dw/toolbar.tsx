@@ -1,4 +1,4 @@
-import { ArrowRight, CirclePlay, File, Pencil } from "lucide-react"
+import { ArrowRight, CirclePlay, Clapperboard, File, Pencil } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 // 工具栏主操作类型
@@ -12,11 +12,27 @@ interface ToolbarProps {
   action: ToolbarAction
   hasContent: boolean
   onOpenScriptEditor: () => void
+  directorModeEnabled: boolean
+  directorModeDisabled: boolean
+  directorModeDisabledReason?: string
+  onToggleDirectorMode: () => void
   onAction: () => void
 }
 
-export function Toolbar({ action, hasContent, onOpenScriptEditor, onAction }: ToolbarProps) {
+export function Toolbar({
+  action,
+  hasContent,
+  onOpenScriptEditor,
+  directorModeEnabled,
+  directorModeDisabled,
+  directorModeDisabledReason,
+  onToggleDirectorMode,
+  onAction,
+}: ToolbarProps) {
   const { t } = useTranslation()
+  const directorModeLabel = directorModeEnabled
+    ? t("app.disableDirectorMode")
+    : t("app.enableDirectorMode")
   return (
     <div className="dw-toolbar">
       <div className="dw-toolbar-left">
@@ -24,6 +40,20 @@ export function Toolbar({ action, hasContent, onOpenScriptEditor, onAction }: To
           {hasContent ? <Pencil size={14} strokeWidth={2} /> : <File size={14} strokeWidth={2} />}
           {t(hasContent ? "app.editProject" : "app.importScript")}
         </button>
+        {hasContent && (
+          <button
+            type="button"
+            className={`dw-pill-btn${directorModeEnabled ? " is-active" : ""}`}
+            aria-label={directorModeLabel}
+            aria-pressed={directorModeEnabled}
+            disabled={directorModeDisabled}
+            title={directorModeDisabled ? directorModeDisabledReason : directorModeLabel}
+            onClick={onToggleDirectorMode}
+          >
+            <Clapperboard size={14} strokeWidth={2} />
+            {t("app.directorMode")}
+          </button>
+        )}
       </div>
       <div className="dw-toolbar-right">
         <ActionButton action={action} onAction={onAction} />

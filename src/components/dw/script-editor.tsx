@@ -1,20 +1,23 @@
-import { VOICE_OPTIONS } from "@/lib/options"
-import type { ApiConfig, TtsMode, VoiceCloneSample, VoiceDesignPreset } from "@/types"
-import { splitTextToSentences } from "@/utils/sentence"
+import { ModalLayer } from "@/components/ui/modal-layer"
+import { Select } from "@/components/ui/select"
+import type { ApiConfig } from "@/types/api-config"
+import type { AudioFormat, TtsMode } from "@/types/tts"
+import type { VoiceCloneSample, VoiceDesignPreset } from "@/types/voice-resource"
+import { AUDIO_FORMATS, getAvailableAudioFormats } from "@/utils/provider-catalog"
+import { parseScriptLines } from "@/utils/script-lines"
 import { X } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-type SplitMode = "auto" | "manual"
 type EditorTab = "script" | "voice"
 
 interface ScriptEditorProps {
   mode: "import" | "edit"
   initialText?: string
   ttsMode: TtsMode
+  outputFormat: AudioFormat
   apiConfigId: string | null
   apiConfigs: ApiConfig[]
-  model: string
   voice: string
   voiceDesignId: string | null
   voiceDesigns: VoiceDesignPreset[]
@@ -23,9 +26,10 @@ interface ScriptEditorProps {
   voiceSamples: VoiceCloneSample[]
   voiceClonePath: string | null
   performancePrompt: string
-  onSave: (text: string, splitMode: SplitMode) => void
+  onSave: (text: string) => void
   onClose: () => void
   onModeChange: (mode: TtsMode) => void
+  onOutputFormatChange: (format: AudioFormat) => void
   onApiConfigChange: (apiConfigId: string | null) => void
   onVoiceChange: (voice: string) => void
   onVoiceDesignIdChange: (id: string | null) => void
@@ -36,51 +40,116 @@ interface ScriptEditorProps {
 
 const MODE_OPTIONS: TtsMode[] = ["basic", "voice-design", "voice-clone"]
 
-/** 测量纯文本在给定宽度下按 word-wrap 规则所需的视觉行数 */
-function measureVisualLines(
-  ctx: CanvasRenderingContext2D,
+function createLineMirror(): HTMLDivElement {
+  const mirror = document.createElement("div")
+  mirror.setAttribute("aria-hidden", "true")
+  Object.assign(mirror.style, {
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
+    visibility: "hidden",
+    pointerEvents: "none",
+    contain: "layout style",
+    boxSizing: "content-box",
+    height: "auto",
+    minHeight: "0",
+    margin: "0",
+    padding: "0",
+    border: "0",
+    overflow: "visible",
+  })
+  document.body.appendChild(mirror)
+  return mirror
+}
+
+function createMirrorRow(): HTMLDivElement {
+  const row = document.createElement("div")
+  Object.assign(row.style, {
+    display: "block",
+    boxSizing: "border-box",
+    width: "100%",
+    margin: "0",
+    padding: "0",
+    border: "0",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "break-word",
+    wordBreak: "normal",
+  })
+  return row
+}
+
+function measureLineTops(
+  textarea: HTMLTextAreaElement,
   text: string,
-  maxWidth: number,
-  lineHeight: number,
-): number {
-  if (text.length === 0) return 1
+  mirror: HTMLDivElement,
+): number[] {
+  const styles = getComputedStyle(textarea)
+  const paddingTop = Number.parseFloat(styles.paddingTop) || 0
+  const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0
+  const paddingRight = Number.parseFloat(styles.paddingRight) || 0
+  const lineHeight = Number.parseFloat(styles.lineHeight) || 21
+  const contentWidth = textarea.clientWidth - paddingLeft - paddingRight
 
-  let totalHeight = 0
-  const tokens = text.match(/\S+\s*/g) ?? [text]
-  let lineWidth = 0
+  if (contentWidth <= 0) return []
 
-  for (const token of tokens) {
-    const tokenWidth = ctx.measureText(token).width
-    if (lineWidth > 0 && lineWidth + tokenWidth > maxWidth) {
-      totalHeight += lineHeight
-      lineWidth = 0
-    }
-    if (tokenWidth > maxWidth) {
-      let charLine = 0
-      for (const ch of token) {
-        const cw = ctx.measureText(ch).width
-        if (charLine > 0 && charLine + cw > maxWidth) {
-          totalHeight += lineHeight
-          charLine = 0
-        }
-        charLine += cw
-      }
-      lineWidth += charLine
-    } else {
-      lineWidth += tokenWidth
-    }
+  Object.assign(mirror.style, {
+    width: `${contentWidth}px`,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "break-word",
+    wordBreak: "normal",
+    font: styles.font,
+    fontFamily: styles.fontFamily,
+    fontSize: styles.fontSize,
+    fontStyle: styles.fontStyle,
+    fontWeight: styles.fontWeight,
+    fontVariant: styles.fontVariant,
+    fontStretch: styles.fontStretch,
+    lineHeight: `${lineHeight}px`,
+    letterSpacing: styles.letterSpacing,
+    wordSpacing: styles.wordSpacing,
+    textIndent: styles.textIndent,
+    textTransform: styles.textTransform,
+    textAlign: styles.textAlign,
+    direction: styles.direction,
+    tabSize: styles.tabSize,
+  })
+
+  const lines = text.split("\n")
+  while (mirror.childElementCount < lines.length) {
+    mirror.appendChild(createMirrorRow())
+  }
+  while (mirror.childElementCount > lines.length) {
+    mirror.lastElementChild?.remove()
   }
 
-  return totalHeight / lineHeight + 1
+  for (const [index, line] of lines.entries()) {
+    const row = mirror.children[index] as HTMLDivElement
+    row.style.minHeight = `${lineHeight}px`
+    row.textContent = line.length > 0 ? line : "\u200b"
+  }
+
+  const mirrorTop = mirror.getBoundingClientRect().top
+  const tops = Array.from(mirror.children, (row) => {
+    return paddingTop + row.getBoundingClientRect().top - mirrorTop
+  })
+
+  return tops
+}
+
+function lineTopsAreEqual(current: number[], next: number[]): boolean {
+  return (
+    current.length === next.length &&
+    current.every((value, index) => Math.abs(value - next[index]) < 0.1)
+  )
 }
 
 export function ScriptEditor({
   mode,
   initialText = "",
   ttsMode,
+  outputFormat,
   apiConfigId,
   apiConfigs,
-  model,
   voice,
   voiceDesignId,
   voiceDesigns,
@@ -92,6 +161,7 @@ export function ScriptEditor({
   onSave,
   onClose,
   onModeChange,
+  onOutputFormatChange,
   onApiConfigChange,
   onVoiceChange,
   onVoiceDesignIdChange,
@@ -102,74 +172,105 @@ export function ScriptEditor({
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<EditorTab>("script")
   const [text, setText] = useState(initialText)
-  const [splitMode, setSplitMode] = useState<SplitMode>(mode === "edit" ? "manual" : "auto")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [textareaElement, setTextareaElement] = useState<HTMLTextAreaElement | null>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const lineMirrorRef = useRef<HTMLDivElement>(null)
+  const latestTextRef = useRef(text)
+  const scheduleLineMeasurementRef = useRef<() => void>(() => undefined)
+
+  const handleTextareaRef = useCallback((element: HTMLTextAreaElement | null) => {
+    textareaRef.current = element
+    setTextareaElement(element)
+  }, [])
+
+  const handleTextChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const nextText = event.target.value
+    latestTextRef.current = nextText
+    setText(nextText)
+    scheduleLineMeasurementRef.current()
+  }, [])
 
   useEffect(() => {
     if (activeTab === "script") {
-      textareaRef.current?.focus()
+      textareaElement?.focus()
     }
-  }, [activeTab])
+  }, [activeTab, textareaElement])
 
-  // ---- 自动拆分预览 ----
-  const autoPreview = useMemo(() => {
-    if (splitMode !== "auto" || !text.trim()) return []
-    return splitTextToSentences(text)
-  }, [text, splitMode])
-
-  // ---- 手动模式行数 ----
-  const manualLineCount = useMemo(() => {
-    return text.split("\n").filter((l) => l.trim().length > 0).length
+  const sentenceCount = useMemo(() => {
+    return parseScriptLines(text).length
   }, [text])
-
-  const sentenceCount = splitMode === "auto" ? autoPreview.length : manualLineCount
   const lines = text.split("\n")
 
   // ---- 行号定位 ----
   const [lineTops, setLineTops] = useState<number[]>([])
 
   useLayoutEffect(() => {
-    if (activeTab !== "script" || splitMode !== "manual") {
+    if (activeTab !== "script") {
       setLineTops([])
       return
     }
 
-    const ta = textareaRef.current
+    const ta = textareaElement
     if (!ta) {
       setLineTops([])
       return
     }
 
-    const cs = getComputedStyle(ta)
-    const font = cs.font
-    const lineHeight = Number.parseFloat(cs.lineHeight) || 21
-    const padTop = Number.parseFloat(cs.paddingTop) || 0
-    const padLeft = Number.parseFloat(cs.paddingLeft) || 0
-    const padRight = Number.parseFloat(cs.paddingRight) || 0
-    const contentWidth = ta.clientWidth - padLeft - padRight
-
-    const canvas = document.createElement("canvas")
-    const ctx = canvas.getContext("2d")
-    if (!ctx) {
-      setLineTops([])
-      return
-    }
-    ctx.font = font
-
-    const currentLines = text.split("\n")
-    const tops: number[] = []
-    let currentTop = padTop
-
-    for (const line of currentLines) {
-      tops.push(currentTop)
-      const visLines = measureVisualLines(ctx, line, contentWidth, lineHeight)
-      currentTop += visLines * lineHeight
+    let active = true
+    let scheduledFrame = 0
+    let bootstrapFrame = 0
+    const updateLineTops = () => {
+      if (!active) return
+      const currentText = latestTextRef.current
+      const mirror = lineMirrorRef.current ?? createLineMirror()
+      lineMirrorRef.current = mirror
+      const nextLineTops = measureLineTops(ta, currentText, mirror)
+      if (nextLineTops.length === currentText.split("\n").length) {
+        setLineTops((current) => (lineTopsAreEqual(current, nextLineTops) ? current : nextLineTops))
+      }
     }
 
-    setLineTops(tops)
-  }, [text, splitMode, activeTab])
+    const scheduleLineMeasurement = () => {
+      if (!active || scheduledFrame !== 0) return
+      scheduledFrame = requestAnimationFrame(() => {
+        scheduledFrame = 0
+        updateLineTops()
+      })
+    }
+    scheduleLineMeasurementRef.current = scheduleLineMeasurement
+
+    updateLineTops()
+
+    // Dialog portals may not have their final width during the first layout effect in WebKit.
+    scheduleLineMeasurement()
+    bootstrapFrame = requestAnimationFrame(scheduleLineMeasurement)
+
+    const resizeObserver = new ResizeObserver(scheduleLineMeasurement)
+    resizeObserver.observe(ta)
+    if (containerRef.current) resizeObserver.observe(containerRef.current)
+    window.addEventListener("resize", scheduleLineMeasurement)
+    document.fonts.addEventListener("loadingdone", scheduleLineMeasurement)
+    void document.fonts.ready.then(scheduleLineMeasurement)
+
+    return () => {
+      active = false
+      scheduleLineMeasurementRef.current = () => undefined
+      cancelAnimationFrame(scheduledFrame)
+      cancelAnimationFrame(bootstrapFrame)
+      resizeObserver.disconnect()
+      window.removeEventListener("resize", scheduleLineMeasurement)
+      document.fonts.removeEventListener("loadingdone", scheduleLineMeasurement)
+    }
+  }, [activeTab, textareaElement])
+
+  useEffect(() => {
+    return () => {
+      lineMirrorRef.current?.remove()
+      lineMirrorRef.current = null
+    }
+  }, [])
 
   // ---- 行号同步滚动 ----
   const handleScroll = useCallback(() => {
@@ -181,8 +282,8 @@ export function ScriptEditor({
 
   const handleSave = useCallback(() => {
     if (!text.trim()) return
-    onSave(text, splitMode)
-  }, [text, splitMode, onSave])
+    onSave(text)
+  }, [text, onSave])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -190,29 +291,49 @@ export function ScriptEditor({
         e.preventDefault()
         handleSave()
       }
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onClose()
-      }
     },
-    [handleSave, onClose],
+    [handleSave],
   )
 
-  const showSplitModeToggle = mode === "import"
+  const selectedApiConfig = apiConfigs.find((config) => config.id === apiConfigId)
+  const availableAudioFormats = useMemo(
+    () => getAvailableAudioFormats(selectedApiConfig, ttsMode),
+    [selectedApiConfig, ttsMode],
+  )
+  const availableModes = selectedApiConfig
+    ? MODE_OPTIONS.filter((candidate) => selectedApiConfig.capabilities[candidate].enabled)
+    : MODE_OPTIONS
+
+  useEffect(() => {
+    if (availableAudioFormats.length > 0 && !availableAudioFormats.includes(outputFormat)) {
+      onOutputFormatChange(availableAudioFormats[0])
+    }
+  }, [availableAudioFormats, onOutputFormatChange, outputFormat])
+
+  const handleApiConfigChange = (value: string) => {
+    const nextConfig = apiConfigs.find((config) => config.id === value)
+    onApiConfigChange(value || null)
+    if (!nextConfig) return
+
+    if (!nextConfig.capabilities[ttsMode].enabled) {
+      const nextMode = MODE_OPTIONS.find((candidate) => nextConfig.capabilities[candidate].enabled)
+      if (nextMode) onModeChange(nextMode)
+    }
+    if (!nextConfig.voices.some((option) => option.id === voice)) {
+      onVoiceChange(nextConfig.voices[0]?.id ?? "")
+    }
+  }
 
   return (
-    <>
-      <button
-        type="button"
-        className="dw-dim-overlay"
-        style={{ top: 0 }}
-        onClick={onClose}
-        aria-label={t("common.close")}
-      />
-      <div className="dw-script-editor" onKeyDown={handleKeyDown}>
+    <ModalLayer onClose={onClose} closeOnBackdrop>
+      <ModalLayer.Panel
+        className="dw-script-editor"
+        aria-labelledby="script-editor-title"
+        onKeyDown={handleKeyDown}
+      >
         {/* Header */}
         <div className="dw-editor-header">
-          <span className="dw-settings-title">
+          <span id="script-editor-title" className="dw-settings-title">
             {t(mode === "import" ? "editor.importTitle" : "editor.editTitle")}
           </span>
           <button
@@ -245,169 +366,126 @@ export function ScriptEditor({
 
         {/* Script Tab */}
         {activeTab === "script" && (
-          <>
-            {showSplitModeToggle && (
-              <div className="dw-mode-toggle" style={{ marginBottom: 8 }}>
-                <button
-                  type="button"
-                  className={`dw-mode-btn${splitMode === "auto" ? " is-active" : ""}`}
-                  onClick={() => setSplitMode("auto")}
-                >
-                  {t("editor.autoSplit")}
-                </button>
-                <button
-                  type="button"
-                  className={`dw-mode-btn${splitMode === "manual" ? " is-active" : ""}`}
-                  onClick={() => setSplitMode("manual")}
-                >
-                  {t("editor.manual")}
-                </button>
+          <div className="dw-editor-container" ref={containerRef}>
+            <div className="dw-line-numbers" aria-hidden="true">
+              <div className="dw-line-numbers-content" ref={lineNumRef}>
+                {lines.map((_, i) => (
+                  <div
+                    key={
+                      // biome-ignore lint/suspicious/noArrayIndexKey: decorative line numbers never reorder
+                      i
+                    }
+                    className="dw-line-num"
+                    style={
+                      lineTops[i] === undefined
+                        ? { visibility: "hidden" }
+                        : { top: `${lineTops[i]}px` }
+                    }
+                  >
+                    {i + 1}
+                  </div>
+                ))}
               </div>
-            )}
-
-            {splitMode === "auto" ? (
-              <textarea
-                ref={textareaRef}
-                className="dw-editor-textarea"
-                placeholder={t("editor.scriptPlaceholder")}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-            ) : (
-              <div className="dw-editor-container" ref={containerRef}>
-                <div className="dw-line-numbers" ref={lineNumRef}>
-                  {lines.map((_, i) => (
-                    <div
-                      key={
-                        // biome-ignore lint/suspicious/noArrayIndexKey: decorative line numbers never reorder
-                        i
-                      }
-                      className="dw-line-num"
-                      style={
-                        lineTops.length > 0
-                          ? { position: "absolute", top: `${lineTops[i]}px` }
-                          : undefined
-                      }
-                    >
-                      {i + 1}
-                    </div>
-                  ))}
-                </div>
-                <textarea
-                  ref={textareaRef}
-                  className="dw-editor-textarea dw-editor-textarea--manual"
-                  placeholder={t("editor.manualPlaceholder")}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onScroll={handleScroll}
-                  spellCheck={false}
-                />
-              </div>
-            )}
-
-            {splitMode === "auto" && autoPreview.length > 0 && (
-              <div className="dw-auto-preview">
-                <div className="dw-auto-preview-label">
-                  {t("editor.preview", { count: autoPreview.length })}
-                </div>
-                <div className="dw-auto-preview-list">
-                  {autoPreview.map((s, i) => (
-                    <div key={s.id} className="dw-auto-preview-item">
-                      <span className="dw-auto-preview-num">{i + 1}</span>
-                      <span className="dw-auto-preview-text">{s.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+            </div>
+            <textarea
+              ref={handleTextareaRef}
+              className="dw-editor-textarea dw-editor-textarea--script"
+              placeholder={t("editor.linePlaceholder")}
+              value={text}
+              onChange={handleTextChange}
+              onScroll={handleScroll}
+              spellCheck={false}
+            />
+          </div>
         )}
 
         {/* Voice Tab */}
         {activeTab === "voice" && (
           <div className="dw-voice-tab">
             <div className="dw-settings-field">
-              <label className="dw-settings-label">
+              <div className="dw-settings-label">
                 {t("editor.apiConfig")}
-                <select
-                  className="dw-settings-select"
+                <Select
                   value={apiConfigId ?? ""}
-                  onChange={(event) => onApiConfigChange(event.target.value || null)}
-                >
-                  <option value="">{t("editor.selectApiConfig")}</option>
-                  {apiConfigs.map((config) => (
-                    <option key={config.id} value={config.id}>
-                      {config.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  ariaLabel={t("editor.apiConfig")}
+                  options={[
+                    { value: "", label: t("editor.selectApiConfig") },
+                    ...apiConfigs.map((config) => ({ value: config.id, label: config.name })),
+                  ]}
+                  onValueChange={handleApiConfigChange}
+                />
+              </div>
             </div>
 
             {/* 模式选择 */}
             <div className="dw-settings-field">
-              <label className="dw-settings-label">
+              <div className="dw-settings-label">
                 {t("editor.ttsMode")}
-                <select
-                  className="dw-settings-select"
+                <Select
                   value={ttsMode}
-                  onChange={(e) => onModeChange(e.target.value as TtsMode)}
-                >
-                  {MODE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {t(`settings.modes.${option}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  ariaLabel={t("editor.ttsMode")}
+                  options={availableModes.map((option) => ({
+                    value: option,
+                    label: t(`settings.modes.${option}`),
+                  }))}
+                  onValueChange={onModeChange}
+                />
+              </div>
             </div>
 
             <div className="dw-settings-field">
-              <label className="dw-settings-label">
-                {t("editor.model")}
-                <input className="dw-settings-input" value={model} readOnly />
-              </label>
+              <div className="dw-settings-label">
+                {t("editor.outputFormat")}
+                <Select
+                  value={outputFormat}
+                  ariaLabel={t("editor.outputFormat")}
+                  options={AUDIO_FORMATS.map((format) => ({
+                    value: format,
+                    label: t(`editor.audioFormats.${format}`),
+                    disabled: !availableAudioFormats.includes(format),
+                  }))}
+                  disabled={!selectedApiConfig || availableAudioFormats.length === 0}
+                  onValueChange={onOutputFormatChange}
+                />
+              </div>
+              {selectedApiConfig?.provider === "custom" && availableAudioFormats.length === 0 && (
+                <div className="dw-editing-hint">{t("editor.outputFormatTestHint")}</div>
+              )}
             </div>
 
             {/* Basic TTS: 音色 */}
             {ttsMode === "basic" && (
               <div className="dw-settings-field">
-                <label className="dw-settings-label">
+                <div className="dw-settings-label">
                   {t("editor.voice")}
-                  <select
-                    className="dw-settings-select"
+                  <Select
                     value={voice}
-                    onChange={(e) => onVoiceChange(e.target.value)}
-                  >
-                    {VOICE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                        {opt.desc ? ` (${opt.desc})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    ariaLabel={t("editor.voice")}
+                    options={(selectedApiConfig?.voices ?? []).map((option) => ({
+                      value: option.id,
+                      label: option.name,
+                    }))}
+                    onValueChange={onVoiceChange}
+                  />
+                </div>
               </div>
             )}
 
             {/* Voice Design: 文本描述 */}
             {ttsMode === "voice-design" && (
               <div className="dw-settings-field">
-                <label className="dw-settings-label">
+                <div className="dw-settings-label">
                   {t("editor.voiceDesign")}
-                  <select
-                    className="dw-settings-select"
+                  <Select
                     value={voiceDesignId ?? ""}
-                    onChange={(event) => onVoiceDesignIdChange(event.target.value || null)}
-                  >
-                    <option value="">{t("editor.selectVoiceDesign")}</option>
-                    {voiceDesigns.map((design) => (
-                      <option key={design.id} value={design.id}>
-                        {design.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    ariaLabel={t("editor.voiceDesign")}
+                    options={[
+                      { value: "", label: t("editor.selectVoiceDesign") },
+                      ...voiceDesigns.map((design) => ({ value: design.id, label: design.name })),
+                    ]}
+                    onValueChange={(value) => onVoiceDesignIdChange(value || null)}
+                  />
+                </div>
                 <label className="dw-settings-label">
                   {t("editor.voiceDescription")}
                   <textarea
@@ -431,23 +509,20 @@ export function ScriptEditor({
             {ttsMode === "voice-clone" && (
               <>
                 <div className="dw-settings-field">
-                  <label className="dw-settings-label">
+                  <div className="dw-settings-label">
                     {t("editor.voiceCloneSample")}
-                    <select
-                      className="dw-settings-select"
+                    <Select
                       value={voiceCloneSampleId ?? ""}
-                      onChange={(event) => onVoiceCloneSampleIdChange(event.target.value || null)}
-                    >
-                      <option value="">{t("editor.selectVoiceCloneSample")}</option>
-                      {voiceSamples
-                        .filter((sample) => sample.durationMs !== null)
-                        .map((sample) => (
-                          <option key={sample.id} value={sample.id}>
-                            {sample.name}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
+                      ariaLabel={t("editor.voiceCloneSample")}
+                      options={[
+                        { value: "", label: t("editor.selectVoiceCloneSample") },
+                        ...voiceSamples
+                          .filter((sample) => sample.durationMs !== null)
+                          .map((sample) => ({ value: sample.id, label: sample.name })),
+                      ]}
+                      onValueChange={(value) => onVoiceCloneSampleIdChange(value || null)}
+                    />
+                  </div>
                   {voiceClonePath && <div className="dw-editing-hint">{voiceClonePath}</div>}
                 </div>
                 <div className="dw-settings-field">
@@ -504,7 +579,7 @@ export function ScriptEditor({
             )}
           </div>
         </div>
-      </div>
-    </>
+      </ModalLayer.Panel>
+    </ModalLayer>
   )
 }

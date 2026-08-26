@@ -12,7 +12,7 @@ DraftWhisper 是一款 macOS 优先的 AI 配音桌面工具（Tauri 2 + React�
 
 核心工作流：**改一句文案 → 重新生成 → 试听 → 拖进剪辑软件**。
 
-当前 MVP 范围：导入文本、自动切句、调用 MiMo v2.5 TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置中心、多套 API 配置和中英文界面。Provider 架构可扩展，但当前只实现 MiMo；不做云同步、波形、字幕。
+当前 MVP 范围：按行导入文本、调用 MiMo v2.5 / Fish Audio / 自定义 OpenAI SDK 兼容 TTS API、基础音色、声音设计、声音克隆、播放试听、单句重新生成、最近 5 个音频版本、本地项目管理、本地缓存、设置中心、多套 API 配置和中英文界面。Provider 架构可扩展，当前实现 MiMo、Fish Audio 与第三方自定义配置；不做云同步、波形、字幕。
 
 ---
 
@@ -46,6 +46,8 @@ npm run format           # Biome 格式化
 # 后端（src-tauri/）
 cargo check              # 类型/编译检查
 cargo build              # 构建
+cargo test               # 单元测试
+cargo clippy --all-targets -- -D warnings # Clippy 静态检查
 ```
 
 > 调 Rust 时建议先在 `src-tauri` 下 `cargo check` 验证，再起 `npm run tauri dev`。
@@ -59,21 +61,35 @@ draft-whisper/
 ├── docs/                 # 产品文档（PRD 等）
 ├── public/
 ├── src/                  # 前端
-│   ├── assets/
 │   ├── components/ui/    # shadcn/ui 基础组件
-│   ├── lib/              # cn 等通用工具
-│   ├── services/         # 封装 Tauri invoke 调用（前端面向接口层）
+│   ├── components/dw/    # 业务 UI 组件
+│   ├── hooks/            # 自定义 React Hooks
+│   ├── lib/              # 通用工具
+│   ├── services/         # 领域 Service 封装（tts, audio, projects, credentials）
 │   ├── stores/           # Zustand stores
-│   ├── types/            # TS 类型定义
-│   ├── utils/            # 领域工具（切句、id 等）
+│   ├── types/            # TS 类型定义（tts, api-config, settings, sentence, project, voice-resource）
+│   ├── utils/            # 领域工具（按行解析脚本、持久化、主题、catalog 等）
 │   ├── App.tsx
 │   ├── main.tsx
 │   └── index.css
 ├── src-tauri/            # Rust 后端
 │   ├── src/
 │   │   ├── main.rs       # 入口
-│   │   ├── lib.rs        # Tauri Builder / 命令注册
-│   │   └── tts.rs        # TTS 实现（OpenAI 兼容 API + 本地缓存）
+│   │   ├── lib.rs        # Tauri Builder / 命令注册与生命周期
+│   │   ├── tts/          # TTS 领域（参数结构、Provider 分发与实现）
+│   │   │   ├── mod.rs
+│   │   │   ├── types.rs
+│   │   │   └── providers/
+│   │   ├── audio/        # 音频存储、目录 fallback、校验与文件生命周期
+│   │   │   ├── mod.rs
+│   │   │   ├── storage.rs
+│   │   │   └── validation.rs
+│   │   ├── projects.rs   # 项目名称校验与目录操作
+│   │   ├── credentials.rs# 系统安全凭据（Keychain / Windows Credential Manager）
+│   │   └── native_file/  # 平台原生操作（macOS objc2 拖拽 / Windows OLE 拖拽）
+│   │       ├── mod.rs
+│   │       ├── macos.rs
+│   │       └── windows.rs
 │   ├── capabilities/     # 权限定义
 │   ├── Cargo.toml
 │   └── tauri.conf.json
@@ -91,16 +107,17 @@ draft-whisper/
 - Biome：2 空格缩进、双引号、**无分号**、行宽 100（见 [biome.json](biome.json)）。
 - `verbatimModuleSyntax: true` → 类型导入必须写 `import type { Foo } from "..."`。
 - `noUnusedLocals` / `noUnusedParameters` 开启 → 未用变量/参数会报错。
-- 优先用 `@/` 别名导入。
+- **精准路径导入**：禁止使用根桶文件（不使用 `@/types`、`@/services`、`@/stores`、`@/utils`）。所有导入必须使用精准路径（如 `@/types/tts`、`@/services/audio`、`@/stores/project-store`）。
 - 组件文件名：PascalCase（`.tsx`）。工具/store 文件：kebab-case（`.ts`）。
 
 ### 后端（Rust）
 
 - edition 2021，`rust-version = 1.77.2`。
-- 4 空格缩进。
+- 4 空格缩进（遵守 rustfmt 标准格式）。
 - 错误以 `Result<T, String>` 返回给前端（`String` 是给用户看的可读错误）。
 - 命令命名：`snake_case`（Tauri 自动转 camelCase 暴露给前端）。
 - 公开 command 必须在 [lib.rs](src-tauri/src/lib.rs) 的 `invoke_handler` 中注册。
+- 遵循领域模块边界，跨模块仅暴露最小必要的 `pub(crate)` API。
 
 ### Git
 
@@ -117,22 +134,22 @@ draft-whisper/
 ┌─────────────────────────────┐         ┌──────────────────────────┐
 │  前端 (React)               │  IPC    │  后端 (Rust / Tauri)     │
 │  stores: settings/project   │ ──────► │  tts_generate / tts_test │
-│  services: invoke 封装       │ ◄────── │  tts_read_audio          │
+│  services: 领域 IPC 封装     │ ◄────── │  tts_read_audio          │
 │  <audio> 播放 Blob URL       │  bytes  │  落盘: app_data/audio/   │
 └─────────────────────────────┘         └──────────────────────────┘
                                               │
                                               ▼
-                                     小米 MiMo v2.5 TTS API
-                                     POST {baseUrl}/chat/completions
-                                     (非 OpenAI /audio/speech 协议)
+                                     Provider-specific TTS API
+                                     MiMo / Fish / custom speech
 ```
 
 要点：
 
 - **状态在前端**：Zustand store 持有 settings 与 project（见 [src/stores](src/stores)）。项目元数据和非敏感设置已持久化到 `localStorage`，API Key 写入 macOS Keychain；后端不维护数据库状态。
-- **协议**：MVP 固定使用小米 MiMo v2.5 TTS（chat-completions 风格，非 OpenAI `/audio/speech`）。详见第 10 节。
+- **导演模式**：会话级前端 UI 状态，默认关闭且不写入项目或设置；仅在已选择音色的 MiMo 基础音色下可用。开启后打开句子编辑会默认聚焦逐句导演指令，关闭后默认聚焦并全选句子文本；切换到不支持的服务商或模式时自动关闭。
+- **协议**：按 Provider 分发协议：MiMo 使用 chat-completions 风格；Fish Audio 使用 `/v1/tts` REST 接口；自定义配置向用户填写的完整 Endpoint URL 发送 OpenAI SDK 兼容语音请求。详见第 10 节。
 - **音频落盘**：后端把音频写到 `audio/{sentence_id}_{timestamp_ms}.wav`；命名项目写入 `audio/projects/{project}/`。每句最多保留最近 5 个版本，替换文本、删除句子或项目时会清理不再引用的文件。返回绝对路径字符串。目录选择有三级 fallback：`app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`。
-- **播放方式**：前端通过 `tts_read_audio` 命令取回 base64 字符串，解码为字节后转 `Blob URL` 播放（无需配置 asset 协议/权限，跨平台稳定）。封装见 `src/services/tts.ts` 的 `readAudioAsUrl`。
+- **播放方式**：前端通过 `tts_read_audio` 命令取回 base64 字符串，解码为字节后转 `Blob URL` 播放（无需配置 asset 协议/权限，跨平台稳定）。封装见 `src/services/audio.ts` 的 `readAudioAsUrl`。
 
 ---
 
@@ -168,10 +185,10 @@ export function generateSentenceId(index: number, text: string): string {
 
 ### 7.2 文件名清理规则
 
-**后端**：[src-tauri/src/tts.rs](src-tauri/src/tts.rs) 的 `sanitize_filename()` 函数
+**后端**：[src-tauri/src/audio/storage.rs](src-tauri/src/audio/storage.rs) 的 `sanitize_filename()` 函数
 
 ```rust
-fn sanitize_filename(name: &str) -> String {
+pub(crate) fn sanitize_filename(name: &str) -> String {
   name
     .chars()
     .map(|c| {
@@ -200,17 +217,7 @@ fn sanitize_filename(name: &str) -> String {
 - `timestamp_ms`：生成时的 Unix 毫秒时间戳，用于保留历史版本
 - 扩展名：`.wav`（固定，与 TTS 输出格式一致）
 
-### 7.4 示例
-
-| 原文 | sentenceId | 清理后 | 最终文件名 |
-|------|------------|--------|------------|
-| `今天我们学习 Agent。` | `001_JinTianWMenXxAgent_k7x9` | `001_JinTianWMenXxAgent_k7x9` | `001_JinTianWMenXxAgent_k7x9_1783670400000.wav` |
-| `它是什么？` | `002_TaSSM_m2n4` | `002_TaSSM_m2n4` | `002_TaSSM_m2n4_1783670400001.wav` |
-| `Hello World!` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8` | `003_HelloWorld_p6q8_1783670400002.wav` |
-
-> 注：拼音首字母缩写（`pattern: "first"`），如「我们」→ `WM`，「什么」→ `SM`。实际输出取决于 `pinyin-pro` 的分词结果。
-
-### 7.5 重新生成行为
+### 7.4 重新生成行为
 
 - 同一 sentenceId 重新生成时创建新文件，并在前端保留最近 5 个版本
 - 超出 5 个版本的文件由 `tts_delete_audio_files` 清理
@@ -220,7 +227,7 @@ fn sanitize_filename(name: &str) -> String {
 
 ## 8. IPC 接口契约（前端必读）
 
-前端通过 `@tauri-apps/api/core` 的 `invoke` 调用以下命令。已封装在 [src/services/tts.ts](src/services/tts.ts)，**前端请直接 import service，不要手写 invoke**。
+前端通过 `@tauri-apps/api/core` 的 `invoke` 调用以下命令。已按领域封装在 [src/services/](src/services/)，**前端请直接 import 具体 service，不要手写 invoke**。
 
 ### 8.1 `tts_generate`
 
@@ -234,16 +241,16 @@ fn sanitize_filename(name: &str) -> String {
 | 返回 | `Promise<{ audioPath: string }>` |
 | 失败 | `reject(string)`，可读错误信息（HTTP 状态码 + 响应体） |
 
-参数类型 `TtsParams`（由 Settings 与当前 Project 的声音配置共同组成，**camelCase**；Rust struct 加了 `#[serde(rename_all = "camelCase")]` 自动映射 snake_case）：
+参数类型 `TtsParams`（定义在 `@/types/tts`，**camelCase**；Rust struct 加了 `#[serde(rename_all = "camelCase")]` 自动映射 snake_case）：
 
 ```ts
 interface TtsParams {
-  provider: ProviderId       // 当前适配器；本轮为 "mimo"
-  baseUrl: string          // MiMo API 根地址
-  apiKey: string           // api-key 头
+  provider: ProviderId       // 当前适配器："mimo" | "fish-audio" | "custom"
+  baseUrl: string          // 可编辑的 Provider API 根地址或完整端点
+  apiKey: string           // Provider 对应的认证密钥
   model: string            // 当前 API 配置对该能力映射的模型 ID
   mode: TtsMode            // "basic" | "voice-design" | "voice-clone"
-  voice: string            // 基础模式的预置音色名
+  voice: string            // 当前 API 配置中的音色 ID
   voiceDesignPrompt: string // 声音设计的音色描述
   voiceClonePath: string | null // 声音克隆的参考音频路径
   performancePrompt: string // 基础/克隆模式的自由文本演绎指令，可为空
@@ -252,7 +259,7 @@ interface TtsParams {
 
 行为：
 - 运行时根据项目的 `apiConfigId` 与当前模式解析能力映射；模型 ID 可编辑，但启用能力时不能为空。
-- 自动规范化 `baseUrl`：去掉尾部 `/`；若已以 `/chat/completions` 结尾则直接用；若以 `/v1` 结尾则补 `/chat/completions`；否则补 `/v1/chat/completions`。
+- 自动按 Provider 规范化 `baseUrl`：MiMo 补全 `/v1/chat/completions`；Fish Audio 补全 `/v1/tts`；自定义配置必须填写完整 Endpoint URL，除去两端空白后原样请求，不补全或改写路径。
 - 请求体（MiMo chat-completions 风格）：
   ```json
   {
@@ -293,26 +300,22 @@ interface TtsParams {
 | 返回 | `Promise<string>`（base64 编码） |
 | 失败 | `reject(string)` |
 
-前端用法（已封装为 `readAudioAsUrl(path)`，自动缓存对象 URL）：
+前端用法（封装在 `src/services/audio.ts` 的 `readAudioAsUrl(path)`，自动缓存对象 URL）：
 
 ```ts
-import { readAudioAsUrl } from "@/services/tts"
+import { readAudioAsUrl } from "@/services/audio"
 const url = await readAudioAsUrl(sentence.audioPath) // blob:...
 // <audio src={url} />
 ```
 
-### 8.4 其他已注册命令
+### 8.4 领域 Service 分布
 
-| 命令 | 用途 |
-| --- | --- |
-| `tts_preview_voice` | 为基础音色或声音设计生成独立试听文件，不写入句子历史 |
-| `tts_preview_voice_clone` | 使用当前克隆样本、自由文本演绎指令和试听文案生成独立试听文件，不写入句子历史 |
-| `tts_list_projects` / `tts_create_project` / `tts_delete_project` | 列出、创建和删除本地项目目录 |
-| `tts_delete_audio_files` | 删除不再被项目元数据引用的缓存音频 |
-| `tts_copy_to_clipboard` / `tts_show_in_finder` / `tts_drag_file` | macOS 文件复制、Finder 定位与原生拖拽 |
-| `save_voice_sample` / `delete_voice_sample` | 校验并管理 WAV/MP3 声音克隆样本；保存时返回路径、格式、MIME 和大小元数据 |
-| `save_api_key` / `load_api_key` / `delete_api_key` | 按 `configId` 管理 macOS Keychain 中隔离的 API Key |
-| `migrate_legacy_api_key` | 将旧 `default` Keychain 条目迁移到第一张 API 配置 |
+| Service 模块 | 命令与方法 | 用途 |
+| --- | --- | --- |
+| `src/services/tts.ts` | `generateSentenceAudio` (`tts_generate`), `previewVoice` (`tts_preview_voice`), `previewVoiceClone` (`tts_preview_voice_clone`), `testTts` (`tts_test`) | 核心合成、独立试听与能力测试 |
+| `src/services/audio.ts` | `readAudioAsUrl` (`tts_read_audio`), `deleteAudioFiles` (`tts_delete_audio_files`), `cleanupAudioFiles`, `copyAudioToClipboard` (`tts_copy_to_clipboard`), `showInFinder` (`tts_show_in_finder`), `nativeDragFile` (`tts_drag_file`), `saveVoiceSample` (`save_voice_sample`), `deleteVoiceSample` (`delete_voice_sample`) | Blob URL 管理、音频清理、原生拖拽与克隆样本库 |
+| `src/services/projects.ts` | `listProjects` (`tts_list_projects`), `createProject` (`tts_create_project`), `deleteProject` (`tts_delete_project`) | 本地项目目录的列出、创建与删除 |
+| `src/services/credentials.ts`| `saveApiKey` (`save_api_key`), `loadApiKey` (`load_api_key`), `deleteApiKey` (`delete_api_key`), `migrateLegacyApiKey` (`migrate_legacy_api_key`) | 系统安全凭据管理与旧凭据迁移 |
 
 ---
 
@@ -340,6 +343,7 @@ interface Sentence {
 ```ts
 interface Settings {
   language: "system" | "zh-CN" | "en"
+  theme: "system" | "light" | "dark"
   concurrency: number
   project: string | null
   apiConfigs: ApiConfig[]
@@ -352,15 +356,20 @@ interface Settings {
 
 ```ts
 type TtsMode = "basic" | "voice-design" | "voice-clone"
+
+type ProjectVoiceConfig =
+  | { mode: "basic"; voice: string; performancePrompt: string }
+  | { mode: "voice-design"; presetId: string | null; prompt: string }
+  | { mode: "voice-clone"; sampleId: string | null; samplePath: string | null; performancePrompt: string }
+
+type ProjectVoiceConfigs = {
+  [Mode in TtsMode]: Extract<ProjectVoiceConfig, { mode: Mode }>
+}
+
 interface Project {
   apiConfigId: string | null
   mode: TtsMode
-  voice: string
-  voiceDesignId: string | null
-  voiceDesignPrompt: string
-  voiceCloneSampleId: string | null
-  voiceClonePath: string | null
-  performancePrompt: string
+  voiceConfigs: ProjectVoiceConfigs
   sentences: Sentence[]
 }
 ```
@@ -369,11 +378,13 @@ interface Project {
 
 ## 10. TTS 实现要点
 
-- 协议：小米 MiMo v2.5 TTS，`POST {baseUrl}/chat/completions`（chat-completions 风格，**非** OpenAI `/audio/speech`）。文档：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
-- 认证：`api-key: <apiKey>` 请求头（不是 `Authorization: Bearer`）。
-- Provider 目录提供新建配置的默认模型；项目运行时从能力映射解析用户可编辑的模型 ID。
+- MiMo 协议：`POST {baseUrl}/chat/completions`（chat-completions 风格，**非** OpenAI `/audio/speech`）。文档：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
+- Fish Audio 协议：`POST {baseUrl}`（预设为 `https://api.fish.audio/v1/tts`），使用 `Authorization: Bearer`、`model` 请求头和包含 `text`、`reference_id`、`format: "wav"` 的 JSON 请求体；响应为原始 WAV 字节。文档：https://docs.fish.audio/developer-guide/getting-started/quickstart
+- 自定义配置协议：用户填写第三方完整 Endpoint URL、模型和音色，后端不改写地址，使用 `Authorization: Bearer`，请求体包含 `model`、`input`、`voice`、`response_format: "wav"`，可选演绎指令映射到 `instructions`；响应为原始 WAV 字节。
+- 认证：MiMo 使用 `api-key: <apiKey>`；Fish Audio 与自定义配置使用 `Authorization: Bearer <apiKey>`。
+- Provider 目录为预置服务提供默认 Base URL、能力、模型和音色；自定义配置保持 Base URL、模型和音色为空，由用户填写。项目运行时从能力映射解析模型 ID，并从当前 API 配置解析音色。
 - 请求体：`{ model, messages:[...], audio:{format:"wav", voice} }`。目标文本必须放 `role: assistant`。
-- 风格控制：基础/克隆模式的 `performancePrompt` 是用户自由输入的可选文本；声音设计模式的 `voiceDesignPrompt` 是用户输入的必填文本。二者都通过 `role: user` 发送，MiMo 不提供原生 speed 参数。
+- 指令控制：MiMo 基础音色支持逐句 `styleInstruction`（界面称“导演指令”）；基础/克隆模式的项目级 `performancePrompt` 是用户自由输入的可选文本，声音设计模式的 `voiceDesignPrompt` 是用户输入的必填文本。它们都通过 `role: user` 发送，MiMo 不提供原生 speed 参数。
 - 声音克隆：参考音频只接受真实 WAV/MP3，以完整 Data URI 传入 `audio.voice`；Base64 Data URI 上限为 10 MB。独立试听文件存放在 `audio/voice-previews/`，不进入项目句子历史。
 - 声音资源库：声音设计和克隆样本分别持久化为可复用资源；项目保存资源 ID，生成时实时解析资源内容，编辑资源后所有引用项目同步生效。
 - 克隆样本保存入口和每次生成入口都会校验真实 WAV/MP3 签名、Base64 Data URI 小于 10 MB且时长小于 30 秒。
@@ -383,14 +394,14 @@ interface Project {
 - 缓存目录：三级 fallback `app_cache_dir/audio` → `app_data_dir/audio` → 项目本地 `.cache/audio`。macOS sandbox 下前两个可能被 TCC 拒绝写入，dev 模式通常落到 `.cache/audio`（已加入 `.gitignore`）。
 - 重新生成 → 唯一时间戳路径；每句保留最近 5 个版本并清理淘汰文件。
 - 不在后端解析音频时长；duration 由前端 `<audio>` 元素的 `onLoadedMetadata` 提供。
-- 预置音色：`冰糖`(女,中) / `茉莉`(女,中) / `苏打`(男,中) / `白桦`(男,中) / `Mia`(女,英) / `Chloe`(女,英) / `Milo`(男,英) / `Dean`(男,英) / `mimo_default`。
+- MiMo 预置音色：`冰糖` / `茉莉` / `苏打` / `白桦` / `Mia` / `Chloe` / `Milo` / `Dean` / `mimo_default`。Fish Audio 预填官方示例 `reference_id`；用户可在每套 API 配置中增删和修改音色。
 
 ---
 
 ## 11. 扩展指引
 
-- 新增 Tauri 命令：在 [src-tauri/src/tts.rs](src-tauri/src/tts.rs)（或新建模块）写 `#[tauri::command]`，在 [lib.rs](src-tauri/src/lib.rs) 的 `invoke_handler![...]` 注册，并在本文件第 8 节补契约。
-- 新增前端 service：放 `src/services/`，命名 kebab-case；通过 `index.ts` re-export。
+- 新增 Tauri 命令：在 `src-tauri/src/` 对应领域模块（`tts/`, `audio/`, `projects.rs`, `credentials.rs`, `native_file/`）编写 `#[tauri::command]`，在 [lib.rs](src-tauri/src/lib.rs) 的 `invoke_handler![...]` 注册，并在本文件第 8 节补契约。
+- 新增前端 service：放 `src/services/` 对应领域文件，直接使用精确路径导入。
 - 新增依赖：前端用 `npm i`；后端改 [Cargo.toml](src-tauri/Cargo.toml) 后 `cargo check`。
 - 涉及文件系统/网络新权限：改 [src-tauri/capabilities/default.json](src-tauri/capabilities/default.json)。
 

@@ -1,13 +1,15 @@
-import { cleanupAudioFiles, generateSentenceAudio, readAudioAsUrl } from "@/services/tts"
+import { cleanupAudioFiles, readAudioAsUrl } from "@/services/audio"
+import { generateSentenceAudio } from "@/services/tts"
 import { useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceDesignStore } from "@/stores/voice-design-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { SentenceStatus } from "@/types"
+import type { SentenceStatus } from "@/types/sentence"
+import type { TtsParams } from "@/types/tts"
 import { retainRecentAudioVersions } from "@/utils/audio-history"
 import { GenerationTaskRegistry } from "@/utils/generation-tasks"
 import { resolveCapability } from "@/utils/provider-catalog"
-import { getTtsConfigurationError } from "@/utils/tts-config"
+import { getTtsConfigurationError, resolvePerformancePrompt } from "@/utils/tts-config"
 import { resolveProjectVoiceResources } from "@/utils/voice-resources"
 import { useCallback, useRef } from "react"
 
@@ -41,13 +43,28 @@ export function useTtsGeneration() {
       const apiConfig = settings.apiConfigs.find((config) => config.id === projState.apiConfigId)
       const capability = apiConfig ? resolveCapability(apiConfig, projState.mode) : null
       const voiceResources = resolveProjectVoiceResources(
-        projState,
+        {
+          voiceDesignId: projState.voiceConfigs["voice-design"].presetId,
+          voiceDesignPrompt: projState.voiceConfigs["voice-design"].prompt,
+          voiceCloneSampleId: projState.voiceConfigs["voice-clone"].sampleId,
+          voiceClonePath: projState.voiceConfigs["voice-clone"].samplePath,
+        },
         useVoiceDesignStore.getState().designs,
         useVoiceSampleStore.getState().samples,
       )
+      const performancePrompt =
+        projState.mode === "basic"
+          ? projState.voiceConfigs.basic.performancePrompt
+          : projState.mode === "voice-clone"
+            ? projState.voiceConfigs["voice-clone"].performancePrompt
+            : ""
       const resolvedProject = {
-        ...projState,
-        ...voiceResources,
+        apiConfigId: projState.apiConfigId,
+        mode: projState.mode,
+        outputFormat: projState.outputFormat,
+        voice: projState.voiceConfigs.basic.voice,
+        voiceDesignPrompt: voiceResources.voiceDesignPrompt,
+        voiceClonePath: voiceResources.voiceClonePath,
       }
       const configurationError = getTtsConfigurationError(
         resolvedProject,
@@ -55,16 +72,17 @@ export function useTtsGeneration() {
         settings.apiKeys,
       )
       if (configurationError || !apiConfig || !capability) return
-      const params = {
+      const params: TtsParams = {
         provider: apiConfig.provider,
         baseUrl: apiConfig.baseUrl,
-        apiKey: settings.apiKeys[apiConfig.id],
+        apiKey: settings.apiKeys[apiConfig.id] ?? "",
         model: capability.modelId,
         mode: projState.mode,
-        voice: projState.voice,
+        voice: projState.mode === "basic" ? projState.voiceConfigs.basic.voice : "",
         voiceDesignPrompt: resolvedProject.voiceDesignPrompt,
         voiceClonePath: resolvedProject.voiceClonePath,
-        performancePrompt: projState.performancePrompt,
+        performancePrompt,
+        audioFormat: projState.outputFormat,
       }
       const concurrency = settings.concurrency
       const currentProject = projState.currentProject
@@ -94,15 +112,31 @@ export function useTtsGeneration() {
           if (!sentence) continue
           updateSentence(id, { status: "generating" as SentenceStatus })
           try {
-            const result = await generateSentenceAudio(id, sentence.text, params, currentProject)
-            let preloadError: unknown = null
+            const sentenceParams = {
+              ...params,
+              performancePrompt: resolvePerformancePrompt(
+                apiConfig.provider,
+                projState.mode,
+                sentence.styleInstruction ?? "",
+                params.performancePrompt,
+              ),
+            }
+            const result = await generateSentenceAudio(
+              id,
+              sentence.text,
+              sentenceParams,
+              currentProject,
+            )
             try {
               // Finish preparing the Blob URL before exposing the sentence as
               // ready. This removes the first-click race between the ready UI
               // and the asynchronous tts_read_audio IPC call.
               await readAudioAsUrl(result.audioPath)
             } catch (error) {
-              preloadError = error
+              cleanupAudioFiles([result.audioPath])
+              throw new Error(
+                `Generated audio could not be prepared: ${error instanceof Error ? error.message : String(error)}`,
+              )
             }
             if (!tasks.current.isCurrent(task, useProjectStore.getState().currentProject)) {
               cleanupAudioFiles([result.audioPath])
@@ -120,7 +154,6 @@ export function useTtsGeneration() {
               audioHistory: retained,
             })
             if (evictedPaths.length > 0) cleanupAudioFiles(evictedPaths)
-            if (preloadError) console.error("Audio preload after generation failed:", preloadError)
           } catch (e) {
             console.error("TTS generate failed:", id, e)
             if (!tasks.current.isCurrent(task, useProjectStore.getState().currentProject)) continue

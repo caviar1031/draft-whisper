@@ -6,22 +6,18 @@ import { StatusBar, WindowShell } from "@/components/dw/window-shell"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useTtsGeneration } from "@/hooks/use-tts-generation"
 import i18n from "@/i18n"
-import {
-  cleanupAudioFiles,
-  createProject,
-  deleteProject,
-  listProjects,
-  readAudioAsUrl,
-} from "@/services/tts"
+import { readAudioAsUrl } from "@/services/audio"
+import { createProject, deleteProject, listProjects } from "@/services/projects"
 import { deleteStoredProject, flushCurrentProject, useProjectStore } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceDesignStore } from "@/stores/voice-design-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { SentenceStatus } from "@/types"
+import type { SentenceStatus } from "@/types/sentence"
+import { isDirectorModeAvailable, resolveSentenceEditTarget } from "@/utils/director-mode"
 import { generateSentenceId } from "@/utils/id"
-import { resolveCapability } from "@/utils/provider-catalog"
-import { splitTextToSentences } from "@/utils/sentence"
+import { parseScriptLines } from "@/utils/script-lines"
 import { resolveLanguage } from "@/utils/settings-validation"
+import { registerTauriListener } from "@/utils/tauri-listener"
 import { applyTheme, getThemeMediaQuery } from "@/utils/theme"
 import { getTtsConfigurationError } from "@/utils/tts-config"
 import { resolveProjectVoiceResources } from "@/utils/voice-resources"
@@ -53,14 +49,22 @@ function App() {
   const loadProject = useProjectStore((s) => s.loadProject)
 
   const projectMode = useProjectStore((s) => s.mode)
+  const projectOutputFormat = useProjectStore((s) => s.outputFormat)
   const projectApiConfigId = useProjectStore((s) => s.apiConfigId)
-  const projectVoice = useProjectStore((s) => s.voice)
-  const projectVoiceDesignId = useProjectStore((s) => s.voiceDesignId)
-  const projectVoiceDesignPrompt = useProjectStore((s) => s.voiceDesignPrompt)
-  const projectVoiceCloneSampleId = useProjectStore((s) => s.voiceCloneSampleId)
-  const projectVoiceClonePath = useProjectStore((s) => s.voiceClonePath)
-  const projectPerformancePrompt = useProjectStore((s) => s.performancePrompt)
+  const projectVoice = useProjectStore((s) => s.voiceConfigs.basic.voice)
+  const projectVoiceDesignId = useProjectStore((s) => s.voiceConfigs["voice-design"].presetId)
+  const projectVoiceDesignPrompt = useProjectStore((s) => s.voiceConfigs["voice-design"].prompt)
+  const projectVoiceCloneSampleId = useProjectStore((s) => s.voiceConfigs["voice-clone"].sampleId)
+  const projectVoiceClonePath = useProjectStore((s) => s.voiceConfigs["voice-clone"].samplePath)
+  const projectPerformancePrompt = useProjectStore((s) =>
+    s.mode === "basic"
+      ? s.voiceConfigs.basic.performancePrompt
+      : s.mode === "voice-clone"
+        ? s.voiceConfigs["voice-clone"].performancePrompt
+        : "",
+  )
   const setProjectMode = useProjectStore((s) => s.setMode)
+  const setProjectOutputFormat = useProjectStore((s) => s.setOutputFormat)
   const setProjectApiConfigId = useProjectStore((s) => s.setApiConfigId)
   const setProjectVoice = useProjectStore((s) => s.setVoice)
   const setProjectVoiceDesignId = useProjectStore((s) => s.setVoiceDesignId)
@@ -91,7 +95,11 @@ function App() {
   const effectiveVoiceDesignPrompt = effectiveVoiceResources.voiceDesignPrompt
   const effectiveVoiceClonePath = effectiveVoiceResources.voiceClonePath
   const selectedApiConfig = apiConfigs.find((config) => config.id === projectApiConfigId)
-  const projectModel = resolveCapability(selectedApiConfig, projectMode)?.modelId ?? ""
+  const directorModeAvailable = isDirectorModeAvailable(
+    selectedApiConfig?.provider,
+    projectMode,
+    projectVoice,
+  )
 
   useEffect(() => {
     void i18n.changeLanguage(resolveLanguage(language))
@@ -126,10 +134,17 @@ function App() {
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [projectConfigOpen, setProjectConfigOpen] = useState(false)
+  const [directorMode, setDirectorMode] = useState(false)
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [projects, setProjects] = useState<string[]>([])
   const [projectError, setProjectError] = useState<string | null>(null)
   const closingRef = useRef(false)
+
+  const effectiveDirectorMode = directorMode && directorModeAvailable
+
+  useEffect(() => {
+    if (!directorModeAvailable) setDirectorMode(false)
+  }, [directorModeAvailable])
 
   // 启动时加载上次选中的项目的句子
   useEffect(() => {
@@ -140,23 +155,22 @@ function App() {
   // 窗口关闭前立即保存项目数据（绕过 debounce）
   useEffect(() => {
     const win = getCurrentWindow()
-    const unlisten = win.onCloseRequested(async (event) => {
-      event.preventDefault()
-      if (closingRef.current) return
-      closingRef.current = true
-      try {
-        flushCurrentProject()
-      } finally {
+    return registerTauriListener(() =>
+      win.onCloseRequested(async (event) => {
+        event.preventDefault()
+        if (closingRef.current) return
+        closingRef.current = true
         try {
-          await win.hide()
+          flushCurrentProject()
         } finally {
-          closingRef.current = false
+          try {
+            await win.hide()
+          } finally {
+            closingRef.current = false
+          }
         }
-      }
-    })
-    return () => {
-      void unlisten.then((fn) => fn())
-    }
+      }),
+    )
   }, [])
 
   // 预缓存已有音频的 Blob URL（启动/切换项目时），确保点击播放时瞬间返回，
@@ -269,6 +283,8 @@ function App() {
     {
       apiConfigId: projectApiConfigId,
       mode: projectMode,
+      outputFormat: projectOutputFormat,
+      voice: projectVoice,
       voiceDesignPrompt: effectiveVoiceDesignPrompt,
       voiceClonePath: effectiveVoiceClonePath,
     },
@@ -283,49 +299,53 @@ function App() {
   }, [])
 
   const handleSaveScript = useCallback(
-    (text: string, splitMode: "auto" | "manual") => {
+    (text: string) => {
       setScriptEditorOpen(false)
       cancelGeneration()
       handlePause()
       setEditingId(null)
 
-      if (splitMode === "auto") {
-        const newSentences = splitTextToSentences(text)
+      const lines = parseScriptLines(text)
+      if (sentences.length === 0) {
+        // No existing content: create all sentences from non-empty lines.
+        const newSentences = lines.map((t, i) => ({
+          id: generateSentenceId(i, t),
+          text: t,
+          styleInstruction: "",
+          status: "pending" as SentenceStatus,
+          audioPath: null,
+          audioHistory: [],
+          duration: null,
+        }))
         setSentences(newSentences)
         void runGeneration(newSentences.map((s) => s.id))
       } else {
-        const lines = text.split("\n").filter((l) => l.trim().length > 0)
-        if (sentences.length === 0) {
-          // 无内容 → 新建全部句子
-          const newSentences = lines.map((t, i) => ({
-            id: generateSentenceId(i, t.trim()),
-            text: t.trim(),
+        // Existing content: compare lines by position and regenerate changed sentences.
+        const newSentences = lines.map((t, i) => {
+          const old = sentences[i]
+          if (old && old.text === t) return old
+          if (old) {
+            return {
+              ...old,
+              text: t,
+              status: "pending" as SentenceStatus,
+              errorMessage: undefined,
+              duration: null,
+            }
+          }
+          return {
+            id: generateSentenceId(i, t),
+            text: t,
+            styleInstruction: "",
             status: "pending" as SentenceStatus,
             audioPath: null,
             audioHistory: [],
             duration: null,
-          }))
-          setSentences(newSentences)
-          void runGeneration(newSentences.map((s) => s.id))
-        } else {
-          // 有内容 → 按位置对比，变化的重新生成
-          const newSentences = lines.map((t, i) => {
-            const old = sentences[i]
-            const trimmed = t.trim()
-            if (old && old.text === trimmed) return old
-            return {
-              id: old?.id ?? generateSentenceId(i, trimmed),
-              text: trimmed,
-              status: "pending" as SentenceStatus,
-              audioPath: null,
-              audioHistory: [],
-              duration: null,
-            }
-          })
-          setSentences(newSentences)
-          const pendingIds = newSentences.filter((s) => s.status === "pending").map((s) => s.id)
-          if (pendingIds.length > 0) void runGeneration(pendingIds)
-        }
+          }
+        })
+        setSentences(newSentences)
+        const pendingIds = newSentences.filter((s) => s.status === "pending").map((s) => s.id)
+        if (pendingIds.length > 0) void runGeneration(pendingIds)
       }
     },
     [cancelGeneration, sentences, setSentences, runGeneration, handlePause],
@@ -364,20 +384,18 @@ function App() {
     setEditingId(id)
   }, [])
 
+  const handleToggleDirectorMode = useCallback(() => {
+    if (!directorModeAvailable || editingId !== null) return
+    setDirectorMode((current) => !current)
+  }, [directorModeAvailable, editingId])
+
   const handleCommitEdit = useCallback(
-    (id: string, text: string) => {
-      const sentence = useProjectStore.getState().sentences.find((item) => item.id === id)
-      if (sentence) {
-        const oldPaths = new Set(sentence.audioHistory.map((version) => version.audioPath))
-        if (sentence.audioPath) oldPaths.add(sentence.audioPath)
-        cleanupAudioFiles([...oldPaths])
-      }
+    (id: string, text: string, styleInstruction: string) => {
       updateSentence(id, {
         text,
+        styleInstruction,
         status: "pending",
         errorMessage: undefined,
-        audioPath: null,
-        audioHistory: [],
         duration: null,
       })
       setEditingId(null)
@@ -478,6 +496,12 @@ function App() {
             action={toolbarAction}
             hasContent={sentences.length > 0}
             onOpenScriptEditor={handleOpenScriptEditor}
+            directorModeEnabled={effectiveDirectorMode}
+            directorModeDisabled={!directorModeAvailable || editingId !== null}
+            directorModeDisabledReason={
+              editingId !== null ? t("app.directorModeEditing") : t("app.directorModeUnavailable")
+            }
+            onToggleDirectorMode={handleToggleDirectorMode}
             onAction={handleToolbarAction}
           />
 
@@ -547,9 +571,16 @@ function App() {
                   onRegenerate={() => handleRegenerateCard(sentence.id)}
                   onRetry={() => handleRegenerateCard(sentence.id)}
                   onEdit={() => handleEditCard(sentence.id)}
-                  onCommitEdit={(text) => handleCommitEdit(sentence.id, text)}
+                  onCommitEdit={(text, styleInstruction) =>
+                    handleCommitEdit(sentence.id, text, styleInstruction)
+                  }
                   onCancelEdit={handleCancelEdit}
                   onSwitchVersion={(historyIndex) => handleSwitchVersion(sentence.id, historyIndex)}
+                  directorInstructionAvailable={directorModeAvailable}
+                  initialEditTarget={resolveSentenceEditTarget(
+                    effectiveDirectorMode,
+                    directorModeAvailable,
+                  )}
                   generationDisabled={Boolean(localizedTtsConfigurationError)}
                   generationDisabledReason={localizedTtsConfigurationError ?? undefined}
                 />
@@ -572,9 +603,9 @@ function App() {
             mode={sentences.length > 0 ? "edit" : "import"}
             initialText={sentences.length > 0 ? sentences.map((s) => s.text).join("\n") : ""}
             ttsMode={projectMode}
+            outputFormat={projectOutputFormat}
             apiConfigId={projectApiConfigId}
             apiConfigs={apiConfigs}
-            model={projectModel}
             voice={projectVoice}
             voiceDesignId={projectVoiceDesignId}
             voiceDesigns={voiceDesigns}
@@ -586,6 +617,7 @@ function App() {
             onSave={handleSaveScript}
             onClose={() => setScriptEditorOpen(false)}
             onModeChange={setProjectMode}
+            onOutputFormatChange={setProjectOutputFormat}
             onApiConfigChange={setProjectApiConfigId}
             onVoiceChange={setProjectVoice}
             onVoiceDesignIdChange={(id) => {

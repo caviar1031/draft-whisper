@@ -1,3 +1,4 @@
+import { registerTauriListener } from "@/utils/tauri-listener"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { Settings } from "lucide-react"
 import { useEffect, useState } from "react"
@@ -29,8 +30,6 @@ export function TitleBar({
 
     const appWindow = getCurrentWindow()
     let disposed = false
-    let unlistenResize: (() => void) | undefined
-    let unlistenFocus: (() => void) | undefined
 
     const syncMaximized = () => {
       void appWindow
@@ -42,27 +41,17 @@ export function TitleBar({
     }
 
     syncMaximized()
-    void appWindow
-      .onResized(syncMaximized)
-      .then((unlisten) => {
-        if (disposed) unlisten()
-        else unlistenResize = unlisten
-      })
-      .catch(() => undefined)
-    void appWindow
-      .onFocusChanged(({ payload: focused }) => {
+    const unregisterResize = registerTauriListener(() => appWindow.onResized(syncMaximized))
+    const unregisterFocus = registerTauriListener(() =>
+      appWindow.onFocusChanged(({ payload: focused }) => {
         if (!disposed) setIsWindowFocused(focused)
-      })
-      .then((unlisten) => {
-        if (disposed) unlisten()
-        else unlistenFocus = unlisten
-      })
-      .catch(() => undefined)
+      }),
+    )
 
     return () => {
       disposed = true
-      unlistenResize?.()
-      unlistenFocus?.()
+      unregisterResize()
+      unregisterFocus()
     }
   }, [isWindows])
 

@@ -1,0 +1,788 @@
+@layer components {
+  /* ===== Sentence list & cards ===== */
+  .sentence-list {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .dw-sentence-card {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--glass-bg-card);
+    border: 1px solid var(--glass-surface-5);
+  }
+
+  .dw-sentence-card:hover {
+    background: var(--glass-bg-card-hover);
+  }
+
+  /* Drag handle */
+  .dw-drag-handle {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    color: var(--glass-handle);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    transition: color 0.15s ease;
+  }
+
+  .dw-drag-handle:active {
+    cursor: grabbing;
+  }
+
+  .dw-sentence-card:hover .dw-drag-handle {
+    color: var(--glass-handle-hover);
+  }
+
+  .dw-sentence-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dw-sentence-text {
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--text-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .dw-sentence-text--muted {
+    color: var(--text-400);
+  }
+
+  .dw-sentence-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  /* Status dot & label */
+  .dw-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-400);
+  }
+
+  .dw-status-dot.is-ready {
+    background: var(--state-success);
+  }
+
+  .dw-status-dot.is-queued {
+    background: var(--text-400);
+  }
+
+  .dw-status-dot.is-generating {
+    background: var(--brand-500);
+    animation: dw-status-pulse 1.5s ease-in-out infinite;
+  }
+
+  .dw-status-dot.is-playing {
+    background: var(--brand-500);
+    animation: dw-status-pulse 1.5s ease-in-out infinite;
+  }
+
+  .dw-status-dot.is-failed {
+    background: var(--state-error);
+  }
+
+  .dw-status-dot.is-pending {
+    background: var(--glass-orange);
+  }
+
+  @keyframes dw-status-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(0.85);
+    }
+  }
+
+  .dw-status-text {
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .dw-status-text.is-ready {
+    color: var(--state-success);
+  }
+
+  .dw-status-text.is-queued {
+    color: var(--text-400);
+  }
+
+  .dw-status-text.is-generating {
+    color: var(--brand-500);
+  }
+
+  .dw-status-text.is-playing {
+    color: var(--brand-500);
+  }
+
+  .dw-status-text.is-failed {
+    color: var(--state-error);
+  }
+
+  .dw-status-text.is-pending {
+    color: var(--glass-orange);
+  }
+
+  .dw-style-instruction-indicator {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--brand-500);
+  }
+
+  /* Card actions */
+  .dw-card-actions {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-width: 80px;
+    justify-content: center;
+  }
+
+  .dw-action-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    position: absolute;
+  }
+
+  .dw-action-btn:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-action-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .dw-play-btn,
+  .dw-pause-btn {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    z-index: 1;
+  }
+
+  .dw-play-btn {
+    color: var(--state-success);
+  }
+
+  .dw-play-btn:hover {
+    background: var(--glass-green-tint);
+  }
+
+  .dw-pause-btn {
+    color: var(--brand-500);
+  }
+
+  .dw-pause-btn:hover {
+    background: var(--glass-blue-tint-medium);
+  }
+
+  .dw-regen-btn {
+    color: var(--text-400);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .dw-regen-btn:first-child {
+    left: 0;
+  }
+
+  .dw-regen-btn:last-child {
+    right: 0;
+  }
+
+  .dw-sentence-card:hover .dw-regen-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .dw-regen-btn:hover {
+    color: var(--text-500);
+  }
+
+  /* Playing card accent */
+  .dw-sentence-card.is-playing {
+    animation: dw-pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes dw-pulse-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--glass-blue-tint);
+    }
+    50% {
+      box-shadow: 0 0 8px 2px var(--glass-blue-tint-glow);
+    }
+  }
+
+  /* Generating card accent */
+  .dw-sentence-card.is-generating {
+    background: var(--glass-blue-tint);
+  }
+
+  /* Error card accent */
+  .dw-sentence-card.is-failed {
+    background: var(--glass-red-tint-medium);
+  }
+
+  .dw-sentence-card.is-failed:hover {
+    background: var(--glass-red-tint-medium);
+  }
+
+  /* Editing card accent */
+  .dw-sentence-card.is-editing {
+    border: 1px solid var(--glass-blue-tint-border);
+    background: var(--glass-bg-card-light);
+    box-shadow: var(--glass-shadow);
+    align-items: flex-start;
+  }
+
+  .dw-sentence-card.is-editing .dw-drag-handle {
+    align-self: center;
+  }
+
+  /* ===== Waveform (CSS-only) ===== */
+  .dw-waveform {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .dw-waveform-bar {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--brand-500);
+    animation: dw-waveform-bounce 1.2s ease-in-out infinite;
+  }
+
+  .dw-waveform-bar:nth-child(1) {
+    height: 6px;
+    animation-delay: 0s;
+  }
+  .dw-waveform-bar:nth-child(2) {
+    height: 12px;
+    animation-delay: 0.15s;
+  }
+  .dw-waveform-bar:nth-child(3) {
+    height: 8px;
+    animation-delay: 0.3s;
+  }
+  .dw-waveform-bar:nth-child(4) {
+    height: 14px;
+    animation-delay: 0.45s;
+  }
+  .dw-waveform-bar:nth-child(5) {
+    height: 10px;
+    animation-delay: 0.6s;
+  }
+
+  @keyframes dw-waveform-bounce {
+    0%,
+    100% {
+      transform: scaleY(0.4);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+
+  /* ===== Version Navigation ===== */
+  .dw-version-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 4px;
+    flex-shrink: 0;
+  }
+
+  .dw-version-btn {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-400);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .dw-version-btn:hover:not(:disabled) {
+    color: var(--text-100);
+    background: var(--glass-bg-card-light);
+  }
+
+  .dw-version-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .dw-version-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-400);
+    min-width: 24px;
+    text-align: center;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== Spinner ===== */
+  .dw-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--glass-blue-tint-spinner);
+    border-top-color: var(--brand-500);
+    border-radius: 50%;
+    animation: dw-spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes dw-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ===== Retry All banner ===== */
+  .dw-retry-all-bar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    min-width: 0;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--glass-red-tint-medium);
+    border-bottom: 1px solid var(--glass-red-tint-medium);
+  }
+
+  .dw-retry-all-label {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: flex-start;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--state-error);
+    gap: 6px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .dw-retry-all-label > svg {
+    flex: 0 0 14px;
+    width: 14px;
+    height: 14px;
+    margin-top: 2px;
+  }
+
+  .dw-retry-all-message {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .dw-retry-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 14px;
+    border: 1px solid var(--state-error);
+    background: transparent;
+    color: var(--state-error);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    align-self: flex-start;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+
+  .dw-retry-all-close {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--state-error);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .dw-retry-all-close:hover {
+    background: var(--glass-red-tint-medium);
+    color: var(--state-error);
+  }
+
+  .dw-retry-all-close:focus-visible {
+    outline: 2px solid var(--state-error);
+    outline-offset: 2px;
+  }
+
+  .dw-retry-all-btn:hover {
+    background: var(--glass-red-tint-medium);
+  }
+
+  .dw-retry-all-btn:focus-visible {
+    outline: 2px solid var(--state-error);
+    outline-offset: 2px;
+  }
+
+  /* ===== Retry button (per-card) ===== */
+  .dw-retry-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 12px;
+    border: 1px solid var(--state-error);
+    background: transparent;
+    color: var(--state-error);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+  }
+
+  .dw-retry-btn:hover {
+    background: var(--glass-red-tint-medium);
+  }
+
+  .dw-retry-btn:focus-visible {
+    outline: 2px solid var(--state-error);
+    outline-offset: 2px;
+  }
+
+  /* ===== Error detail ===== */
+  .dw-error-detail {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    gap: 4px;
+    margin-top: 3px;
+  }
+
+  .dw-error-icon {
+    color: var(--state-error);
+    flex-shrink: 0;
+  }
+
+  .dw-error-msg {
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--state-error);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  /* ===== Editing textarea ===== */
+  .dw-editing-textarea {
+    width: 100%;
+    min-height: 52px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--brand-500);
+    background: var(--glass-bg-input);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-800);
+    resize: none;
+    outline: none;
+    box-shadow: none;
+    transition: border-color 0.15s ease;
+    /* 恢复文字选择 */
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .dw-editing-textarea::placeholder {
+    color: var(--text-300);
+  }
+
+  .dw-style-instruction-editor {
+    display: flex;
+    flex-direction: column;
+    margin-top: 8px;
+    padding-top: 4px;
+    border-top: 1px solid var(--glass-divider);
+  }
+
+  .dw-style-instruction-toggle {
+    width: 100%;
+    min-width: 0;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-500);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .dw-style-instruction-toggle:hover {
+    color: var(--text-700);
+  }
+
+  .dw-style-instruction-toggle-main {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dw-style-instruction-toggle-main > svg,
+  .dw-style-instruction-toggle > svg {
+    flex-shrink: 0;
+  }
+
+  .dw-style-instruction-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-400);
+    font-weight: 400;
+  }
+
+  .dw-style-instruction-toggle:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+  }
+
+  .dw-style-instruction-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 3px;
+  }
+
+  .dw-style-instruction-textarea {
+    width: 100%;
+    min-height: 58px;
+    max-height: 180px;
+    padding: 9px 11px;
+    border: 1px solid var(--glass-input-border);
+    border-radius: 10px;
+    background: var(--glass-bg-input);
+    color: var(--text-800);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .dw-style-instruction-textarea::placeholder {
+    color: var(--text-300);
+  }
+
+  .dw-style-instruction-textarea:focus {
+    border-color: var(--brand-500);
+    box-shadow: none;
+  }
+
+  .dw-style-instruction-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    color: var(--text-400);
+    font-size: 10px;
+  }
+
+  .dw-editing-hint {
+    font-size: 11px;
+    color: var(--text-400);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .dw-editing-hint-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  /* ===== Voice Sample Selector ===== */
+  .dw-sample-add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .dw-sample-add-label {
+    font-size: 11px;
+    color: var(--text-400);
+    flex-shrink: 0;
+  }
+
+  .dw-sample-name-input {
+    flex: 1;
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-surface);
+    color: var(--text-100);
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .dw-sample-name-input:focus {
+    border-color: var(--brand-500);
+  }
+
+  .dw-sample-manage-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dw-sample-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--glass-surface);
+  }
+
+  .dw-sample-name {
+    font-size: 12px;
+    color: var(--text-200);
+  }
+
+  .dw-sample-meta {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--text-400);
+  }
+
+  .dw-clone-preview-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--glass-divider);
+    border-radius: 10px;
+    background: var(--glass-surface);
+  }
+
+  .dw-clone-preview-panel .dw-editor-textarea {
+    min-height: 72px;
+  }
+
+  .dw-clone-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dw-settings-inline-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .dw-sentence-num {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-400);
+    min-width: 18px;
+    flex-shrink: 0;
+  }
+}

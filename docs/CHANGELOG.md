@@ -50,7 +50,7 @@ All notable changes to DraftWhisper will be documented in this file.
 ## [0.1.0] - 2026-06-29
 
 ### Added
-- MVP 核心功能：导入文本、自动切句、TTS 生成、试听播放、单句重新生成、本地缓存
+- MVP 核心功能：按行导入文本、TTS 生成、试听播放、单句重新生成、本地缓存
 - 小米 MiMo v2.5 TTS 协议支持（chat-completions 风格）
 - macOS Liquid Glass 毛玻璃窗口（window-vibrancy）
 - 原生红黄绿交通灯按钮

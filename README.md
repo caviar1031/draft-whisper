@@ -60,7 +60,7 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 
 | Step | What happens |
 | --- | --- |
-| 1. Import | Paste a script or enter one line per sentence. DraftWhisper can split a script automatically. |
+| 1. Import | Paste a script with one sentence per line. Blank lines are ignored. |
 | 2. Choose a voice | Use a preset, describe a new voice, or select a local voice-clone sample. |
 | 3. Generate | Create independent WAV clips with visible per-sentence progress and errors. |
 | 4. Review | Play a single sentence, edit its text, retry it, or switch among its five latest versions. |
@@ -78,12 +78,12 @@ DraftWhisper shortens that loop to one sentence. It keeps the script, voice sett
 
 ## What you can do
 
-- **Work sentence by sentence** — paste a script, preview automatic splitting, or enter manual lines.
+- **Work sentence by sentence** — paste a script with one sentence per line; blank lines are ignored.
 - **Generate in batches** — use configurable concurrency and see queued, generating, ready, and failed states.
 - **Revise without starting over** — edit one sentence and regenerate only that sentence.
 - **Keep useful history** — retain and switch between the five latest audio versions for each sentence.
-- **Shape the voice** — use MiMo preset voices, text-based voice design, or WAV/MP3 voice cloning.
-- **Direct the performance** — add optional free-text performance direction for basic and clone modes.
+- **Shape the voice** — use MiMo preset voices, Fish Audio voices, text-based voice design, or WAV/MP3 voice cloning.
+- **Direct the performance** — use the session-only Director Mode to focus sentence editing on per-sentence direction, or keep the sentence text as the default target.
 - **Preview voices separately** — test a voice without adding the preview to a sentence's history.
 - **Move audio into the edit** — drag or copy files natively on macOS and Windows, and reveal them in Finder or File Explorer.
 - **Keep work organized locally** — store scripts, voice settings, samples, and cached audio by project.
@@ -108,11 +108,13 @@ It fits especially well into workflows for:
 
 ## Current provider and voice modes
 
-The provider layer is designed to grow, but the current MVP ships with Xiaomi MiMo v2.5:
+The provider layer ships with editable presets for Xiaomi MiMo v2.5 and Fish Audio, plus a blank custom configuration for third-party OpenAI SDK-compatible speech APIs:
 
 | Provider | Protocol | Default base URL | Modes |
 | --- | --- | --- | --- |
 | Xiaomi MiMo | Chat Completions-style TTS | `https://api.xiaomimimo.com/v1` | Basic voice, voice design, voice clone |
+| Fish Audio | `/v1/tts` REST API | `https://api.fish.audio/v1/tts` | Basic voice |
+| Custom configuration | OpenAI SDK-compatible speech request | Complete endpoint supplied by user | Basic voice |
 
 Default model mappings for a new MiMo configuration:
 
@@ -124,6 +126,10 @@ Default model mappings for a new MiMo configuration:
 
 See the [MiMo v2.5 speech synthesis documentation](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5) for API access and account details.
 
+Fish Audio configurations default to `s2.1-pro-free` and include editable example voice IDs. See the [Fish Audio quick start](https://docs.fish.audio/developer-guide/getting-started/quickstart). Provider presets populate the base URL, models, capabilities, and voices, while keeping every value editable.
+
+Custom configurations do not assume an OpenAI account or endpoint. Enter the third-party service's complete speech endpoint, API key, model ID, and voice IDs; DraftWhisper uses the endpoint unchanged, sends the standard speech request with Bearer authentication, and stores the returned WAV bytes locally.
+
 Voice-clone samples are checked locally before storage or upload: they must be valid WAV or MP3 files, shorter than 30 seconds, and under MiMo's 10 MB limit after conversion to a complete Base64 Data URI.
 
 ## Quick start
@@ -132,7 +138,7 @@ Voice-clone samples are checked locally before storage or upload: they must be v
 
 - Recent Node.js and npm
 - Rust and Cargo compatible with the Tauri toolchain (Rust 1.77.2 or newer)
-- A MiMo API key
+- A MiMo, Fish Audio, or compatible third-party TTS API key
 
 Platform-specific requirements:
 
@@ -157,7 +163,7 @@ npm run tauri dev
 
 On first launch:
 
-1. Open **Settings** and add a MiMo API configuration.
+1. Open **Settings** and add a preset or custom API configuration.
 2. Enter the API key and test the capabilities you want to use.
 3. Import a script, choose a voice mode, and generate the sentence audio.
 
@@ -183,7 +189,7 @@ For front-end-only work, use `npm run dev`. Tauri commands and native macOS/Wind
 React + TypeScript + Zustand
           │ Tauri IPC
           ▼
-Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
+Rust + reqwest ──────► MiMo, Fish Audio, or custom TTS API
           │
           ├─ project metadata and preferences: localStorage
           ├─ API keys: platform credential store
@@ -191,12 +197,6 @@ Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
 ```
 
 The front end owns project and settings state. The Rust side handles HTTP requests, file I/O, audio caching, credential storage, and platform-native integrations. Generated audio is stored as local WAV files so it can be played, copied, revealed, or dragged into another app.
-
-## Current MVP scope
-
-Included: script import, sentence splitting, batch generation, playback, single-sentence regeneration, five-version history, local projects, voice design, voice cloning, local caching, settings, and English/Simplified Chinese UI.
-
-Not included yet: cloud sync, waveform editing, timeline editing, subtitles, and additional providers beyond MiMo.
 
 ## License
 

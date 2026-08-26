@@ -62,7 +62,7 @@ DraftWhisper 把这条链路缩短到一句话：脚本、声音设置、当前�
 
 | 步骤 | 发生什么 |
 | --- | --- |
-| 1. 导入 | 粘贴整篇稿子，或按行输入；应用可以自动切句。 |
+| 1. 导入 | 粘贴脚本并按行输入，一行对应一句；空行会被忽略。 |
 | 2. 选择声音 | 使用预置音色、文字描述声音，或选择本地声音克隆样本。 |
 | 3. 生成 | 按句生成独立 WAV，并显示排队、生成中、完成和失败状态。 |
 | 4. 试听与修改 | 单句播放、编辑、重试，或切换该句最近 5 个音频版本。 |
@@ -80,12 +80,12 @@ DraftWhisper 把这条链路缩短到一句话：脚本、声音设置、当前�
 
 ## 你可以用它做什么？
 
-- **逐句处理脚本**：粘贴文案，预览自动切句，或手动一行一句。
+- **逐句处理脚本**：粘贴文案并手动一行一句，空行会被忽略。
 - **批量生成配音**：配置并发数，并观察每句的排队、生成、完成和失败状态。
 - **只改需要改的地方**：编辑一句话后，只重新生成这一句。
 - **保留可用版本**：每句保留最近 5 个音频版本，随时切换和试听。
 - **设计或克隆声音**：使用 MiMo 预置音色、文字声音设计，或 WAV/MP3 声音克隆。
-- **控制演绎方式**：基础音色和声音克隆支持可选的自由文本演绎指令。
+- **导演模式**：使用会话级开关控制逐句编辑；开启时默认聚焦导演指令，关闭时默认聚焦正文。
 - **单独试听声音**：试听不会写入句子的音频历史。
 - **快速交给剪辑**：macOS 和 Windows 均支持原生拖拽和复制音频文件，并可分别在 Finder 或文件资源管理器中定位。
 - **按项目整理工作**：脚本、声音设置、声音样本和音频缓存都可以按本地项目管理。
@@ -110,11 +110,13 @@ DraftWhisper 不是通用写作助手、时间线编辑器，也不是把所有�
 
 ## 当前支持的 Provider 与声音模式
 
-Provider 架构已经为扩展预留，但当前 MVP 只支持小米 MiMo v2.5：
+DraftWhisper 当前支持三类 Provider 配置：小米 MiMo v2.5、Fish Audio，以及兼容 OpenAI SDK 语音协议的第三方自定义接口。每套 API 配置可以独立保存 API Key、模型、音色和能力映射，并可在项目中切换使用。
 
 | Provider | 协议 | 默认 Base URL | 支持模式 |
 | --- | --- | --- | --- |
 | Xiaomi MiMo | Chat Completions 风格 TTS | `https://api.xiaomimimo.com/v1` | 基础音色、声音设计、声音克隆 |
+| Fish Audio | `/v1/tts` REST API | `https://api.fish.audio/v1/tts` | 基础音色 |
+| 自定义配置 | OpenAI SDK 兼容语音请求 | 用户填写完整 Endpoint | 基础音色 |
 
 新建 MiMo 配置时使用以下默认模型映射：
 
@@ -126,6 +128,10 @@ Provider 架构已经为扩展预留，但当前 MVP 只支持小米 MiMo v2.5�
 
 API 使用方式和账号信息请参考 [MiMo v2.5 语音合成文档](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5)。
 
+Fish Audio 配置默认使用 `s2.1-pro-free`，并提供可编辑的示例音色 ID；具体接入方式请参考 [Fish Audio 快速开始文档](https://docs.fish.audio/developer-guide/getting-started/quickstart)。预置配置会填入默认地址、模型、能力和音色，所有值都可以在设置中修改。
+
+自定义配置不会预填服务商地址、模型或音色。请填写第三方服务的完整语音 Endpoint、API Key、模型 ID 和音色 ID；DraftWhisper 会原样使用该 Endpoint，并通过 Bearer 认证发送标准语音请求。
+
 声音克隆样本在保存或发送前会进行本地校验：必须是签名有效的 WAV 或 MP3 文件，时长小于 30 秒，并且转换为完整 Base64 Data URI 后小于 MiMo 的 10 MB 限制。
 
 ## 快速开始
@@ -134,7 +140,7 @@ API 使用方式和账号信息请参考 [MiMo v2.5 语音合成文档](https://
 
 - 较新版本的 Node.js 与 npm
 - 与 Tauri 工具链兼容的 Rust 和 Cargo（Rust 1.77.2 或更高版本）
-- 一个 MiMo API Key
+- 一个 MiMo、Fish Audio 或兼容第三方 TTS API Key
 
 各平台还需要：
 
@@ -159,7 +165,7 @@ npm run tauri dev
 
 首次启动后：
 
-1. 打开 **设置**，添加一套 MiMo API 配置。
+1. 打开 **设置**，添加一套预置或自定义 API 配置。
 2. 填入 API Key，并测试准备使用的能力。
 3. 导入脚本，选择声音模式，生成逐句音频。
 
@@ -185,7 +191,7 @@ npm run tauri dev
 React + TypeScript + Zustand
           │ Tauri IPC
           ▼
-Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
+Rust + reqwest ──────► MiMo、Fish Audio 或自定义 TTS API
           │
           ├─ 项目元数据与偏好设置：localStorage
           ├─ API Key：系统凭据存储
@@ -193,12 +199,6 @@ Rust + reqwest ──────► Xiaomi MiMo v2.5 TTS API
 ```
 
 前端负责项目和设置状态；Rust 负责 HTTP 请求、文件读写、音频缓存、凭据存储和各平台原生集成。生成的音频以本地 WAV 文件保存，可以播放、复制、定位或拖入其他应用。
-
-## 当前 MVP 范围
-
-已包含：文本导入、自动切句、批量生成、播放试听、单句重新生成、最近 5 个版本、本地项目、声音设计、声音克隆、本地缓存、设置中心，以及 English / 简体中文界面。
-
-暂不包含：云同步、波形编辑、时间线编辑、字幕，以及 MiMo 之外的 Provider。
 
 ## License
 

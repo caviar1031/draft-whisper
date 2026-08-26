@@ -1,16 +1,18 @@
+import { ModalLayer } from "@/components/ui/modal-layer"
+import { Select } from "@/components/ui/select"
 import {
   cleanupAudioFiles,
   deleteVoiceSample,
-  previewVoice,
   readAudioAsUrl,
   saveVoiceSample,
-} from "@/services/tts"
+} from "@/services/audio"
+import { previewVoice } from "@/services/tts"
 import { clearVoiceResourceReferences } from "@/stores/project-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useVoiceDesignStore } from "@/stores/voice-design-store"
 import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { VoiceDesignPreset } from "@/types"
-import { resolveCapability } from "@/utils/provider-catalog"
+import type { VoiceDesignPreset } from "@/types/voice-resource"
+import { getDefaultAudioFormat, resolveCapability } from "@/utils/provider-catalog"
 import { open } from "@tauri-apps/plugin-dialog"
 import {
   CheckCircle2,
@@ -285,98 +287,100 @@ export function VoiceLibrarySection() {
         />
       )}
       {sampleDraft && (
-        <dialog
-          className="dw-api-editor dw-resource-editor"
-          open
-          aria-labelledby="sample-editor-title"
-        >
-          <header className="dw-api-editor-header">
-            <h2 id="sample-editor-title">{t("voiceLibrary.clone.add")}</h2>
-            <button
-              type="button"
-              className="dw-settings-close"
-              onClick={() => setSampleDraft(null)}
-            >
-              <X size={16} />
-            </button>
-          </header>
-          <div className="dw-api-editor-body">
-            <label className="dw-settings-label">
-              {t("voiceLibrary.name")}
-              <input
-                className="dw-settings-input"
-                value={sampleDraft.name}
-                onChange={(event) => setSampleDraft({ ...sampleDraft, name: event.target.value })}
-              />
-            </label>
-            <div className="dw-resource-file-path">{sampleDraft.sourcePath}</div>
-            <p className="dw-resource-rule">{t("voiceLibrary.clone.rules")}</p>
-            {sampleError && <div className="dw-settings-inline-error">{sampleError}</div>}
-          </div>
-          <footer className="dw-api-editor-footer">
-            <span />
-            <div>
-              <button type="button" className="dw-pill-btn" onClick={() => setSampleDraft(null)}>
-                {t("common.cancel")}
-              </button>
+        <ModalLayer onClose={() => setSampleDraft(null)}>
+          <ModalLayer.Panel
+            className="dw-api-editor dw-resource-editor dw-resource-compact-editor"
+            aria-labelledby="sample-editor-title"
+          >
+            <header className="dw-api-editor-header">
+              <h2 id="sample-editor-title">{t("voiceLibrary.clone.add")}</h2>
               <button
                 type="button"
-                className="dw-primary-btn"
-                disabled={sampleSaving || !sampleDraft.name.trim()}
-                onClick={() => void saveSample()}
+                className="dw-settings-close"
+                onClick={() => setSampleDraft(null)}
               >
-                {t(sampleSaving ? "common.saving" : "common.save")}
+                <X size={16} />
               </button>
+            </header>
+            <div className="dw-api-editor-body">
+              <label className="dw-settings-label">
+                {t("voiceLibrary.name")}
+                <input
+                  className="dw-settings-input"
+                  value={sampleDraft.name}
+                  onChange={(event) => setSampleDraft({ ...sampleDraft, name: event.target.value })}
+                />
+              </label>
+              <div className="dw-resource-file-path">{sampleDraft.sourcePath}</div>
+              <p className="dw-resource-rule">{t("voiceLibrary.clone.rules")}</p>
+              {sampleError && <div className="dw-settings-inline-error">{sampleError}</div>}
             </div>
-          </footer>
-        </dialog>
+            <footer className="dw-api-editor-footer">
+              <span />
+              <div>
+                <button type="button" className="dw-pill-btn" onClick={() => setSampleDraft(null)}>
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="dw-primary-btn"
+                  disabled={sampleSaving || !sampleDraft.name.trim()}
+                  onClick={() => void saveSample()}
+                >
+                  {t(sampleSaving ? "common.saving" : "common.save")}
+                </button>
+              </div>
+            </footer>
+          </ModalLayer.Panel>
+        </ModalLayer>
       )}
       {renameDraft && (
-        <dialog
-          className="dw-api-editor dw-resource-editor"
-          open
-          aria-labelledby="rename-sample-title"
-        >
-          <header className="dw-api-editor-header">
-            <h2 id="rename-sample-title">{t("voiceLibrary.clone.rename")}</h2>
-            <button
-              type="button"
-              className="dw-settings-close"
-              onClick={() => setRenameDraft(null)}
-            >
-              <X size={16} />
-            </button>
-          </header>
-          <div className="dw-api-editor-body">
-            <label className="dw-settings-label">
-              {t("voiceLibrary.name")}
-              <input
-                className="dw-settings-input"
-                value={renameDraft.name}
-                onChange={(event) => setRenameDraft({ ...renameDraft, name: event.target.value })}
-              />
-            </label>
-          </div>
-          <footer className="dw-api-editor-footer">
-            <span />
-            <div>
-              <button type="button" className="dw-pill-btn" onClick={() => setRenameDraft(null)}>
-                {t("common.cancel")}
-              </button>
+        <ModalLayer onClose={() => setRenameDraft(null)}>
+          <ModalLayer.Panel
+            className="dw-api-editor dw-resource-editor dw-resource-compact-editor"
+            aria-labelledby="rename-sample-title"
+          >
+            <header className="dw-api-editor-header">
+              <h2 id="rename-sample-title">{t("voiceLibrary.clone.rename")}</h2>
               <button
                 type="button"
-                className="dw-primary-btn"
-                disabled={!renameDraft.name.trim()}
-                onClick={() => {
-                  renameSample(renameDraft.id, renameDraft.name.trim())
-                  setRenameDraft(null)
-                }}
+                className="dw-settings-close"
+                onClick={() => setRenameDraft(null)}
               >
-                {t("common.save")}
+                <X size={16} />
               </button>
+            </header>
+            <div className="dw-api-editor-body">
+              <label className="dw-settings-label">
+                {t("voiceLibrary.name")}
+                <input
+                  className="dw-settings-input"
+                  value={renameDraft.name}
+                  onChange={(event) => setRenameDraft({ ...renameDraft, name: event.target.value })}
+                />
+              </label>
             </div>
-          </footer>
-        </dialog>
+            <footer className="dw-api-editor-footer">
+              <span />
+              <div>
+                <button type="button" className="dw-pill-btn" onClick={() => setRenameDraft(null)}>
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="dw-primary-btn"
+                  disabled={!renameDraft.name.trim()}
+                  onClick={() => {
+                    renameSample(renameDraft.id, renameDraft.name.trim())
+                    setRenameDraft(null)
+                  }}
+                >
+                  {t("common.save")}
+                </button>
+              </div>
+            </footer>
+          </ModalLayer.Panel>
+        </ModalLayer>
       )}
     </>
   )
@@ -430,6 +434,7 @@ function VoiceDesignEditor({
         voiceDesignPrompt: draft.prompt.trim(),
         voiceClonePath: null,
         performancePrompt: "",
+        audioFormat: getDefaultAudioFormat(config.provider),
       })
       if (draft.previewAudioPath && draft.previewAudioPath !== design.previewAudioPath) {
         cleanupAudioFiles([draft.previewAudioPath])
@@ -477,135 +482,129 @@ function VoiceDesignEditor({
     }
   }
 
+  const handleCancel = () => {
+    if (draft.previewAudioPath && draft.previewAudioPath !== design.previewAudioPath) {
+      cleanupAudioFiles([draft.previewAudioPath])
+    }
+    onCancel()
+  }
+
   return (
-    <dialog className="dw-api-editor dw-resource-editor" open aria-labelledby="design-editor-title">
-      <header className="dw-api-editor-header">
-        <h2 id="design-editor-title">{t("voiceLibrary.design.editorTitle")}</h2>
-        <button
-          type="button"
-          className="dw-settings-close"
-          onClick={() => {
-            if (draft.previewAudioPath && draft.previewAudioPath !== design.previewAudioPath) {
-              cleanupAudioFiles([draft.previewAudioPath])
-            }
-            onCancel()
-          }}
-        >
-          <X size={16} />
-        </button>
-      </header>
-      <div className="dw-api-editor-body">
-        <section
-          className="dw-resource-editor-section"
-          aria-labelledby="voice-design-section-title"
-        >
-          <h3 id="voice-design-section-title">{t("voiceLibrary.design.sectionTitle")}</h3>
-          <label className="dw-settings-label">
-            {t("voiceLibrary.name")}
-            <input
-              className="dw-settings-input"
-              value={draft.name}
-              onChange={(event) => update({ name: event.target.value })}
-            />
-          </label>
-          <label className="dw-settings-label">
-            {t("voiceLibrary.design.prompt")}
-            <textarea
-              className="dw-editor-textarea dw-resource-editor-textarea"
-              value={draft.prompt}
-              maxLength={500}
-              onChange={(event) => update({ prompt: event.target.value }, true)}
-            />
-          </label>
-        </section>
-        <section
-          className="dw-resource-editor-section"
-          aria-labelledby="voice-preview-section-title"
-        >
-          <h3 id="voice-preview-section-title">{t("voiceLibrary.design.previewSectionTitle")}</h3>
-          <label className="dw-settings-label">
-            {t("editor.apiConfig")}
-            <select
-              className="dw-settings-select"
-              value={draft.previewApiConfigId ?? ""}
-              onChange={(event) => update({ previewApiConfigId: event.target.value || null }, true)}
-            >
-              <option value="">{t("editor.selectApiConfig")}</option>
-              {settings.apiConfigs.map((config) => (
-                <option key={config.id} value={config.id}>
-                  {config.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="dw-settings-label">
-            {t("voiceLibrary.previewText")}
-            <textarea
-              className="dw-editor-textarea dw-resource-editor-textarea"
-              value={draft.previewText}
-              maxLength={200}
-              onChange={(event) => update({ previewText: event.target.value }, true)}
-            />
-          </label>
-          <div className="dw-preview-panel">
-            <div className="dw-preview-panel-actions">
-              <button
-                type="button"
-                className="dw-preview-generate-btn"
-                disabled={testing}
-                onClick={() => void test()}
-              >
-                <Sparkles size={13} />
-                {testing ? t("common.testing") : t("voiceLibrary.design.test")}
-              </button>
-              {draft.previewAudioPath && (
+    <ModalLayer onClose={handleCancel}>
+      <ModalLayer.Panel
+        className="dw-api-editor dw-resource-editor"
+        aria-labelledby="design-editor-title"
+      >
+        <header className="dw-api-editor-header">
+          <h2 id="design-editor-title">{t("voiceLibrary.design.editorTitle")}</h2>
+          <button type="button" className="dw-settings-close" onClick={handleCancel}>
+            <X size={16} />
+          </button>
+        </header>
+        <div className="dw-api-editor-body">
+          <section
+            className="dw-resource-editor-section"
+            aria-labelledby="voice-design-section-title"
+          >
+            <h3 id="voice-design-section-title">{t("voiceLibrary.design.sectionTitle")}</h3>
+            <label className="dw-settings-label">
+              {t("voiceLibrary.name")}
+              <input
+                className="dw-settings-input"
+                value={draft.name}
+                onChange={(event) => update({ name: event.target.value })}
+              />
+            </label>
+            <label className="dw-settings-label">
+              {t("voiceLibrary.design.prompt")}
+              <textarea
+                className="dw-editor-textarea dw-resource-editor-textarea"
+                value={draft.prompt}
+                maxLength={500}
+                onChange={(event) => update({ prompt: event.target.value }, true)}
+              />
+            </label>
+          </section>
+          <section
+            className="dw-resource-editor-section"
+            aria-labelledby="voice-preview-section-title"
+          >
+            <h3 id="voice-preview-section-title">{t("voiceLibrary.design.previewSectionTitle")}</h3>
+            <div className="dw-settings-label">
+              {t("editor.apiConfig")}
+              <Select
+                value={draft.previewApiConfigId ?? ""}
+                ariaLabel={t("editor.apiConfig")}
+                options={[
+                  { value: "", label: t("editor.selectApiConfig") },
+                  ...settings.apiConfigs.map((config) => ({
+                    value: config.id,
+                    label: config.name,
+                  })),
+                ]}
+                onValueChange={(value) => update({ previewApiConfigId: value || null }, true)}
+              />
+            </div>
+            <label className="dw-settings-label">
+              {t("voiceLibrary.previewText")}
+              <textarea
+                className="dw-editor-textarea dw-resource-editor-textarea"
+                value={draft.previewText}
+                maxLength={200}
+                onChange={(event) => update({ previewText: event.target.value }, true)}
+              />
+            </label>
+            <div className="dw-preview-panel">
+              <div className="dw-preview-panel-actions">
                 <button
                   type="button"
-                  className="dw-preview-play-btn"
-                  onClick={() => void playPreview()}
+                  className="dw-preview-generate-btn"
+                  disabled={testing}
+                  onClick={() => void test()}
                 >
-                  {playing ? <Pause size={13} /> : <Play size={13} />}
-                  {t(playing ? "sentence.pause" : "sentence.play")}
+                  <Sparkles size={13} />
+                  {testing ? t("common.testing") : t("voiceLibrary.design.test")}
                 </button>
+                {draft.previewAudioPath && (
+                  <button
+                    type="button"
+                    className="dw-preview-play-btn"
+                    onClick={() => void playPreview()}
+                  >
+                    {playing ? <Pause size={13} /> : <Play size={13} />}
+                    {t(playing ? "sentence.pause" : "sentence.play")}
+                  </button>
+                )}
+              </div>
+              {draft.previewAudioPath && (
+                <output className="dw-preview-ready">
+                  <CheckCircle2 size={13} />
+                  <span>{t("voiceLibrary.design.testSuccess")}</span>
+                </output>
               )}
             </div>
-            {draft.previewAudioPath && (
-              <output className="dw-preview-ready">
-                <CheckCircle2 size={13} />
-                <span>{t("voiceLibrary.design.testSuccess")}</span>
-              </output>
-            )}
-          </div>
-        </section>
-        {error && <div className="dw-settings-inline-error">{error}</div>}
-      </div>
-      <footer className="dw-api-editor-footer">
-        <span />
-        <div>
-          <button
-            type="button"
-            className="dw-pill-btn"
-            onClick={() => {
-              if (draft.previewAudioPath && draft.previewAudioPath !== design.previewAudioPath) {
-                cleanupAudioFiles([draft.previewAudioPath])
-              }
-              onCancel()
-            }}
-          >
-            {t("common.cancel")}
-          </button>
-          <button
-            type="button"
-            className="dw-primary-btn"
-            disabled={!draft.name.trim() || !draft.prompt.trim()}
-            onClick={() =>
-              onSave({ ...draft, name: draft.name.trim(), prompt: draft.prompt.trim() })
-            }
-          >
-            {t("common.save")}
-          </button>
+          </section>
+          {error && <div className="dw-settings-inline-error">{error}</div>}
         </div>
-      </footer>
-    </dialog>
+        <footer className="dw-api-editor-footer">
+          <span />
+          <div>
+            <button type="button" className="dw-pill-btn" onClick={handleCancel}>
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="dw-primary-btn"
+              disabled={!draft.name.trim() || !draft.prompt.trim()}
+              onClick={() =>
+                onSave({ ...draft, name: draft.name.trim(), prompt: draft.prompt.trim() })
+              }
+            >
+              {t("common.save")}
+            </button>
+          </div>
+        </footer>
+      </ModalLayer.Panel>
+    </ModalLayer>
   )
 }

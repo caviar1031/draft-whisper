@@ -1,12 +1,14 @@
-import type { TtsMode } from "./project"
+import type { AudioFormatTestResults, ProviderId, TtsMode } from "./tts"
 
-export type ProviderId = "mimo"
-export type LanguagePreference = "system" | "zh-CN" | "en"
+export interface ApiVoice {
+  id: string
+  name: string
+}
 
 export interface CapabilityMapping {
   enabled: boolean
   modelId: string
-  lastVerifiedAt: number | null
+  formatTests: AudioFormatTestResults
 }
 
 export type CapabilityMappings = Record<TtsMode, CapabilityMapping>
@@ -18,4 +20,5 @@ export interface ApiConfig {
   baseUrl: string
   createdAt: number
   capabilities: CapabilityMappings
+  voices: ApiVoice[]
 }
