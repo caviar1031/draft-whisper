@@ -1,6 +1,6 @@
 [package]
 name = "draft-whisper"
-version = "0.1.1"
+version = "0.1.2"
 description = "AI 配音桌面工具 - 一句一句管理你的配音"
 authors = ["caviar1031"]
 license = "MIT"
