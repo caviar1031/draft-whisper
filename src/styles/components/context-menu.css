@@ -1,0 +1,48 @@
+@layer components {
+  /* ===== Context menu (right-click on sentence card) ===== */
+  .dw-context-menu {
+    position: fixed;
+    min-width: 160px;
+    padding: 4px;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--glass-popover-bg);
+    border: 1px solid var(--glass-bg-card);
+    border-radius: 10px;
+    box-shadow: var(--glass-popover-shadow);
+    z-index: 100;
+  }
+
+  .dw-context-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-800);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s ease;
+  }
+
+  .dw-context-item:hover {
+    background: var(--glass-surface-hover);
+  }
+
+  .dw-context-item:active {
+    background: var(--glass-surface-2);
+  }
+
+  .dw-import-count {
+    font-size: 12px;
+    color: var(--text-400);
+    white-space: nowrap;
+  }
+}

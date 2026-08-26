@@ -1,0 +1,59 @@
+@layer utilities {
+  /* macOS desktop wallpaper backdrop */
+  .dw-desktop-bg {
+    background: linear-gradient(
+      135deg,
+      var(--macos-bg-1) 0%,
+      var(--macos-bg-2) 25%,
+      var(--macos-bg-3) 40%,
+      var(--macos-bg-4) 60%,
+      var(--macos-bg-5) 80%,
+      var(--macos-bg-6) 100%
+    );
+    background-attachment: fixed;
+  }
+
+  /* glass surface (window) */
+  .dw-glass {
+    backdrop-filter: blur(36px) saturate(180%);
+    -webkit-backdrop-filter: blur(36px) saturate(180%);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .dw-glass-card {
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
+
+  .dw-glass-popover {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--glass-popover-bg);
+    box-shadow: var(--glass-popover-shadow);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* thin glass scrollbar */
+  .dw-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .dw-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .dw-scroll::-webkit-scrollbar-thumb {
+    background: var(--glass-divider-strong);
+    border-radius: 3px;
+  }
+  .dw-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--glass-bg-card-subtle);
+  }
+}

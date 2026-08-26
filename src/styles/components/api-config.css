@@ -1,0 +1,479 @@
+@layer components {
+  /* ===== Multi-API settings center ===== */
+  .dw-preference-card {
+    overflow: visible;
+    border: 1px solid var(--glass-divider);
+    border-radius: 14px;
+    background: var(--glass-bg-card);
+  }
+
+  .dw-preference-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 8px 14px;
+  }
+
+  .dw-preference-row strong {
+    color: var(--text-700);
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .dw-preference-row p {
+    margin: 3px 0 0;
+    color: var(--text-400);
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .dw-custom-select-trigger.is-compact {
+    width: 142px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+
+  .dw-custom-select-trigger.is-flexible {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dw-models-section-heading {
+    align-items: center;
+  }
+
+  .dw-add-model-btn {
+    width: auto;
+    height: 32px;
+    padding: 0 12px;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .dw-api-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 18px;
+    border: 1px dashed var(--glass-divider-strong);
+    border-radius: 14px;
+    background: var(--glass-surface);
+    color: var(--text-400);
+    text-align: center;
+  }
+
+  .dw-api-empty-state strong {
+    margin-top: 8px;
+    color: var(--text-700);
+    font-size: 12px;
+  }
+
+  .dw-api-empty-state p {
+    margin: 4px 0 12px;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+
+  .dw-api-config-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dw-api-config-card {
+    overflow: hidden;
+    border: 1px solid var(--glass-divider-strong);
+    border-radius: 14px;
+    background: var(--glass-bg-card);
+  }
+
+  .dw-api-config-summary {
+    display: grid;
+    grid-template-columns: 24px 30px minmax(0, 1fr) 26px 26px;
+    align-items: center;
+    gap: 7px;
+    min-height: 54px;
+    padding: 7px 9px;
+  }
+
+  .dw-api-expand-btn,
+  .dw-icon-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-400);
+    cursor: pointer;
+  }
+
+  .dw-api-expand-btn:hover,
+  .dw-icon-action:hover {
+    background: var(--glass-surface-hover);
+    color: var(--text-700);
+  }
+
+  .dw-api-expand-btn svg {
+    transition: transform 0.16s ease;
+  }
+
+  .dw-api-expand-btn svg.is-open {
+    transform: rotate(180deg);
+  }
+
+  .dw-icon-action.is-danger:hover {
+    background: var(--state-error-surface);
+    color: var(--state-error);
+  }
+
+  .dw-api-config-summary .dw-provider-icon {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .dw-api-config-name {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .dw-api-config-name > div {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .dw-api-config-name strong {
+    overflow: hidden;
+    color: var(--text-800);
+    font-size: 12px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dw-api-config-name > span {
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--text-400);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dw-default-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: var(--glass-surface);
+    color: var(--text-400);
+    font-size: 8px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+
+  .dw-api-config-details {
+    position: relative;
+    padding: 10px 12px 12px 46px;
+    border-top: 1px solid var(--glass-divider);
+    background: var(--glass-surface);
+  }
+
+  .dw-api-config-url {
+    margin-bottom: 7px;
+    overflow: hidden;
+    color: var(--text-400);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dw-api-mapping-row {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .dw-api-mapping-row span {
+    color: var(--text-500);
+    font-size: 9px;
+  }
+
+  .dw-set-default-btn {
+    margin-top: 8px;
+  }
+
+  .dw-api-editor {
+    position: fixed;
+    inset: 14px;
+    z-index: 110;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    color: inherit;
+    overflow: hidden;
+    border: 1px solid var(--glass-divider-strong);
+    border-radius: 16px;
+    background: var(--glass-editor-bg);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(24px) saturate(170%);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+  }
+
+  .dw-api-editor-header,
+  .dw-api-editor-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--glass-divider);
+    flex-shrink: 0;
+  }
+
+  .dw-api-editor-header h2 {
+    margin: 0;
+    color: var(--text-800);
+    font-size: 15px;
+    font-weight: 680;
+  }
+
+  .dw-api-editor-header p {
+    margin: 2px 0 0;
+    color: var(--text-400);
+    font-size: 9px;
+  }
+
+  .dw-api-editor-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    padding: 14px;
+    overflow-y: auto;
+  }
+
+  .dw-api-editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .dw-api-editor-section-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 4px;
+  }
+
+  .dw-api-editor-section-title strong {
+    color: var(--text-700);
+    font-size: 12px;
+  }
+
+  .dw-api-editor-section-title span {
+    color: var(--text-400);
+    font-size: 9px;
+  }
+
+  .dw-api-voices-heading {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .dw-api-voices-heading > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .dw-api-voice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .dw-api-voice-row {
+    display: grid;
+    grid-template-columns: minmax(110px, 0.8fr) minmax(160px, 1.2fr) auto;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .dw-api-voice-row .dw-icon-action {
+    width: 30px;
+    height: 30px;
+  }
+
+  .dw-api-capabilities {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .dw-api-capability {
+    padding: 10px;
+    border: 1px solid var(--glass-divider);
+    border-radius: 12px;
+    background: var(--glass-surface);
+    opacity: 0.72;
+  }
+
+  .dw-api-capability.is-enabled {
+    background: var(--glass-bg-card);
+    opacity: 1;
+  }
+
+  .dw-api-capability-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .dw-switch-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-700);
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .dw-switch-label input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .dw-switch-label:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .dw-api-unsupported {
+    color: var(--text-400);
+    font-size: 8px;
+    font-weight: 450;
+  }
+
+  .dw-mini-switch {
+    position: relative;
+    width: 28px;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--background-400);
+    transition: background 0.16s ease;
+  }
+
+  .dw-mini-switch::after {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    content: "";
+    transition: transform 0.16s ease;
+  }
+
+  .dw-switch-label input:checked + .dw-mini-switch {
+    background: var(--state-success);
+  }
+
+  .dw-switch-label input:checked + .dw-mini-switch::after {
+    transform: translateX(12px);
+  }
+
+  .dw-api-model-row,
+  .dw-clone-test-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 8px;
+  }
+
+  .dw-api-model-row .dw-settings-input,
+  .dw-clone-test-row .dw-custom-select-trigger {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dw-api-model-row .dw-pill-btn,
+  .dw-clone-test-row .dw-pill-btn {
+    flex-shrink: 0;
+  }
+
+  .dw-test-result {
+    display: block;
+    margin-top: 6px;
+    font-size: 9px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .dw-test-result.is-success {
+    color: var(--state-success);
+  }
+
+  .dw-test-result.is-error {
+    color: var(--state-error);
+  }
+
+  .dw-format-test-results {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .dw-format-test-result {
+    color: var(--text-400);
+    font-size: 9px;
+  }
+
+  .dw-format-test-result.is-success {
+    color: var(--state-success);
+  }
+
+  .dw-format-test-result.is-error {
+    color: var(--state-error);
+  }
+
+  .dw-api-editor-footer {
+    border-top: 1px solid var(--glass-divider);
+    border-bottom: none;
+    background: var(--glass-surface);
+    color: var(--text-400);
+    font-size: 9px;
+  }
+
+  .dw-api-editor-footer > div {
+    display: flex;
+    gap: 7px;
+  }
+
+  .dw-api-editor-footer .dw-primary-btn {
+    width: auto;
+    padding: 0 14px;
+  }
+}
