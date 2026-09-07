@@ -30,12 +30,12 @@ tauri = { version = "2.11.3", features = ["macos-private-api"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-base64 = "0.22"
+base64 = "0.23"
 tauri-plugin-opener = "2"
 # Windows API Key 安全存储 — 使用系统 Credential Manager
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
-windows = { version = "0.61.3", features = [
+windows = { version = "0.62.2", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
   "Win32_System_Com",
@@ -45,7 +45,7 @@ windows = { version = "0.61.3", features = [
   "Win32_System_SystemServices",
   "Win32_UI_Shell",
 ] }
-windows-core = "0.61.2"
+windows-core = "0.62.2"
 
 # macOS 原生文件拖拽 — 用于将音频文件拖入剪映/Premiere 等剪辑软件
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -53,4 +53,4 @@ objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 # macOS 动态毛玻璃 (Vibrancy) — Tauri 2 直接在 setup 中应用
-window-vibrancy = "0.5"
+window-vibrancy = "0.6"
