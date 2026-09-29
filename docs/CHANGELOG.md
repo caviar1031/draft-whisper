@@ -4,6 +4,9 @@ All notable changes to DraftWhisper will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Keyboard shortcuts for always-on-top, settings, script import/editing, sentence navigation, playback, and editing.
+
 ## [0.1.2] - 2026-08-26
 
 ### Added

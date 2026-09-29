@@ -1,6 +1,7 @@
 import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/audio"
 import type { Sentence } from "@/types/sentence"
 import type { SentenceEditTarget } from "@/utils/director-mode"
+import { keyboardShortcutLabels } from "@/utils/keyboard-shortcuts"
 import {
   Check,
   ChevronDown,
@@ -223,12 +224,37 @@ export function SentenceCard({
   const statusDotClass = `dw-status-dot is-${view}`
   const statusTextClass = `dw-status-text is-${view}`
   const statusLabel = viewLabel(view, queuedLabel, t)
+  const audioPlayable = view === "ready" || view === "playing"
+  const sentenceKeyboardShortcuts = [
+    "ArrowUp",
+    "ArrowDown",
+    ...(audioPlayable ? ["Space"] : []),
+    ...(view === "ready" ? ["E"] : []),
+  ].join(" ")
+  const sentenceKeyboardHint = [
+    `${keyboardShortcutLabels.navigateSentences}: ${t("sentence.keyboardHint")}`,
+    ...(audioPlayable
+      ? [
+          `${keyboardShortcutLabels.playPauseSentence}: ${t("sentence.play")} / ${t("sentence.pause")}`,
+        ]
+      : []),
+    ...(view === "ready" ? [`${keyboardShortcutLabels.editSentence}: ${t("common.edit")}`] : []),
+  ].join(" · ")
 
   return (
     <div
       ref={cardRef}
       className={cardClassName}
       data-sentence-id={sentence.id}
+      data-sentence-playable={audioPlayable ? "true" : undefined}
+      data-sentence-editable={view === "ready" ? "true" : undefined}
+      // biome-ignore lint/a11y/useSemanticElements: Sentence cards group controls outside a form.
+      role="group"
+      aria-label={t("sentence.keyboardGroup", { index: index + 1 })}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: This group is a documented keyboard shortcut focus target.
+      tabIndex={0}
+      aria-keyshortcuts={sentenceKeyboardShortcuts}
+      title={sentenceKeyboardHint}
       onContextMenu={handleContextMenu}
     >
       <div className="dw-drag-handle" onPointerDown={handleDragPointerDown}>

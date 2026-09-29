@@ -3,6 +3,7 @@ import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
 import { TitleBar } from "@/components/dw/title-bar"
 import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
+import { useAppKeyboardShortcuts } from "@/hooks/use-app-keyboard-shortcuts"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useTtsGeneration } from "@/hooks/use-tts-generation"
 import i18n from "@/i18n"
@@ -298,6 +299,10 @@ function App() {
     setScriptEditorOpen(true)
   }, [])
 
+  const handleToggleSettings = useCallback(() => {
+    setSettingsOpen((current) => !current)
+  }, [])
+
   const handleSaveScript = useCallback(
     (text: string) => {
       setScriptEditorOpen(false)
@@ -421,6 +426,18 @@ function App() {
     }
   }, [alwaysOnTop])
 
+  useAppKeyboardShortcuts({
+    settingsOpen,
+    modalOpen: scriptEditorOpen || projectConfigOpen,
+    playingId,
+    onToggleSettings: handleToggleSettings,
+    onOpenScriptEditor: handleOpenScriptEditor,
+    onToggleAlwaysOnTop: handleToggleAlwaysOnTop,
+    onPlay: handlePlay,
+    onPause: handlePause,
+    onEdit: handleEditCard,
+  })
+
   // --- 工具栏 ---
   const toolbarAction: ToolbarAction =
     phase === "complete"
@@ -482,7 +499,7 @@ function App() {
       <TitleBar
         settingsOpen={settingsOpen}
         alwaysOnTop={alwaysOnTop}
-        onToggleSettings={() => setSettingsOpen((v) => !v)}
+        onToggleSettings={handleToggleSettings}
         onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
       />
 
