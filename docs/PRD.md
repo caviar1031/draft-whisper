@@ -1,11 +1,11 @@
-# DraftWhisper PRD（MVP）
+# DraftWhisper PRD（v0.1.2）
 
-**版本：** v0.1.0
+**版本：** v0.1.2
 **产品名称：** DraftWhisper
 **中文名称：** 稿语（暂定）
 **产品类型：** AI 桌面配音工作台（Desktop AI Voice Workspace）
-**目标平台：** macOS（优先）→ Windows
-**文档状态：** MVP
+**目标平台：** macOS（优先）与 Windows
+**文档状态：** v0.1.2 已发布；MVP 已完成，路线图持续更新
 
 ---
 
@@ -102,13 +102,13 @@ MVP 只验证一件事情：
 
 ✓ 声音设计与声音克隆
 
+✓ 多 Provider 架构（MiMo、Fish Audio、第三方自定义配置）
+
 ---
 
 ## 不包含
 
 ✕ AI 智能断句
-
-✓ 多 Provider 架构（MiMo、Fish Audio、第三方自定义配置）
 
 ✕ 云同步
 
@@ -695,37 +695,33 @@ Conventional Commits
 
 # 14. 后续 Roadmap
 
-## v0.2
+### v0.1.x 已交付
 
-* 注册更多 Provider 适配器
-* 快捷键
-* 深色模式
-* 菜单栏模式
+* MiMo、Fish Audio 与 OpenAI SDK 兼容的自定义 TTS Provider
+* 深色模式与中英文界面
+* Windows x64 支持，以及 macOS Apple Silicon / Intel 和 Windows 安装包
+* 多 API 配置、可复用声音设计与克隆样本、逐句导演指令
+* 项目管理、并发生成与每句最近 5 个音频版本
 
----
+### v0.2 近期候选
 
-## v0.5
+* 常用操作快捷键
+* 自动更新能力
+* 菜单栏模式（先根据用户使用场景验证需求）
 
-* AI 智能断句
-* 波形
+### v0.5+ 需求验证后再考虑
 
----
+* AI 智能断句（保留按行编辑作为可预测的默认方式）
+* 基于真实音频数据的波形查看或编辑；当前播放动画不代表波形功能
+* Provider 插件机制
 
-## v0.8
+### 长期探索（暂无版本承诺）
 
-* Windows
-* 多语言
-* 自动更新
-* 插件
-
----
-
-## v1.0
-
-* AI Script Assistant
-* Agent Workflow
-* 时间轴同步
+* AI 脚本助手或 Agent 工作流
+* 与剪辑时间轴同步
 * 云同步
+
+v0.5+ 与长期探索项都是候选方向，不代表版本承诺。优先级以创作者对核心“修改一句、重新生成、试听、交给剪辑”流程的反馈为准。
 
 ---
 
