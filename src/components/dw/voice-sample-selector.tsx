@@ -353,10 +353,11 @@ export function VoiceSampleSelector({
 
       {/* 新增样本：名称输入 */}
       {adding && (
-        <div className="dw-sample-add-row" onKeyDown={handleAddKeyDown}>
+        <div className="dw-sample-add-row">
           <span className="dw-sample-add-label">{t("samples.name")}</span>
           <input
             ref={nameInputRef}
+            onKeyDown={handleAddKeyDown}
             className="dw-sample-name-input"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}

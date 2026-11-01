@@ -242,13 +242,13 @@ export function SentenceCard({
   ].join(" · ")
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Sentence cards group controls outside a form.
     <div
       ref={cardRef}
       className={cardClassName}
       data-sentence-id={sentence.id}
       data-sentence-playable={audioPlayable ? "true" : undefined}
       data-sentence-editable={view === "ready" ? "true" : undefined}
-      // biome-ignore lint/a11y/useSemanticElements: Sentence cards group controls outside a form.
       role="group"
       aria-label={t("sentence.keyboardGroup", { index: index + 1 })}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: This group is a documented keyboard shortcut focus target.

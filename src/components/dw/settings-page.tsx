@@ -81,7 +81,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="dw-settings-page" aria-label={t("settings.title")}>
+    <div className="dw-settings-page">
       <header className="dw-settings-page-header">
         <div>
           <h1 className="dw-settings-page-title">{t("settings.title")}</h1>
@@ -131,7 +131,7 @@ export function SettingsPage() {
               <strong>{t("settings.concurrency")}</strong>
               <p>{t("settings.concurrencyHint")}</p>
             </div>
-            <div className="dw-stepper" aria-label={t("settings.concurrency")}>
+            <div className="dw-stepper">
               <button
                 type="button"
                 onClick={() => settings.setConcurrency(settings.concurrency - 1)}
@@ -139,7 +139,7 @@ export function SettingsPage() {
               >
                 <Minus size={13} />
               </button>
-              <output>{settings.concurrency}</output>
+              <output aria-label={t("settings.concurrency")}>{settings.concurrency}</output>
               <button
                 type="button"
                 onClick={() => settings.setConcurrency(settings.concurrency + 1)}
