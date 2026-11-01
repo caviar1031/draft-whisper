@@ -8,11 +8,14 @@ updates:
       time: "09:00"
       timezone: Asia/Shanghai
     target-branch: develop
-    open-pull-requests-limit: 1
+    open-pull-requests-limit: 5
     groups:
       npm-dependencies:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: cargo
     directory: "/src-tauri"
@@ -22,11 +25,14 @@ updates:
       time: "09:00"
       timezone: Asia/Shanghai
     target-branch: develop
-    open-pull-requests-limit: 1
+    open-pull-requests-limit: 5
     groups:
       cargo-dependencies:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -36,8 +42,11 @@ updates:
       time: "09:00"
       timezone: Asia/Shanghai
     target-branch: develop
-    open-pull-requests-limit: 1
+    open-pull-requests-limit: 5
     groups:
       github-actions-dependencies:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
