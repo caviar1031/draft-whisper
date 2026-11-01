@@ -1,7 +1,7 @@
-import { ModalLayer } from "@/components/ui/modal-layer"
 import { Folder, FolderPlus, Trash2, TriangleAlert, X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { ModalLayer } from "@/components/ui/modal-layer"
 
 interface ProjectConfigCardProps {
   currentProject: string | null

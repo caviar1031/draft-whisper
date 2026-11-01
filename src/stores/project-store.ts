@@ -1,19 +1,19 @@
+import { create } from "zustand"
 import { cleanupAudioFiles, invalidateAudioUrl, revokeAllAudioUrls } from "@/services/audio"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { Project } from "@/types/project"
 import type { Sentence } from "@/types/sentence"
 import type { AudioFormat, TtsMode } from "@/types/tts"
 import {
-  PROJECT_STORAGE_PREFIX,
   createDefaultProject,
   decodePersistedProject,
   loadProjectFromStorage,
+  PROJECT_STORAGE_PREFIX,
   projectStorageKey,
   resolveVoiceForApiConfig,
   saveProjectToStorage,
 } from "@/utils/project-persistence"
 import { resolveAudioFormat } from "@/utils/provider-catalog"
-import { create } from "zustand"
 
 function audioPaths(sentences: Sentence[]): Set<string> {
   const paths = new Set<string>()

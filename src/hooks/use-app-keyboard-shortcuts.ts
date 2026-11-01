@@ -1,5 +1,5 @@
-import { isEditableTarget, isMacOSPlatform } from "@/utils/keyboard-shortcuts"
 import { useEffect } from "react"
+import { isEditableTarget, isMacOSPlatform } from "@/utils/keyboard-shortcuts"
 
 interface UseAppKeyboardShortcutsOptions {
   settingsOpen: boolean

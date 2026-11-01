@@ -1,7 +1,3 @@
-import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/audio"
-import type { Sentence } from "@/types/sentence"
-import type { SentenceEditTarget } from "@/utils/director-mode"
-import { keyboardShortcutLabels } from "@/utils/keyboard-shortcuts"
 import {
   Check,
   ChevronDown,
@@ -21,6 +17,10 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
+import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/audio"
+import type { Sentence } from "@/types/sentence"
+import type { SentenceEditTarget } from "@/utils/director-mode"
+import { keyboardShortcutLabels } from "@/utils/keyboard-shortcuts"
 
 // 卡片可视状态 — 由 status 派生 + 播放/编辑等 UI 状态叠加
 export type CardView = "queued" | "generating" | "ready" | "playing" | "failed" | "editing"

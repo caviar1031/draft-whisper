@@ -1,7 +1,7 @@
 import type { ApiConfig, ApiVoice } from "@/types/api-config"
 import type { LanguagePreference, Settings, ThemePreference } from "@/types/settings"
 import type { AudioFormatTestResults, ProviderId, TtsMode } from "@/types/tts"
-import { PROVIDERS, TTS_MODES, createApiConfig } from "./provider-catalog.ts"
+import { createApiConfig, PROVIDERS, TTS_MODES } from "./provider-catalog.ts"
 
 export const MIN_CONCURRENCY = 1
 export const MAX_CONCURRENCY = 16

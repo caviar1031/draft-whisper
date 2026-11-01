@@ -1,3 +1,7 @@
+import { getCurrentWindow } from "@tauri-apps/api/window"
+import { RefreshCw, TriangleAlert, X } from "lucide-react"
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { EmptyState } from "@/components/dw/empty-state"
 import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
 import { TitleBar } from "@/components/dw/title-bar"
@@ -22,10 +26,6 @@ import { registerTauriListener } from "@/utils/tauri-listener"
 import { applyTheme, getThemeMediaQuery } from "@/utils/theme"
 import { getTtsConfigurationError } from "@/utils/tts-config"
 import { resolveProjectVoiceResources } from "@/utils/voice-resources"
-import { getCurrentWindow } from "@tauri-apps/api/window"
-import { RefreshCw, TriangleAlert, X } from "lucide-react"
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
-import { useTranslation } from "react-i18next"
 
 const SettingsPage = lazy(() =>
   import("@/components/dw/settings-page").then((module) => ({ default: module.SettingsPage })),

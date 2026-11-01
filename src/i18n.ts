@@ -1,6 +1,6 @@
-import { getSystemLanguage } from "@/utils/settings-validation"
 import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
+import { getSystemLanguage } from "@/utils/settings-validation"
 
 const resources = {
   "zh-CN": {

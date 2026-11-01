@@ -10,17 +10,17 @@ import {
   normalizeSentences,
 } from "../src/utils/project-persistence.ts"
 import {
-  PROVIDERS,
   createApiConfig,
   getAvailableAudioFormats,
   getFormatsToTest,
+  PROVIDERS,
   resolveConfigVoice,
 } from "../src/utils/provider-catalog.ts"
 import { parseScriptLines } from "../src/utils/script-lines.ts"
 import {
-  MAX_CONCURRENCY,
   createDefaultSettings,
   isValidHttpUrl,
+  MAX_CONCURRENCY,
   migratePersistedSettings,
   normalizeConcurrency,
   normalizeTheme,

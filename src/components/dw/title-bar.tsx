@@ -1,9 +1,9 @@
-import { isMacOSPlatform, keyboardShortcutLabels } from "@/utils/keyboard-shortcuts"
-import { registerTauriListener } from "@/utils/tauri-listener"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { Settings } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { isMacOSPlatform, keyboardShortcutLabels } from "@/utils/keyboard-shortcuts"
+import { registerTauriListener } from "@/utils/tauri-listener"
 import { AppIcon } from "./app-icon"
 
 // 跨平台标题栏：macOS 保留原生交通灯，Windows 使用与系统视觉一致的自绘标题按钮。
