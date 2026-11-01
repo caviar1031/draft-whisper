@@ -188,20 +188,6 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn preserves_legacy_windows_credential_target_names() {
-        let entry = windows_credential_entry("api-config:compatibility-test").unwrap();
-        let credential = entry
-            .as_any()
-            .downcast_ref::<windows_native_keyring_store::cred::Cred>()
-            .expect("expected a native Windows credential");
-        assert_eq!(
-            credential.target_name,
-            "api-config:compatibility-test.com.draft-whisper.api-key"
-        );
-    }
-
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[test]
     #[ignore = "writes a temporary entry to the system credential store"]
@@ -210,6 +196,18 @@ mod tests {
         let secret = "draft-whisper-credential-test";
         let result = (|| -> Result<(), String> {
             save_credential_account(&account, secret)?;
+            #[cfg(target_os = "windows")]
+            {
+                let attributes = windows_credential_entry(&account)?
+                    .get_attributes()
+                    .map_err(|error| format!("Failed to inspect the test credential: {error}"))?;
+                let expected_target = format!("{account}.{CREDENTIAL_SERVICE}");
+                if attributes.get("target_name") != Some(&expected_target)
+                    || attributes.get("persistence").map(String::as_str) != Some("Enterprise")
+                {
+                    return Err("Windows credential target or persistence changed".into());
+                }
+            }
             let loaded = load_credential_account(&account)?;
             if loaded.as_deref() != Some(secret) {
                 return Err("System credential store returned a different value".into());
