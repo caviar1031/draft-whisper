@@ -4,6 +4,19 @@ All notable changes to DraftWhisper will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-01
+
+### Changed
+- Update frontend, Tauri, native dependencies, and CI actions to current stable releases.
+- Pin Rust 1.99.1 and document the supported Node.js 24 toolchain.
+- Migrate Biome 2 configuration and use Babel for translation-key validation with TypeScript 7.
+- Use the maintained Windows native credential store while preserving existing credential targets.
+- Group compatible Dependabot updates and review major upgrades separately.
+- Remove unused scaffolding styles and CLI dependencies.
+
+### Fixed
+- Correct accessibility labels and scope sample-name keyboard handling to its input.
+
 ### Added
 - Keyboard shortcuts for always-on-top, settings, script import/editing, sentence navigation, playback, and editing.
 
