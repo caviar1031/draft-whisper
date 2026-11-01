@@ -104,7 +104,7 @@ draft-whisper/
 
 ### 前端（TypeScript / React）
 
-- Biome：2 空格缩进、双引号、**无分号**、行宽 100（见 [biome.json](biome.json)）。
+- Biome 2：2 空格缩进、双引号、**无分号**、行宽 100（见 [biome.json](biome.json)）。
 - `verbatimModuleSyntax: true` → 类型导入必须写 `import type { Foo } from "..."`。
 - `noUnusedLocals` / `noUnusedParameters` 开启 → 未用变量/参数会报错。
 - **精准路径导入**：禁止使用根桶文件（不使用 `@/types`、`@/services`、`@/stores`、`@/utils`）。所有导入必须使用精准路径（如 `@/types/tts`、`@/services/audio`、`@/stores/project-store`）。
@@ -112,7 +112,7 @@ draft-whisper/
 
 ### 后端（Rust）
 
-- edition 2021，`rust-version = 1.77.2`。
+- edition 2021，`rust-version = 1.99.1`。
 - 4 空格缩进（遵守 rustfmt 标准格式）。
 - 错误以 `Result<T, String>` 返回给前端（`String` 是给用户看的可读错误）。
 - 命令命名：`snake_case`（Tauri 自动转 camelCase 暴露给前端）。

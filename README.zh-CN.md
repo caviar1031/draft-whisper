@@ -138,8 +138,8 @@ Fish Audio 配置默认使用 `s2.1-pro-free`，并提供可编辑的示例音�
 
 ### 环境要求
 
-- 较新版本的 Node.js 与 npm
-- 与 Tauri 工具链兼容的 Rust 和 Cargo（Rust 1.77.2 或更高版本）
+- Node.js 24.17+（24.x）与 npm 11+（可用 `nvm use` 切换支持的主版本）
+- 与 Tauri 工具链兼容的 Rust 和 Cargo（Rust 1.99.1，由 `rust-toolchain.toml` 固定）
 - 一个 MiMo、Fish Audio 或兼容第三方 TTS API Key
 
 各平台还需要：

@@ -136,8 +136,8 @@ Voice-clone samples are checked locally before storage or upload: they must be v
 
 ### Requirements
 
-- Recent Node.js and npm
-- Rust and Cargo compatible with the Tauri toolchain (Rust 1.77.2 or newer)
+- Node.js 24.17+ (24.x) and npm 11+ (`nvm use` selects the supported major)
+- Rust and Cargo compatible with the Tauri toolchain (Rust 1.99.1, pinned in `rust-toolchain.toml`)
 - A MiMo, Fish Audio, or compatible third-party TTS API key
 
 Platform-specific requirements:

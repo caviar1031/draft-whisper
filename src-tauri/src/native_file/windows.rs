@@ -5,6 +5,8 @@ use std::path::Path;
 use std::{ffi::OsString, os::windows::ffi::OsStrExt, os::windows::ffi::OsStringExt};
 
 #[cfg(target_os = "windows")]
+use windows::core::Free;
+#[cfg(target_os = "windows")]
 use windows::{
     core::{implement, Interface, BOOL, PCWSTR},
     Win32::{
@@ -30,8 +32,6 @@ use windows::{
         },
     },
 };
-#[cfg(target_os = "windows")]
-use windows_core::Free;
 
 #[cfg(target_os = "windows")]
 struct OleApartment;
