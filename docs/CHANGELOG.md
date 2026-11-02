@@ -11,7 +11,7 @@ All notable changes to DraftWhisper will be documented in this file.
 - Pin Rust 1.99.1 and document the supported Node.js 24 toolchain.
 - Migrate Biome 2 configuration and use Babel for translation-key validation with TypeScript 7.
 - Use the maintained Windows native credential store while preserving existing credential targets.
-- Group compatible Dependabot updates and review major upgrades separately.
+- Remove Dependabot version-update automation.
 - Remove unused scaffolding styles and CLI dependencies.
 
 ### Fixed
