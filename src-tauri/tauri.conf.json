@@ -13,7 +13,7 @@
     "macOSPrivateApi": true,
     "withGlobalTauri": false,
     "security": {
-      "csp": "default-src 'self' blob: data: https:; script-src 'self'; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self' blob: data: https:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost blob: data: https:"
     }
   },
   "bundle": {

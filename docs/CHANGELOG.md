@@ -4,7 +4,7 @@ All notable changes to DraftWhisper will be documented in this file.
 
 ## [Unreleased]
 
-## [0.1.3] - 2026-11-01
+## [0.1.3] - 2026-11-02
 
 ### Changed
 - Update frontend, Tauri, native dependencies, and CI actions to current stable releases.
@@ -15,6 +15,7 @@ All notable changes to DraftWhisper will be documented in this file.
 - Remove unused scaffolding styles and CLI dependencies.
 
 ### Fixed
+- Allow Tauri IPC connections explicitly in the content security policy.
 - Correct accessibility labels and scope sample-name keyboard handling to its input.
 
 ### Added
