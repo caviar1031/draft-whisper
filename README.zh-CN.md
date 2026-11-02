@@ -28,7 +28,7 @@ DraftWhisper 是一款桌面配音工具，服务于正在剪视频、做教程�
 
 前往 [GitHub Releases](https://github.com/caviar1031/draft-whisper/releases/latest) 下载最新的桌面发行版。
 
-当前发行版本为 `v0.1.2`，提供 macOS Apple Silicon 与 Intel 的 DMG，以及 Windows x64 的 NSIS 和 MSI 安装包。
+当前发行版本为 `v0.1.3`，提供 macOS Apple Silicon 与 Intel 的 DMG，以及 Windows x64 的 NSIS 和 MSI 安装包。
 
 1. 打开最新的 Release，并展开 **Assets**。
 2. 根据平台选择安装包：

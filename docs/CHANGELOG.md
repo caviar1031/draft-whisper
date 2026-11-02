@@ -15,6 +15,7 @@ All notable changes to DraftWhisper will be documented in this file.
 - Remove unused scaffolding styles and CLI dependencies.
 
 ### Fixed
+- Hydrate the selected project before startup saves can overwrite persisted scripts and audio history.
 - Allow Tauri IPC connections explicitly in the content security policy.
 - Correct accessibility labels and scope sample-name keyboard handling to its input.
 

@@ -26,7 +26,7 @@ With most TTS tools, changing one line means regenerating a long recording, find
 
 Download the latest published desktop build from [GitHub Releases](https://github.com/caviar1031/draft-whisper/releases/latest).
 
-The current `v0.1.2` release includes macOS Apple Silicon and Intel DMGs, plus Windows x64 NSIS and MSI installers.
+The current `v0.1.3` release includes macOS Apple Silicon and Intel DMGs, plus Windows x64 NSIS and MSI installers.
 
 1. Open the latest release and expand **Assets**.
 2. Choose the package for your platform:
