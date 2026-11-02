@@ -26,10 +26,10 @@ With most TTS tools, changing one line means regenerating a long recording, find
 
 Download the latest published desktop build from [GitHub Releases](https://github.com/caviar1031/draft-whisper/releases/latest).
 
-The currently published `v0.1.0` release contains an Apple Silicon DMG. Releases built by the new cross-platform pipeline will add macOS Intel packages and Windows x64 NSIS and MSI installers.
+The current `v0.1.3` release includes macOS Apple Silicon and Intel DMGs, plus Windows x64 NSIS and MSI installers.
 
 1. Open the latest release and expand **Assets**.
-2. For releases produced by the cross-platform pipeline, choose the package for your platform:
+2. Choose the package for your platform:
    - **macOS Apple Silicon:** download the `.dmg` asset whose name contains `aarch64`.
    - **macOS Intel:** download the `.dmg` asset whose name contains `x86_64`.
    - **Windows x64:** download the `-setup.exe` NSIS installer, or the `.msi` installer for managed deployment.
@@ -136,8 +136,8 @@ Voice-clone samples are checked locally before storage or upload: they must be v
 
 ### Requirements
 
-- Recent Node.js and npm
-- Rust and Cargo compatible with the Tauri toolchain (Rust 1.77.2 or newer)
+- Node.js 24.17+ (24.x) and npm 11+ (`nvm use` selects the supported major)
+- Rust and Cargo compatible with the Tauri toolchain (Rust 1.99.1, pinned in `rust-toolchain.toml`)
 - A MiMo, Fish Audio, or compatible third-party TTS API key
 
 Platform-specific requirements:

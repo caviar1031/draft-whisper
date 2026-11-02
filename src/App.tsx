@@ -1,8 +1,13 @@
+import { getCurrentWindow } from "@tauri-apps/api/window"
+import { RefreshCw, TriangleAlert, X } from "lucide-react"
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { EmptyState } from "@/components/dw/empty-state"
 import { type CardView, SentenceCard } from "@/components/dw/sentence-card"
 import { TitleBar } from "@/components/dw/title-bar"
 import { Toolbar, type ToolbarAction } from "@/components/dw/toolbar"
 import { StatusBar, WindowShell } from "@/components/dw/window-shell"
+import { useAppKeyboardShortcuts } from "@/hooks/use-app-keyboard-shortcuts"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useTtsGeneration } from "@/hooks/use-tts-generation"
 import i18n from "@/i18n"
@@ -21,10 +26,6 @@ import { registerTauriListener } from "@/utils/tauri-listener"
 import { applyTheme, getThemeMediaQuery } from "@/utils/theme"
 import { getTtsConfigurationError } from "@/utils/tts-config"
 import { resolveProjectVoiceResources } from "@/utils/voice-resources"
-import { getCurrentWindow } from "@tauri-apps/api/window"
-import { RefreshCw, TriangleAlert, X } from "lucide-react"
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
-import { useTranslation } from "react-i18next"
 
 const SettingsPage = lazy(() =>
   import("@/components/dw/settings-page").then((module) => ({ default: module.SettingsPage })),
@@ -298,6 +299,10 @@ function App() {
     setScriptEditorOpen(true)
   }, [])
 
+  const handleToggleSettings = useCallback(() => {
+    setSettingsOpen((current) => !current)
+  }, [])
+
   const handleSaveScript = useCallback(
     (text: string) => {
       setScriptEditorOpen(false)
@@ -421,6 +426,18 @@ function App() {
     }
   }, [alwaysOnTop])
 
+  useAppKeyboardShortcuts({
+    settingsOpen,
+    modalOpen: scriptEditorOpen || projectConfigOpen,
+    playingId,
+    onToggleSettings: handleToggleSettings,
+    onOpenScriptEditor: handleOpenScriptEditor,
+    onToggleAlwaysOnTop: handleToggleAlwaysOnTop,
+    onPlay: handlePlay,
+    onPause: handlePause,
+    onEdit: handleEditCard,
+  })
+
   // --- 工具栏 ---
   const toolbarAction: ToolbarAction =
     phase === "complete"
@@ -482,7 +499,7 @@ function App() {
       <TitleBar
         settingsOpen={settingsOpen}
         alwaysOnTop={alwaysOnTop}
-        onToggleSettings={() => setSettingsOpen((v) => !v)}
+        onToggleSettings={handleToggleSettings}
         onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
       />
 

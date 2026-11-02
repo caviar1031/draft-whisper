@@ -1,15 +1,3 @@
-import { Select } from "@/components/ui/select"
-import {
-  cleanupAudioFiles,
-  deleteVoiceSample,
-  readAudioAsUrl,
-  saveVoiceSample,
-} from "@/services/audio"
-import { previewVoiceClone } from "@/services/tts"
-import { clearVoiceSampleReferences } from "@/stores/project-store"
-import { useSettingsStore } from "@/stores/settings-store"
-import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import { getDefaultAudioFormat } from "@/utils/provider-catalog"
 import { open } from "@tauri-apps/plugin-dialog"
 import {
   Check,
@@ -25,6 +13,18 @@ import {
 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { Select } from "@/components/ui/select"
+import {
+  cleanupAudioFiles,
+  deleteVoiceSample,
+  readAudioAsUrl,
+  saveVoiceSample,
+} from "@/services/audio"
+import { previewVoiceClone } from "@/services/tts"
+import { clearVoiceSampleReferences } from "@/stores/project-store"
+import { useSettingsStore } from "@/stores/settings-store"
+import { useVoiceSampleStore } from "@/stores/voice-sample-store"
+import { getDefaultAudioFormat } from "@/utils/provider-catalog"
 
 interface VoiceSampleSelectorProps {
   selectedPath: string | null
@@ -353,10 +353,11 @@ export function VoiceSampleSelector({
 
       {/* 新增样本：名称输入 */}
       {adding && (
-        <div className="dw-sample-add-row" onKeyDown={handleAddKeyDown}>
+        <div className="dw-sample-add-row">
           <span className="dw-sample-add-label">{t("samples.name")}</span>
           <input
             ref={nameInputRef}
+            onKeyDown={handleAddKeyDown}
             className="dw-sample-name-input"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}

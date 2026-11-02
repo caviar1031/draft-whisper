@@ -28,10 +28,10 @@ DraftWhisper 是一款桌面配音工具，服务于正在剪视频、做教程�
 
 前往 [GitHub Releases](https://github.com/caviar1031/draft-whisper/releases/latest) 下载最新的桌面发行版。
 
-当前已发布的 `v0.1.0` 仅包含 Apple Silicon DMG。使用新的跨平台流水线构建下一版本后，Release 将增加 macOS Intel，以及 Windows x64 的 NSIS 和 MSI 安装包。
+当前发行版本为 `v0.1.3`，提供 macOS Apple Silicon 与 Intel 的 DMG，以及 Windows x64 的 NSIS 和 MSI 安装包。
 
 1. 打开最新的 Release，并展开 **Assets**。
-2. 对于新跨平台流水线生成的 Release，根据平台选择安装包：
+2. 根据平台选择安装包：
    - **macOS Apple Silicon：** 下载名称中包含 `aarch64` 的 `.dmg`。
    - **macOS Intel：** 下载名称中包含 `x86_64` 的 `.dmg`。
    - **Windows x64：** 下载 NSIS `-setup.exe` 安装程序；需要集中部署时也可以使用 `.msi`。
@@ -138,8 +138,8 @@ Fish Audio 配置默认使用 `s2.1-pro-free`，并提供可编辑的示例音�
 
 ### 环境要求
 
-- 较新版本的 Node.js 与 npm
-- 与 Tauri 工具链兼容的 Rust 和 Cargo（Rust 1.77.2 或更高版本）
+- Node.js 24.17+（24.x）与 npm 11+（可用 `nvm use` 切换支持的主版本）
+- 与 Tauri 工具链兼容的 Rust 和 Cargo（Rust 1.99.1，由 `rust-toolchain.toml` 固定）
 - 一个 MiMo、Fish Audio 或兼容第三方 TTS API Key
 
 各平台还需要：

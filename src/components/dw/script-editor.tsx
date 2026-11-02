@@ -1,3 +1,6 @@
+import { X } from "lucide-react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { ModalLayer } from "@/components/ui/modal-layer"
 import { Select } from "@/components/ui/select"
 import type { ApiConfig } from "@/types/api-config"
@@ -5,9 +8,6 @@ import type { AudioFormat, TtsMode } from "@/types/tts"
 import type { VoiceCloneSample, VoiceDesignPreset } from "@/types/voice-resource"
 import { AUDIO_FORMATS, getAvailableAudioFormats } from "@/utils/provider-catalog"
 import { parseScriptLines } from "@/utils/script-lines"
-import { X } from "lucide-react"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { useTranslation } from "react-i18next"
 
 type EditorTab = "script" | "voice"
 

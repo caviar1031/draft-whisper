@@ -1,15 +1,15 @@
+import { create } from "zustand"
+import { persist } from "zustand/middleware"
 import { deleteApiKey, loadApiKey, migrateLegacyApiKey, saveApiKey } from "@/services/credentials"
 import type { ApiConfig } from "@/types/api-config"
 import type { LanguagePreference, Settings, ThemePreference } from "@/types/settings"
 import { createApiConfig } from "@/utils/provider-catalog"
 import {
-  LEGACY_API_CONFIG_ID,
   createDefaultSettings,
+  LEGACY_API_CONFIG_ID,
   migratePersistedSettings,
   normalizeConcurrency,
 } from "@/utils/settings-validation"
-import { create } from "zustand"
-import { persist } from "zustand/middleware"
 
 interface SettingsState extends Settings {
   apiKeys: Record<string, string>

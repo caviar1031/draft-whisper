@@ -1,8 +1,9 @@
-import { registerTauriListener } from "@/utils/tauri-listener"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { Settings } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { isMacOSPlatform, keyboardShortcutLabels } from "@/utils/keyboard-shortcuts"
+import { registerTauriListener } from "@/utils/tauri-listener"
 import { AppIcon } from "./app-icon"
 
 // 跨平台标题栏：macOS 保留原生交通灯，Windows 使用与系统视觉一致的自绘标题按钮。
@@ -97,8 +98,9 @@ export function TitleBar({
             type="button"
             className={`dw-nav-btn${settingsOpen ? " is-active" : ""}`}
             aria-label={t("app.settings")}
-            title={t("app.settings")}
+            title={`${t("app.settings")} (${keyboardShortcutLabels.openSettings})`}
             aria-pressed={settingsOpen}
+            aria-keyshortcuts={isMacOSPlatform ? "Meta+," : "Control+,"}
             onClick={onToggleSettings}
           >
             <Settings size={16} strokeWidth={2} />
@@ -107,8 +109,9 @@ export function TitleBar({
             type="button"
             className={`dw-toggle-pill${alwaysOnTop ? " is-active" : ""}`}
             aria-label={t("app.alwaysOnTop")}
-            title={t("app.alwaysOnTop")}
+            title={`${t("app.alwaysOnTop")} (${keyboardShortcutLabels.toggleAlwaysOnTop})`}
             aria-pressed={alwaysOnTop}
+            aria-keyshortcuts={isMacOSPlatform ? "Meta+Shift+T" : "Control+Shift+T"}
             onClick={onToggleAlwaysOnTop}
           >
             <span className="dw-toggle-dot" />

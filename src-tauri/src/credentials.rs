@@ -76,8 +76,13 @@ fn delete_credential_account(account: &str) -> Result<(), String> {
 static WINDOWS_CREDENTIAL_STORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(target_os = "windows")]
-fn windows_credential_entry(account: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(CREDENTIAL_SERVICE, account)
+fn windows_credential_entry(account: &str) -> Result<keyring_core::Entry, String> {
+    use keyring_core::api::CredentialStoreApi;
+
+    // The default store preserves keyring 3's "{user}.{service}" target names
+    // and Enterprise persistence, so existing API keys remain accessible.
+    windows_native_keyring_store::Store::new()
+        .and_then(|store| store.build(CREDENTIAL_SERVICE, account, None))
         .map_err(|error| format!("Failed to access Windows Credential Manager: {error}"))
 }
 
@@ -94,7 +99,7 @@ fn load_credential_account(account: &str) -> Result<Option<String>, String> {
     let entry = windows_credential_entry(account)?;
     match entry.get_password() {
         Ok(key) => Ok((!key.is_empty()).then_some(key)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring_core::Error::NoEntry) => Ok(None),
         Err(error) => Err(format!(
             "Failed to load API key from Windows Credential Manager: {error}"
         )),
@@ -114,7 +119,7 @@ fn delete_credential_account(account: &str) -> Result<(), String> {
     let _guard = lock_windows_credential_store()?;
     match windows_credential_entry(account)?.delete_credential() {
         Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => {
+        Err(keyring_core::Error::NoEntry) => {
             log::warn!("Windows Credential Manager entry did not exist: {account}");
             Ok(())
         }
@@ -183,24 +188,36 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[test]
-    #[ignore = "writes a temporary entry to Windows Credential Manager"]
-    fn stores_api_keys_in_windows_credential_manager() {
+    #[ignore = "writes a temporary entry to the system credential store"]
+    fn stores_api_keys_in_system_credential_store() {
         let account = format!("integration-test-{}", std::process::id());
-        let secret = "draft-whisper-windows-credential-test";
+        let secret = "draft-whisper-credential-test";
         let result = (|| -> Result<(), String> {
             save_credential_account(&account, secret)?;
+            #[cfg(target_os = "windows")]
+            {
+                let attributes = windows_credential_entry(&account)?
+                    .get_attributes()
+                    .map_err(|error| format!("Failed to inspect the test credential: {error}"))?;
+                let expected_target = format!("{account}.{CREDENTIAL_SERVICE}");
+                if attributes.get("target_name") != Some(&expected_target)
+                    || attributes.get("persistence").map(String::as_str) != Some("Enterprise")
+                {
+                    return Err("Windows credential target or persistence changed".into());
+                }
+            }
             let loaded = load_credential_account(&account)?;
             if loaded.as_deref() != Some(secret) {
-                return Err("Windows Credential Manager returned a different value".into());
+                return Err("System credential store returned a different value".into());
             }
             Ok(())
         })();
         let cleanup = delete_credential_account(&account);
 
-        result.expect("failed to round-trip a Windows credential");
-        cleanup.expect("failed to remove the temporary Windows credential");
+        result.expect("failed to round-trip a system credential");
+        cleanup.expect("failed to remove the temporary system credential");
         assert_eq!(load_credential_account(&account).unwrap(), None);
     }
 }
