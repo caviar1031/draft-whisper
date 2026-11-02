@@ -1,5 +1,5 @@
-import type { SavedVoiceSample } from "@/types/voice-resource"
 import { invoke } from "@tauri-apps/api/core"
+import type { SavedVoiceSample } from "@/types/voice-resource"
 
 // ---- Blob URL 缓存 ----------------------------------------------------
 // 同一句重新生成会用相同路径覆盖文件，缓存中对应 URL 即失效。

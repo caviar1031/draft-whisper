@@ -2,99 +2,89 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import test from "node:test"
-import * as ts from "typescript"
+import { parse } from "@babel/parser"
+import * as ast from "@babel/types"
 
 const projectRoot = path.resolve(import.meta.dirname, "..")
 const sourceRoot = path.join(projectRoot, "src")
 const i18nPath = path.join(sourceRoot, "i18n.ts")
 
-function unwrap(node: ts.Node | undefined): ts.Node | undefined {
-  let current = node
+function parseSource(filePath: string): ast.File {
+  return parse(fs.readFileSync(filePath, "utf8"), {
+    sourceType: "module",
+    plugins: filePath.endsWith(".tsx") ? ["typescript", "jsx"] : ["typescript"],
+  })
+}
+
+function unwrap(node: ast.Node | null | undefined): ast.Node | undefined {
+  let current = node ?? undefined
   while (
-    current &&
-    (ts.isAsExpression(current) ||
-      ts.isParenthesizedExpression(current) ||
-      ts.isTypeAssertionExpression(current))
+    ast.isTSAsExpression(current) ||
+    ast.isTSSatisfiesExpression(current) ||
+    ast.isParenthesizedExpression(current) ||
+    ast.isTSTypeAssertion(current)
   ) {
     current = current.expression
   }
   return current
 }
 
-function getPropertyName(node: ts.ObjectLiteralElementLike): string | null {
-  if (!node.name) return null
-  if (ts.isIdentifier(node.name)) return node.name.text
-  if (ts.isStringLiteral(node.name) || ts.isNumericLiteral(node.name)) return node.name.text
+function getPropertyName(node: ast.ObjectProperty): string | null {
+  if (node.computed) return null
+  if (ast.isIdentifier(node.key)) return node.key.name
+  if (ast.isStringLiteral(node.key) || ast.isNumericLiteral(node.key)) return String(node.key.value)
   return null
 }
 
-function getObjectProperty(object: ts.Node | undefined, name: string): ts.Node | undefined {
+function getObjectProperty(object: ast.Node | undefined, name: string): ast.Node | undefined {
   const unwrapped = unwrap(object)
-  if (!unwrapped || !ts.isObjectLiteralExpression(unwrapped)) return undefined
-
+  if (!ast.isObjectExpression(unwrapped)) return undefined
   for (const property of unwrapped.properties) {
-    if (ts.isPropertyAssignment(property) && getPropertyName(property) === name) {
-      return unwrap(property.initializer)
+    if (ast.isObjectProperty(property) && getPropertyName(property) === name) {
+      return unwrap(property.value)
     }
   }
   return undefined
 }
 
-function getResourceObject(sourceFile: ts.SourceFile): ts.Node | undefined {
-  let resourceObject: ts.Node | undefined
-
-  function visit(node: ts.Node) {
-    if (resourceObject) return
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === "resources"
-    ) {
-      resourceObject = unwrap(node.initializer)
-      return
+function getResourceObject(sourceFile: ast.File): ast.Node | undefined {
+  let resourceObject: ast.Node | undefined
+  ast.traverseFast(sourceFile, (node) => {
+    if (ast.isVariableDeclarator(node) && ast.isIdentifier(node.id, { name: "resources" })) {
+      resourceObject = unwrap(node.init)
     }
-    ts.forEachChild(node, visit)
-  }
-
-  visit(sourceFile)
+  })
   return resourceObject
 }
 
 function flattenObjectKeys(
-  object: ts.Node | undefined,
+  object: ast.Node | undefined,
   prefix = "",
   keys = new Set<string>(),
 ): Set<string> {
   const unwrapped = unwrap(object)
-  if (!unwrapped || !ts.isObjectLiteralExpression(unwrapped)) return keys
-
+  if (!ast.isObjectExpression(unwrapped)) return keys
   for (const property of unwrapped.properties) {
-    if (!ts.isPropertyAssignment(property)) continue
+    if (!ast.isObjectProperty(property)) continue
     const name = getPropertyName(property)
     if (name === null) continue
-
     const key = prefix ? `${prefix}.${name}` : name
-    const value = unwrap(property.initializer)
-    if (value && ts.isObjectLiteralExpression(value)) flattenObjectKeys(value, key, keys)
+    const value = unwrap(property.value)
+    if (ast.isObjectExpression(value)) flattenObjectKeys(value, key, keys)
     else keys.add(key)
   }
-
   return keys
 }
 
-function getStaticKeysFromArgument(argument: ts.Expression | undefined, keys: Set<string>) {
-  if (!argument) return
-  if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) {
-    keys.add(argument.text)
-    return
-  }
-  if (ts.isConditionalExpression(argument)) {
-    getStaticKeysFromArgument(argument.whenTrue, keys)
-    getStaticKeysFromArgument(argument.whenFalse, keys)
-    return
-  }
-  if (ts.isParenthesizedExpression(argument) || ts.isAsExpression(argument)) {
-    getStaticKeysFromArgument(argument.expression, keys)
+function getStaticKeysFromArgument(argument: ast.Node | undefined, keys: Set<string>) {
+  const value = unwrap(argument)
+  if (ast.isStringLiteral(value)) {
+    keys.add(value.value)
+  } else if (ast.isTemplateLiteral(value) && value.expressions.length === 0) {
+    keys.add(value.quasis[0].value.cooked ?? value.quasis[0].value.raw)
+  } else if (ast.isConditionalExpression(value)) {
+    getStaticKeysFromArgument(value.consequent, keys)
+    getStaticKeysFromArgument(value.alternate, keys)
   }
 }
 
@@ -110,57 +100,35 @@ function listSourceFiles(directory: string): string[] {
 
 function collectStaticTranslationKeys(): Set<string> {
   const keys = new Set<string>()
-
   for (const filePath of listSourceFiles(sourceRoot)) {
-    const source = fs.readFileSync(filePath, "utf8")
-    const sourceFile = ts.createSourceFile(
-      filePath,
-      source,
-      ts.ScriptTarget.Latest,
-      true,
-      filePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-    )
-
-    function visit(node: ts.Node) {
-      if (ts.isCallExpression(node)) {
-        const expression = node.expression
-        const isTranslationCall =
-          (ts.isIdentifier(expression) && expression.text === "t") ||
-          (ts.isPropertyAccessExpression(expression) && expression.name.text === "t")
-        if (isTranslationCall) getStaticKeysFromArgument(node.arguments[0], keys)
-      }
-      ts.forEachChild(node, visit)
-    }
-
-    visit(sourceFile)
+    ast.traverseFast(parseSource(filePath), (node) => {
+      if (!ast.isCallExpression(node)) return
+      const expression = node.callee
+      const isTranslationCall =
+        ast.isIdentifier(expression, { name: "t" }) ||
+        (ast.isMemberExpression(expression) &&
+          !expression.computed &&
+          ast.isIdentifier(expression.property, { name: "t" }))
+      if (isTranslationCall) getStaticKeysFromArgument(node.arguments[0], keys)
+    })
   }
-
   return keys
 }
 
 test("all static translation calls exist in both locales", () => {
-  const source = fs.readFileSync(i18nPath, "utf8")
-  const sourceFile = ts.createSourceFile(
-    i18nPath,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  )
-  const resources = getResourceObject(sourceFile)
+  const resources = getResourceObject(parseSource(i18nPath))
+  assert.ok(resources, "Translation resources must be found")
+  const usedKeys = collectStaticTranslationKeys()
+  assert.ok(usedKeys.size > 0, "Translation calls must be found")
   const missing: string[] = []
-
-  for (const [locale, keys] of ["zh-CN", "en"].map(
-    (locale) =>
-      [
-        locale,
-        flattenObjectKeys(getObjectProperty(getObjectProperty(resources, locale), "translation")),
-      ] as const,
-  )) {
-    for (const key of collectStaticTranslationKeys()) {
+  for (const locale of ["zh-CN", "en"]) {
+    const keys = flattenObjectKeys(
+      getObjectProperty(getObjectProperty(resources, locale), "translation"),
+    )
+    assert.ok(keys.size > 0, `Translation resources must exist for ${locale}`)
+    for (const key of usedKeys) {
       if (!keys.has(key)) missing.push(`${locale}:${key}`)
     }
   }
-
   assert.deepEqual(missing, [])
 })

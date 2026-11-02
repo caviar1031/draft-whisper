@@ -1,5 +1,6 @@
 import { ArrowRight, CirclePlay, Clapperboard, File, Pencil } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { isMacOSPlatform, keyboardShortcutLabels } from "@/utils/keyboard-shortcuts"
 
 // 工具栏主操作类型
 export type ToolbarAction = {
@@ -36,7 +37,13 @@ export function Toolbar({
   return (
     <div className="dw-toolbar">
       <div className="dw-toolbar-left">
-        <button type="button" className="dw-pill-btn" onClick={onOpenScriptEditor}>
+        <button
+          type="button"
+          className="dw-pill-btn"
+          title={`${t(hasContent ? "app.editProject" : "app.importScript")} (${keyboardShortcutLabels.openScriptEditor})`}
+          aria-keyshortcuts={isMacOSPlatform ? "Meta+O" : "Control+O"}
+          onClick={onOpenScriptEditor}
+        >
           {hasContent ? <Pencil size={14} strokeWidth={2} /> : <File size={14} strokeWidth={2} />}
           {t(hasContent ? "app.editProject" : "app.importScript")}
         </button>
@@ -62,13 +69,7 @@ export function Toolbar({
   )
 }
 
-function ActionButton({
-  action,
-  onAction,
-}: {
-  action: ToolbarAction
-  onAction: () => void
-}) {
+function ActionButton({ action, onAction }: { action: ToolbarAction; onAction: () => void }) {
   const { t } = useTranslation()
   if (action.kind === "generate") {
     return (

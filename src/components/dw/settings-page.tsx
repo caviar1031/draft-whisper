@@ -1,13 +1,3 @@
-import { ModalLayer } from "@/components/ui/modal-layer"
-import { Select } from "@/components/ui/select"
-import i18n from "@/i18n"
-import { countApiConfigReferences, reassignApiConfigReferences } from "@/stores/project-store"
-import { useSettingsStore } from "@/stores/settings-store"
-import type { ApiConfig } from "@/types/api-config"
-import type { LanguagePreference, ThemePreference } from "@/types/settings"
-import type { ProviderId } from "@/types/tts"
-import { PROVIDERS, TTS_MODES, createApiConfig } from "@/utils/provider-catalog"
-import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
 import {
   ChevronDown,
   ChevronRight,
@@ -21,6 +11,16 @@ import {
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { ModalLayer } from "@/components/ui/modal-layer"
+import { Select } from "@/components/ui/select"
+import i18n from "@/i18n"
+import { countApiConfigReferences, reassignApiConfigReferences } from "@/stores/project-store"
+import { useSettingsStore } from "@/stores/settings-store"
+import type { ApiConfig } from "@/types/api-config"
+import type { LanguagePreference, ThemePreference } from "@/types/settings"
+import type { ProviderId } from "@/types/tts"
+import { createApiConfig, PROVIDERS, TTS_MODES } from "@/utils/provider-catalog"
+import { MAX_CONCURRENCY, MIN_CONCURRENCY, resolveLanguage } from "@/utils/settings-validation"
 import { ApiConfigEditor } from "./api-config-editor"
 import { VoiceLibrarySection } from "./voice-library-section"
 
@@ -81,7 +81,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="dw-settings-page" aria-label={t("settings.title")}>
+    <div className="dw-settings-page">
       <header className="dw-settings-page-header">
         <div>
           <h1 className="dw-settings-page-title">{t("settings.title")}</h1>
@@ -131,7 +131,7 @@ export function SettingsPage() {
               <strong>{t("settings.concurrency")}</strong>
               <p>{t("settings.concurrencyHint")}</p>
             </div>
-            <div className="dw-stepper" aria-label={t("settings.concurrency")}>
+            <div className="dw-stepper">
               <button
                 type="button"
                 onClick={() => settings.setConcurrency(settings.concurrency - 1)}
@@ -139,7 +139,7 @@ export function SettingsPage() {
               >
                 <Minus size={13} />
               </button>
-              <output>{settings.concurrency}</output>
+              <output aria-label={t("settings.concurrency")}>{settings.concurrency}</output>
               <button
                 type="button"
                 onClick={() => settings.setConcurrency(settings.concurrency + 1)}

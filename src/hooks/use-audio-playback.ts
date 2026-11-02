@@ -1,6 +1,6 @@
+import { useCallback, useEffect, useRef, useState } from "react"
 import { getCachedAudioUrl, readAudioAsUrl } from "@/services/audio"
 import { useProjectStore } from "@/stores/project-store"
-import { useCallback, useEffect, useRef, useState } from "react"
 
 export function useAudioPlayback() {
   const updateSentence = useProjectStore((s) => s.updateSentence)

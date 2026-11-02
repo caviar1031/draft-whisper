@@ -1,5 +1,5 @@
-import type { TtsParams, TtsResult } from "@/types/tts"
 import { invoke } from "@tauri-apps/api/core"
+import type { TtsParams, TtsResult } from "@/types/tts"
 import { invalidateAudioUrl } from "./audio"
 
 /**

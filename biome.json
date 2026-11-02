@@ -1,22 +1,27 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "organizeImports": {
-    "enabled": true
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "files": {
-    "ignore": [
-      "**/node_modules/**",
-      "dist/**",
-      "src-tauri/target/**",
-      "src-tauri/gen/**",
-      "src-tauri/icons/draft-whisper.icon/**",
-      ".cache/**"
+    "includes": [
+      "**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc}",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/src-tauri/target",
+      "!**/src-tauri/gen",
+      "!**/src-tauri/icons/draft-whisper.icon",
+      "!**/.cache"
     ]
   },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "correctness": {
         "noUnusedImports": "error",
         "noUnusedVariables": "error"

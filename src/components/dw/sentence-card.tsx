@@ -1,6 +1,3 @@
-import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/audio"
-import type { Sentence } from "@/types/sentence"
-import type { SentenceEditTarget } from "@/utils/director-mode"
 import {
   Check,
   ChevronDown,
@@ -20,6 +17,10 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
+import { copyAudioToClipboard, nativeDragFile, showInFinder } from "@/services/audio"
+import type { Sentence } from "@/types/sentence"
+import type { SentenceEditTarget } from "@/utils/director-mode"
+import { keyboardShortcutLabels } from "@/utils/keyboard-shortcuts"
 
 // 卡片可视状态 — 由 status 派生 + 播放/编辑等 UI 状态叠加
 export type CardView = "queued" | "generating" | "ready" | "playing" | "failed" | "editing"
@@ -223,12 +224,37 @@ export function SentenceCard({
   const statusDotClass = `dw-status-dot is-${view}`
   const statusTextClass = `dw-status-text is-${view}`
   const statusLabel = viewLabel(view, queuedLabel, t)
+  const audioPlayable = view === "ready" || view === "playing"
+  const sentenceKeyboardShortcuts = [
+    "ArrowUp",
+    "ArrowDown",
+    ...(audioPlayable ? ["Space"] : []),
+    ...(view === "ready" ? ["E"] : []),
+  ].join(" ")
+  const sentenceKeyboardHint = [
+    `${keyboardShortcutLabels.navigateSentences}: ${t("sentence.keyboardHint")}`,
+    ...(audioPlayable
+      ? [
+          `${keyboardShortcutLabels.playPauseSentence}: ${t("sentence.play")} / ${t("sentence.pause")}`,
+        ]
+      : []),
+    ...(view === "ready" ? [`${keyboardShortcutLabels.editSentence}: ${t("common.edit")}`] : []),
+  ].join(" · ")
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Sentence cards group controls outside a form.
     <div
       ref={cardRef}
       className={cardClassName}
       data-sentence-id={sentence.id}
+      data-sentence-playable={audioPlayable ? "true" : undefined}
+      data-sentence-editable={view === "ready" ? "true" : undefined}
+      role="group"
+      aria-label={t("sentence.keyboardGroup", { index: index + 1 })}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: This group is a documented keyboard shortcut focus target.
+      tabIndex={0}
+      aria-keyshortcuts={sentenceKeyboardShortcuts}
+      title={sentenceKeyboardHint}
       onContextMenu={handleContextMenu}
     >
       <div className="dw-drag-handle" onPointerDown={handleDragPointerDown}>

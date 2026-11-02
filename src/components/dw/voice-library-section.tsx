@@ -1,18 +1,3 @@
-import { ModalLayer } from "@/components/ui/modal-layer"
-import { Select } from "@/components/ui/select"
-import {
-  cleanupAudioFiles,
-  deleteVoiceSample,
-  readAudioAsUrl,
-  saveVoiceSample,
-} from "@/services/audio"
-import { previewVoice } from "@/services/tts"
-import { clearVoiceResourceReferences } from "@/stores/project-store"
-import { useSettingsStore } from "@/stores/settings-store"
-import { useVoiceDesignStore } from "@/stores/voice-design-store"
-import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { VoiceDesignPreset } from "@/types/voice-resource"
-import { getDefaultAudioFormat, resolveCapability } from "@/utils/provider-catalog"
 import { open } from "@tauri-apps/plugin-dialog"
 import {
   CheckCircle2,
@@ -28,6 +13,21 @@ import {
 } from "lucide-react"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { ModalLayer } from "@/components/ui/modal-layer"
+import { Select } from "@/components/ui/select"
+import {
+  cleanupAudioFiles,
+  deleteVoiceSample,
+  readAudioAsUrl,
+  saveVoiceSample,
+} from "@/services/audio"
+import { previewVoice } from "@/services/tts"
+import { clearVoiceResourceReferences } from "@/stores/project-store"
+import { useSettingsStore } from "@/stores/settings-store"
+import { useVoiceDesignStore } from "@/stores/voice-design-store"
+import { useVoiceSampleStore } from "@/stores/voice-sample-store"
+import type { VoiceDesignPreset } from "@/types/voice-resource"
+import { getDefaultAudioFormat, resolveCapability } from "@/utils/provider-catalog"
 
 function resourceId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`

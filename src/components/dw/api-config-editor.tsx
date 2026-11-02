@@ -1,17 +1,3 @@
-import { ModalLayer } from "@/components/ui/modal-layer"
-import { Select } from "@/components/ui/select"
-import { saveVoiceSample } from "@/services/audio"
-import { testTts } from "@/services/tts"
-import { useVoiceSampleStore } from "@/stores/voice-sample-store"
-import type { ApiConfig } from "@/types/api-config"
-import type { AudioFormat, AudioFormatTestResults, ProviderId, TtsMode } from "@/types/tts"
-import {
-  PROVIDERS,
-  TTS_MODES,
-  applyProviderPreset,
-  getFormatsToTest,
-} from "@/utils/provider-catalog"
-import { validateApiConfig } from "@/utils/settings-validation"
 import { open } from "@tauri-apps/plugin-dialog"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import {
@@ -28,6 +14,20 @@ import {
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { ModalLayer } from "@/components/ui/modal-layer"
+import { Select } from "@/components/ui/select"
+import { saveVoiceSample } from "@/services/audio"
+import { testTts } from "@/services/tts"
+import { useVoiceSampleStore } from "@/stores/voice-sample-store"
+import type { ApiConfig } from "@/types/api-config"
+import type { AudioFormat, AudioFormatTestResults, ProviderId, TtsMode } from "@/types/tts"
+import {
+  applyProviderPreset,
+  getFormatsToTest,
+  PROVIDERS,
+  TTS_MODES,
+} from "@/utils/provider-catalog"
+import { validateApiConfig } from "@/utils/settings-validation"
 
 type TestStatus = { state: "idle" | "testing" | "success" | "error"; error?: string }
 

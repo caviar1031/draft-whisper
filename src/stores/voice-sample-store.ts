@@ -1,6 +1,6 @@
-import type { VoiceCloneSample } from "@/types/voice-resource"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
+import type { VoiceCloneSample } from "@/types/voice-resource"
 
 interface VoiceSampleState {
   samples: VoiceCloneSample[]
