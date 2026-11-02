@@ -37,7 +37,7 @@ tauri-plugin-opener = "2.7.2"
 keyring-core = "1.0.1"
 windows-native-keyring-store = { version = "1.1.0", default-features = false }
 # Keep the COM macro support crate aligned with the Windows bindings.
-windows-core = "0.62.2"
+windows-core = "0.100.0"
 windows = { version = "0.62.2", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
